@@ -8,12 +8,18 @@
 
 ## 1. Visão geral
 
-SaaS no estilo ERP voltado para varejo de pequeno e médio porte (a confirmar o segmento), com:
+SaaS no estilo ERP voltado para varejo de pequeno e médio porte. **Piloto: lojas de roupas.**
 
-- **Controle de estoque**
+Escopo do piloto:
+
+- **Controle de estoque** com grade (tamanho × cor)
 - **Controle financeiro**
-- **PDV (Ponto de Venda)**
 - **Web** (operação completa) + **Mobile** (somente leitura, para o dono acompanhar a empresa em tempo real)
+
+Fora do escopo do piloto (em estudo):
+
+- **PDV** e **emissão fiscal** (NFC-e/NF-e) — o fiscal é o maior risco do projeto; será estudado à parte antes de entrar no roadmap (ver 4.4 e 4.5).
+- **Lote e validade** — não se aplica a loja de roupas.
 
 Por ser SaaS, **multi-tenant** desde o primeiro dia: várias empresas (clientes) usando a mesma instalação, com dados isolados.
 
@@ -32,9 +38,9 @@ Por ser SaaS, **multi-tenant** desde o primeiro dia: várias empresas (clientes)
 | CI/CD | GitHub Actions | Build + testes obrigatórios em todo PR |
 | Metodologia | **TDD first** | Teste antes do código, sempre |
 
-**[ABERTO]**
-- Autenticação: Identity próprio (ASP.NET Core Identity + JWT) vs. provedor externo (Keycloak, Auth0, Clerk). Sugestão inicial: ASP.NET Identity + JWT/refresh token, para não depender de terceiros no começo.
-- Monorepo (tudo neste repositório) vs. repositórios separados. Sugestão: **monorepo** (ver seção 9).
+**Decidido:**
+- Autenticação: **ASP.NET Core Identity + JWT com refresh token** (sem provedor externo por enquanto).
+- **Monorepo** — backend, web e mobile neste repositório (ver seção 9).
 
 ---
 
@@ -78,7 +84,7 @@ Tenant (cliente do SaaS / assinatura)
            └── Usuários com perfis (Dono, Gerente, Operador de caixa, Estoquista, Financeiro)
 ```
 
-**[ABERTO]** Um tenant pode ter mais de um CNPJ? (Ex.: dono com duas lojas em CNPJs diferentes.) Sugestão: sim, já modelar assim.
+**Decidido:** um tenant pode ter **mais de um CNPJ** (ex.: dono com duas lojas em CNPJs diferentes). Já modelar assim desde o início.
 
 ---
 
@@ -87,10 +93,39 @@ Tenant (cliente do SaaS / assinatura)
 ### 4.1 Cadastros base
 
 - **Produtos:** código interno, código de barras (EAN/GTIN), descrição, unidade, preço de venda, preço de custo, categoria, marca, dados fiscais (NCM, CEST, origem), ativo/inativo.
-- **Variações (grade):** ex.: camiseta P/M/G × cor. Cada combinação é um **SKU** com estoque próprio. **[ABERTO]** precisa de grade no MVP? (depende do segmento — roupa/calçado sim, mercadinho não.)
+- **Variações (grade) — obrigatório no piloto:** ver 4.1.1.
 - **Unidades e conversão:** compra em CX com 12, vende em UN.
 - **Clientes e fornecedores:** pessoa física/jurídica, CPF/CNPJ, contatos, endereço. Normalmente uma única entidade "Pessoa" com papéis.
 - **Usuários e permissões:** perfis + permissões granulares (ex.: "dar desconto acima de 10%", "cancelar venda").
+
+#### 4.1.1 Grade de produtos (loja de roupas)
+
+É o coração do cadastro em loja de roupas. Modelo:
+
+```
+Produto (modelo)         -> "Camiseta Básica Gola V" — descrição, marca, categoria, coleção, preço base, NCM futuro
+ └── SKU (variação)      -> Camiseta Básica Gola V / Azul / M — código de barras próprio, estoque próprio
+```
+
+- **Atributos de grade:** começar com **Tamanho** e **Cor** (dois eixos). Modelar de forma genérica (atributo + valores) para permitir um terceiro eixo no futuro (ex.: comprimento/numeração de calça 38–48).
+- **Grades de tamanho reutilizáveis:** cadastrar "grades" padrão — *PP–GG*, *36–48* (calça), *1–16* (infantil), *Único* — e aplicar ao produto. A grade define também a **ordem de exibição** (P antes de M, não alfabético).
+- **Geração automática de SKUs:** ao criar o produto, escolher grade de tamanhos + cores → sistema gera todas as combinações; o usuário pode desativar combinações que não existem.
+- **Código de barras por SKU:** EAN do fornecedor quando houver; senão, **código interno gerado** pelo sistema (ex.: EAN-13 com prefixo "2", reservado para uso interno).
+- **Preço:** definido no produto; **opcionalmente sobrescrito por SKU** (ex.: tamanhos plus mais caros).
+- **Precificação por markup:** preço de venda sugerido = custo × markup (ex.: 2,0 a 2,5 é comum em moda). Markup padrão por categoria.
+- **Coleção / estação:** ex.: "Verão 2027". Permite relatórios de giro por coleção e decisão de liquidação.
+- **Referência do fornecedor:** guardar o código do fornecedor para facilitar a recompra.
+- **Fotos:** foto por produto e, opcionalmente, por cor.
+- **Impressão de etiquetas:** etiqueta com código de barras, tamanho, cor e preço — gerada na entrada de mercadoria (quantidade = quantidade recebida por SKU). Etiquetas são essenciais para o futuro PDV.
+
+**Visualização em matriz:** o estoque de um produto deve ser exibido como tabela **cor × tamanho**, que é como o lojista pensa:
+
+| Cor \ Tam. | P | M | G | GG |
+|---|---|---|---|---|
+| Azul | 3 | 5 | 2 | 0 |
+| Preto | 4 | 6 | 4 | 1 |
+
+A entrada de mercadoria também deve permitir digitar quantidades nessa matriz.
 
 ### 4.2 Estoque
 
@@ -100,8 +135,8 @@ Tenant (cliente do SaaS / assinatura)
 
 | Tipo | Origem típica | Efeito |
 |---|---|---|
-| Entrada por compra | Nota fiscal do fornecedor (importar XML da NF-e) | + saldo, recalcula custo |
-| Saída por venda | PDV / pedido | − saldo |
+| Entrada por compra | Lançamento manual na matriz de grade (MVP); importação do XML da NF-e do fornecedor (futuro) | + saldo, recalcula custo |
+| Saída por venda | Registro de venda (ver 4.4 e pergunta 1 da seção 11) | − saldo |
 | Devolução de cliente | Troca/devolução | + saldo |
 | Devolução a fornecedor | Avaria/erro | − saldo |
 | Ajuste | Perda, quebra, furto, vencimento (com motivo obrigatório) | ± saldo |
@@ -111,12 +146,11 @@ Tenant (cliente do SaaS / assinatura)
 **Regras importantes:**
 - **Custo médio ponderado:** é o método mais usado no Brasil (e aceito pelo fisco). A cada entrada: `novo_custo = (saldo_atual × custo_atual + qtd_entrada × custo_entrada) / (saldo_atual + qtd_entrada)`. Base do lucro bruto e do CMV.
 - **Estoque mínimo / ponto de reposição:** alerta quando o saldo cai abaixo do limite.
-- **Estoque negativo:** permitir ou bloquear? No PDV costuma-se **permitir com alerta** (não travar a fila do caixa por cadastro errado). **[ABERTO]** configurável por empresa.
+- **Estoque negativo:** **configurável por empresa**; padrão = permitir com alerta (não travar a venda por erro de cadastro/contagem).
 - **Reserva:** pedido aprovado reserva quantidade (saldo disponível = físico − reservado). Pode ficar para depois do MVP.
-- **Lote e validade:** essencial para farmácia/alimentos. **[ABERTO]** depende do segmento.
 - **Inventário:** congela uma "foto" do saldo, contagem (pode ser por coletor/celular), comparação, aprovação, ajuste.
 
-**Relatórios:** posição de estoque, kardex (extrato por produto), curva ABC, produtos parados, valor total em estoque.
+**Relatórios:** posição de estoque (em matriz cor × tamanho), kardex (extrato por SKU), curva ABC, produtos parados, valor total em estoque, **giro por coleção**, **quebra de grade** (produto que acabou em tamanhos-chave como M e G, mas ainda tem P e GG — sinal de reposição ou liquidação).
 
 ### 4.3 Financeiro
 
@@ -143,7 +177,11 @@ Tenant (cliente do SaaS / assinatura)
 
 **Relatórios:** fluxo de caixa (previsto × realizado), DRE simplificado, contas vencidas/a vencer, inadimplência.
 
-### 4.4 PDV (Ponto de Venda)
+### 4.4 PDV (Ponto de Venda) — ⏸️ FORA DO PILOTO (em estudo)
+
+> Decisão de 2026-10-13: PDV fica à parte até o estudo do fiscal ser concluído. O conteúdo abaixo é **material de referência** para esse estudo.
+>
+> Particularidades de loja de roupas para quando o PDV voltar: **troca** é muito frequente (troca por outro tamanho/cor, vale-troca/crédito do cliente), **condicional** (cliente leva peças para provar em casa e devolve o que não quiser) e **vendedor/comissão** por venda.
 
 Fluxo de um dia típico de caixa:
 
@@ -174,9 +212,9 @@ Fluxo de um dia típico de caixa:
 - **B)** PDV web com fila local (IndexedDB/Service Worker) e sincronização posterior + NFC-e em contingência.
 - **C)** PDV como app desktop (Electron/Tauri) com banco local.
 
-Sugestão: MVP com **A**, já desenhando os comandos de venda para serem **idempotentes** (ID gerado no cliente), o que facilita evoluir para **B**.
+Sugestão (quando o PDV entrar): começar com **A**, já desenhando os comandos de venda para serem **idempotentes** (ID gerado no cliente), o que facilita evoluir para **B**.
 
-### 4.5 Fiscal (Brasil) — atenção especial
+### 4.5 Fiscal (Brasil) — ⏸️ FORA DO PILOTO (em estudo, maior risco do projeto)
 
 É a parte mais complexa e a que mais muda. Itens envolvidos:
 - **NFC-e** (cupom fiscal eletrônico, venda ao consumidor no PDV) e **NF-e** (venda para empresa, entrada de mercadoria).
@@ -188,16 +226,24 @@ Sugestão: MVP com **A**, já desenhando os comandos de venda para serem **idemp
 
 **Sugestão forte:** **não implementar a comunicação com a SEFAZ do zero.** Usar uma API fiscal terceirizada (ex.: Focus NFe, PlugNotas, NFE.io, Nuvem Fiscal) atrás de uma interface própria (`IEmissorFiscal`), para poder trocar de fornecedor. Validar regras tributárias com um contador.
 
-**[ABERTO]** Fiscal entra no MVP? Sem NFC-e, o PDV não pode ser usado "de verdade" pela maioria dos varejistas.
+**Decidido:** fiscal **não** entra no piloto. Quando entrar, será via API terceirizada atrás de `IEmissorFiscal`.
+
+**Preparação já no piloto (barato e evita retrabalho):** o cadastro de produto já reserva campos fiscais opcionais (NCM, origem, CEST) e a empresa já guarda o regime tributário — sem nenhuma regra fiscal implementada.
+
+**Roteiro de estudo sugerido:**
+1. Conversar com um contador que atenda lojas de roupas (regime típico: Simples Nacional).
+2. Entender NFC-e × NF-e e quando cada uma é exigida no estado do piloto.
+3. Avaliar 2–3 APIs fiscais (preço por nota, ambiente de homologação, SDK/REST, suporte à reforma tributária).
+4. Fazer uma **prova de conceito isolada** emitindo NFC-e em homologação, fora do código principal.
 
 ### 4.6 Dashboard / Mobile (somente leitura)
 
 O que o dono quer ver no celular:
 - **Vendas do dia** (total, quantidade, ticket médio) — comparação com ontem/semana passada.
 - Vendas por loja, por vendedor, por forma de pagamento.
-- **Caixas abertos** e status.
+- **Estoque:** valor total, quebras de grade, mais vendidos por cor/tamanho.
 - **Saldo financeiro** atual, contas a pagar/receber de hoje e da semana, vencidas.
-- **Alertas:** estoque baixo, produtos sem giro, diferenças de caixa, cancelamentos acima do normal.
+- **Alertas:** estoque baixo, produtos sem giro, contas vencendo/vencidas.
 - Produtos mais vendidos.
 
 **Técnico:**
@@ -212,16 +258,17 @@ O que o dono quer ver no celular:
 
 ```mermaid
 flowchart LR
-    Compra[Entrada NF-e fornecedor] -->|+ estoque, custo médio| Estoque
+    Compra[Entrada de mercadoria - matriz de grade] -->|+ estoque, custo médio| Estoque
     Compra -->|gera conta a pagar| Financeiro
-    PDV[Venda no PDV] -->|- estoque| Estoque
-    PDV -->|caixa ou recebível| Financeiro
-    PDV -->|NFC-e| Fiscal[API Fiscal / SEFAZ]
+    Venda[Registro de venda - a definir] -->|- estoque| Estoque
+    Venda -->|caixa ou recebível| Financeiro
+    PDV[PDV + Fiscal - futuro]:::futuro -.-> Venda
     Estoque --> Dashboard
     Financeiro --> Dashboard
-    PDV --> Dashboard
+    Venda --> Dashboard
     Dashboard --> Web
     Dashboard --> Mobile[App mobile - leitura]
+    classDef futuro stroke-dasharray: 5 5
 ```
 
 ---
@@ -235,7 +282,7 @@ flowchart LR
 | Unitário | xUnit + Shouldly/AwesomeAssertions + NSubstitute | Vitest + Testing Library |
 | Integração | WebApplicationFactory + **Testcontainers** (PostgreSQL real em container) | MSW (mock de API) |
 | Arquitetura | NetArchTest (garante fronteiras entre módulos e camadas) | — |
-| E2E | — | Playwright (fluxos críticos: venda no PDV, entrada de nota) |
+| E2E | — | Playwright (fluxos críticos: cadastro de produto com grade, entrada de mercadoria, baixa de título) |
 
 - Domínio puro (regras de estoque, custo médio, cálculo de troco, parcelas) é o lugar ideal para TDD — sem banco, sem HTTP.
 - Testes de integração com banco **real** (não in-memory), para pegar problemas de SQL, RLS e migrations.
@@ -294,7 +341,7 @@ kamusErp/
 │   │   │   ├── Cadastros/
 │   │   │   ├── Estoque/
 │   │   │   ├── Financeiro/
-│   │   │   ├── Vendas/         # PDV
+│   │   │   ├── Vendas/         # registro de vendas (PDV no futuro)
 │   │   │   └── Identidade/
 │   │   └── Shared/             # kernel compartilhado (Result, tenant, eventos)
 │   ├── web/                    # React + TS + Tailwind (Vite)
@@ -309,33 +356,36 @@ kamusErp/
 
 ---
 
-## 10. Roadmap sugerido (a validar)
+## 10. Roadmap do piloto (loja de roupas)
 
 | Fase | Entrega |
 |---|---|
-| **0 — Fundação** | Repositório, solução .NET, Docker Compose, CI, auth, multi-tenancy, primeiro teste verde |
-| **1 — Cadastros** | Empresa/loja, usuários e perfis, produtos, clientes/fornecedores |
-| **2 — Estoque** | Movimentações, saldo, custo médio, ajustes, kardex, alertas de mínimo |
-| **3 — PDV** | Abertura/fechamento de caixa, venda, pagamentos múltiplos, sangria/suprimento (sem fiscal) |
-| **4 — Financeiro** | Contas a pagar/receber, baixas, contas financeiras, formas de pagamento com taxa, fluxo de caixa |
-| **5 — Dashboard + Mobile** | Read models, KPIs na web, app mobile somente leitura |
-| **6 — Fiscal** | NFC-e/NF-e via API terceira, importação de XML de entrada |
-| **7 — Produção** | Deploy na VPS, backups, monitoramento, primeiro cliente piloto |
+| **0 — Fundação** | Repositório, solução .NET, Docker Compose, CI, auth (Identity + JWT), multi-tenancy (`tenant_id` + RLS), primeiro teste verde |
+| **1 — Cadastros** | Tenant/empresas (multi-CNPJ)/lojas, usuários e perfis, clientes/fornecedores, **produtos com grade** (tamanho × cor), geração de SKUs, códigos de barras internos |
+| **2 — Estoque** | Movimentações, saldo, custo médio, entrada de mercadoria em matriz, ajustes, transferência entre lojas, inventário, kardex, etiquetas, alertas |
+| **3 — Financeiro** | Contas a pagar/receber, parcelas, baixas, contas financeiras, plano de contas, formas de pagamento com taxa, recorrência, fluxo de caixa, DRE simplificado |
+| **4 — Registro de vendas** | Forma de dar saída de estoque e gerar receita sem PDV (depende da pergunta 1 abaixo) |
+| **5 — Dashboard + Mobile** | Read models, KPIs na web, app mobile somente leitura, push de alertas |
+| **6 — Produção** | Deploy na VPS, backups, monitoramento, primeira loja piloto |
+| *Futuro* | *PDV + Fiscal (após o estudo), importação de XML de NF-e de entrada, condicional, trocas/vale-troca, conciliação bancária* |
 
 ---
 
 ## 11. Perguntas em aberto (para a próxima conversa)
 
-1. **Segmento-alvo:** qual tipo de loja? (roupas, mercado, materiais de construção, farmácia, autopeças...) Isso decide grade, lote/validade, balança, etc.
-2. **Tamanho do cliente:** loja única ou redes com várias filiais?
-3. **Fiscal no MVP:** sim ou não? Tem contato com um contador para validar regras?
-4. **PDV offline:** aceita PDV online-only no começo?
-5. **Pagamentos:** qual adquirente/maquininha integrar primeiro? PIX direto com banco ou via intermediador?
-6. **Vendas fora do PDV:** haverá pedidos/orçamentos (venda balcão com entrega, venda para empresas)?
-7. **Compras:** precisa de pedido de compra ao fornecedor, ou só a entrada da nota?
-8. **Modelo de cobrança do SaaS:** por loja, por usuário, por plano/módulos? (afeta a modelagem de tenant e permissões)
-9. **Idioma/moeda:** só Brasil (pt-BR, BRL) ou pensar em internacionalização?
-10. **Autenticação:** própria ou provedor externo?
+1. **Como as vendas entram no sistema sem PDV?** Sem vendas, o estoque não baixa e o dashboard não tem faturamento. Opções:
+   - **A)** Tela simples de **"registro de venda"** no backoffice (itens + forma de pagamento), sem emissão fiscal — a loja continua emitindo nota no sistema que já usa.
+   - **B)** **Importar** as vendas do PDV/sistema fiscal que a loja já usa (planilha/CSV ou XML das NFC-e emitidas).
+   - **C)** Piloto só com estoque + financeiro, e vendas lançadas como baixa de estoque + receita manual.
+
+   Sugestão: **A**, desenhada como o "núcleo" de venda que o futuro PDV vai reaproveitar (o PDV vira só uma interface mais rápida + fiscal por cima).
+2. **Tamanho do cliente piloto:** loja única ou várias lojas? (define a prioridade de transferência entre lojas)
+3. **Já existe uma loja piloto?** Que sistema/planilha ela usa hoje? (ajuda a entender a migração de dados e o que mais dói)
+4. **Compras:** precisa de pedido de compra ao fornecedor, ou só a entrada de mercadoria?
+5. **Vendedores e comissão:** entram no piloto? (comum em loja de roupas)
+6. **Crediário próprio / "fiado":** a loja vende a prazo direto ao cliente? (impacta contas a receber e cadastro de cliente)
+7. **Modelo de cobrança do SaaS:** por loja, por usuário, por plano/módulos?
+8. **Idioma/moeda:** só Brasil (pt-BR, BRL) ou pensar em internacionalização?
 
 ---
 
@@ -344,6 +394,10 @@ kamusErp/
 | Termo | Significado |
 |---|---|
 | **SKU** | Unidade de controle de estoque (produto + variação) |
+| **Grade** | Conjunto de variações de um produto (tamanhos × cores) |
+| **Quebra de grade** | Quando faltam tamanhos/cores-chave de um produto que ainda tem estoque em outros |
+| **Markup** | Multiplicador aplicado ao custo para formar o preço de venda |
+| **Condicional** | Cliente leva peças para provar em casa e devolve o que não quiser |
 | **Kardex** | Extrato de movimentações de um produto |
 | **CMV** | Custo da Mercadoria Vendida |
 | **Curva ABC** | Classificação de produtos pela relevância no faturamento |
@@ -370,7 +424,13 @@ kamusErp/
 | 2026-10-13 | TDD first em todo o projeto | Aceita |
 | 2026-10-13 | CI/CD com GitHub Actions | Aceita |
 | 2026-10-13 | Mobile somente leitura na primeira versão | Aceita |
-| 2026-10-13 | Monólito modular | Proposta |
-| 2026-10-13 | Multi-tenant com `tenant_id` + Global Query Filter + RLS | Proposta |
-| 2026-10-13 | Monorepo | Proposta |
-| 2026-10-13 | Fiscal via API terceirizada atrás de interface própria | Proposta |
+| 2026-10-13 | Monólito modular | Aceita |
+| 2026-10-13 | Multi-tenant com `tenant_id` + Global Query Filter + RLS | Aceita |
+| 2026-10-13 | Monorepo | Aceita |
+| 2026-10-13 | Fiscal via API terceirizada atrás de interface própria (quando entrar) | Aceita |
+| 2026-10-13 | Autenticação com ASP.NET Core Identity + JWT/refresh token | Aceita |
+| 2026-10-13 | Tenant pode ter múltiplos CNPJs | Aceita |
+| 2026-10-13 | Estoque negativo configurável por empresa (padrão: permite com alerta) | Aceita |
+| 2026-10-13 | Segmento do piloto: **loja de roupas** (grade tamanho × cor obrigatória) | Aceita |
+| 2026-10-13 | Lote e validade fora do escopo | Aceita |
+| 2026-10-13 | **PDV e Fiscal fora do piloto** — em estudo separado | Aceita |
