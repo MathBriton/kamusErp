@@ -54,6 +54,10 @@ cd src/web && npm test              # frontend
 
 TDD first: todo código de produção nasce de um teste que falhou antes.
 
+## Versões e releases
+
+Versionamento semântico automático a partir de [Conventional Commits](https://www.conventionalcommits.org/pt-br/) (`feat:`, `fix:`, `docs:`...). Cada release gera tag, changelog e imagens Docker no GHCR. Detalhes em [docs/RELEASES.md](docs/RELEASES.md). A versão em execução aparece em `GET /api/versao`.
+
 ## Estrutura
 
 ```
