@@ -40,7 +40,7 @@ Por ser SaaS, **multi-tenant** desde o primeiro dia: várias empresas (clientes)
 
 **Decidido:**
 - Autenticação: **ASP.NET Core Identity + JWT com refresh token** (sem provedor externo por enquanto).
-- **Monorepo** — backend, web e mobile neste repositório (ver seção 9).
+- **Monorepo** — backend, web e mobile neste repositório (ver seção 10).
 
 ---
 
@@ -136,7 +136,7 @@ A entrada de mercadoria também deve permitir digitar quantidades nessa matriz.
 | Tipo | Origem típica | Efeito |
 |---|---|---|
 | Entrada por compra | Lançamento manual na matriz de grade (MVP); importação do XML da NF-e do fornecedor (futuro) | + saldo, recalcula custo |
-| Saída por venda | Registro de venda (ver 4.4 e pergunta 1 da seção 11) | − saldo |
+| Saída por venda | Registro de venda (ver 4.4 e pergunta 1 da seção 12) | − saldo |
 | Devolução de cliente | Troca/devolução | + saldo |
 | Devolução a fornecedor | Avaria/erro | − saldo |
 | Ajuste | Perda, quebra, furto, vencimento (com motivo obrigatório) | ± saldo |
@@ -254,7 +254,184 @@ O que o dono quer ver no celular:
 
 ---
 
-## 5. Fluxo integrado
+## 5. Fundação da aplicação (dia 1)
+
+Itens transversais que existem **antes** de qualquer módulo de negócio. Todos entram na Fase 0 do roadmap e seguem TDD como o resto.
+
+### 5.1 Login e usuário de teste
+
+- **Tela de login** (e-mail + senha) com ASP.NET Core Identity.
+- **Tokens:** access token JWT de curta duração (~15 min) + **refresh token em cookie `HttpOnly`/`Secure`** com rotação. Nada de token em `localStorage`.
+- **Segurança mínima desde o início:** senha com hash (padrão do Identity), bloqueio após N tentativas erradas, rate limit no endpoint de login, log de acesso (data, IP, sucesso/falha).
+- **Usuário de teste via seed — somente em ambiente `Development`:**
+  - Tenant "Loja Demo" com **2 CNPJs** (para testar o seletor de empresa), 1 loja em cada, produtos com grade, alguns títulos financeiros e notificações de exemplo.
+  - Usuário: `admin@kamus.local`. A senha vem de variável de ambiente (`SEED_ADMIN_PASSWORD`), com valor padrão definido no `.env.example` — **nunca** senha real versionada no repositório.
+  - O seed **não roda** em produção (verificação de ambiente + teste automatizado garantindo isso).
+- **Um usuário pode acessar várias empresas** do mesmo tenant, com perfis possivelmente diferentes em cada uma.
+- **Depois (não dia 1):** "esqueci minha senha" (exige envio de e-mail), 2FA para o perfil Dono.
+
+### 5.2 Shell da aplicação (layout)
+
+```
+┌──────────────┬──────────────────────────────────────────────────────────────┐
+│  KAMUS       │ [🔍 Pesquisar...  Ctrl+K]   [Empresa: Loja Centro ▾] [🔔 3] [☀/🌙] [👤] │
+│              ├──────────────────────────────────────────────────────────────┤
+│ ▣ Dashboard  │                                                              │
+│ ▤ Cadastros ▸│                                                              │
+│ ▥ Estoque   ▸│                    Conteúdo da página                         │
+│ $ Financeiro▸│                                                              │
+│ ▦ Relatórios │                                                              │
+│ ⚙ Config.    │                                                              │
+│              │                                                              │
+│ [«] recolher │                                                              │
+└──────────────┴──────────────────────────────────────────────────────────────┘
+```
+
+**Sidebar (esquerda):**
+- Menu por módulo, com submenus; item ativo destacado.
+- **Recolhível** (só ícones) — preferência salva por usuário.
+- Itens **filtrados por permissão** (o usuário só vê o que pode acessar). O menu é definido em um único lugar (configuração), não espalhado pelo código.
+- Em telas pequenas vira **drawer** (abre pelo botão ☰).
+
+**Topbar:**
+- **Pesquisa global** (ver 5.3).
+- **Seletor de empresa/CNPJ** (ver 5.4).
+- **Sininho de notificações** (ver 5.5).
+- **Alternador de tema** (ver 5.7).
+- **Menu do usuário:** perfil, preferências, sair.
+- **Breadcrumb** abaixo da topbar (Estoque › Produtos › Camiseta Gola V).
+
+**Componentes:** sugestão de usar **shadcn/ui** (componentes copiados para o projeto, baseados em Radix + Tailwind). Já traz sidebar, dropdown, command palette (cmdk), dialogs, tabelas e suporte nativo a dark mode — acelera muito o shell sem prender a uma biblioteca fechada.
+
+### 5.3 Pesquisa global
+
+- Atalho **Ctrl+K / ⌘K** abre uma "command palette".
+- Pesquisa em uma só caixa: **produtos** (nome, referência, **código de barras/SKU**), **clientes**, **fornecedores**, **títulos financeiros** (número, valor) e também **telas/ações** ("nova entrada de mercadoria", "contas a pagar").
+- Resultados agrupados por tipo, navegação por teclado, últimos itens acessados quando a busca está vazia.
+- **Backend:** endpoint único `GET /api/search?q=` que consulta cada módulo (cada módulo expõe seu "provedor de busca"). PostgreSQL com extensões **`unaccent`** (ignora acentos) e **`pg_trgm`** (busca por trecho/erro de digitação), com índices.
+- Respeita **tenant, empresa ativa e permissões** — nunca retorna o que o usuário não pode ver (teste automatizado para isso).
+
+### 5.4 Seletor de empresa (troca de CNPJ)
+
+- Dropdown na topbar com as empresas que o usuário tem acesso (nome fantasia + CNPJ formatado).
+- **Empresa ativa** enviada em toda requisição (header `X-Empresa-Id`) e **validada no backend** contra os acessos do usuário — o frontend nunca é a fonte da verdade.
+- Ao trocar: todos os dados em cache no frontend são descartados e a tela recarrega no contexto da nova empresa; a última empresa usada fica salva.
+- Opção **"Todas as empresas" (visão consolidada)** para o perfil Dono — apenas em telas de leitura (dashboard, relatórios). Lançamentos sempre exigem uma empresa específica.
+- Se o usuário tiver só uma empresa, o dropdown aparece apenas informativo.
+
+### 5.5 Notificações (sininho)
+
+- Badge com contador de não lidas; painel com lista, "marcar como lida" e "marcar todas".
+- Clique leva ao item relacionado (ex.: produto com estoque baixo, título vencendo).
+- **Tempo real via SignalR** (WebSocket) — o contador atualiza sem recarregar a página. Mesmo canal será reaproveitado pelo dashboard.
+- **Modelo:** tabela `notificacoes` (tenant, empresa, usuário destinatário ou perfil, tipo, título, mensagem, link, lida_em, criada_em). Qualquer módulo cria notificações via um serviço comum.
+- **Tipos iniciais:** estoque baixo / quebra de grade, contas a pagar vencendo hoje, contas vencidas, **exportação de relatório pronta** (5.6), **licença vencendo** (5.8).
+- **Depois:** preferências por tipo (o que recebe e por qual canal), e-mail e push no mobile.
+
+### 5.6 Exportação de relatórios (PDF e Excel)
+
+**Princípio:** a tela e a exportação usam **a mesma consulta**. Um relatório é definido uma vez e renderizado em formatos diferentes.
+
+```
+Consulta do relatório  ->  ReportData (colunas, tipos, linhas, totais, filtros aplicados)
+                                 ├── PdfExporter   (QuestPDF)
+                                 ├── ExcelExporter (ClosedXML)
+                                 └── CsvExporter   (de brinde)
+```
+
+- **Geração no backend** (não no navegador): dados grandes, formatação consistente e o mesmo resultado na web e no mobile.
+- **Bibliotecas sugeridas:**
+  - **QuestPDF** — PDF por código C#, ótimo para layout. *Licença Community gratuita para empresas com faturamento abaixo de US$ 1 milhão/ano; verificar ao crescer.*
+  - **ClosedXML** — Excel (.xlsx), licença MIT.
+- **Padrão visual de todo relatório:** cabeçalho com logo, razão social e CNPJ da empresa ativa, nome do relatório, **filtros aplicados**, data/hora de geração e usuário; rodapé com paginação; totais no fim.
+- **Excel de verdade:** números como número (não texto), datas como data, moeda formatada em R$, cabeçalho congelado, filtro automático, largura de coluna ajustada.
+- **PDF sempre no tema claro**, independente do tema da tela (é para imprimir).
+- **Exportações grandes:** acima de um limite de linhas, a geração vai para **processamento em segundo plano**; quando termina, chega uma **notificação no sininho** com o link para baixar.
+- **Componente padrão no frontend:** toda tabela/relatório tem o botão **"Exportar ▾ (PDF / Excel)"**, que envia os mesmos filtros da tela.
+- **Testes:** o Excel gerado é relido com ClosedXML e o texto do PDF extraído (ex.: PdfPig) para verificar conteúdo e totais.
+- Toda exportação fica **registrada em log** (quem exportou o quê) — relevante para LGPD.
+
+### 5.7 Tema claro / escuro
+
+- Três opções: **Claro**, **Escuro** e **Sistema** (segue o sistema operacional).
+- **Tokens de cor em variáveis CSS** (`--background`, `--foreground`, `--primary`, `--muted`, `--border`, `--success`, `--danger`...) e Tailwind usando esses tokens. **Proibido usar cor "fixa"** (ex.: `bg-white`) nos componentes — tudo via token. Assim o dark mode funciona em qualquer tela nova sem esforço extra.
+- Preferência salva **no perfil do usuário (backend)** e em `localStorage`; um script mínimo no `index.html` aplica o tema **antes** da página renderizar (evita o "piscar" branco).
+- Gráficos do dashboard usam as mesmas variáveis de cor.
+- **Mobile:** mesma ideia com `useColorScheme` do React Native e os mesmos tokens.
+- **Teste:** testes E2E (Playwright) rodam as telas principais nos dois temas, com verificação de contraste (axe).
+
+### 5.8 Licenciamento e mensalidade
+
+**Ideia central:** como é SaaS (todos os clientes rodam no nosso servidor), a licença é um **estado guardado no servidor por tenant**, controlado por você a partir de um **Painel Administrativo** separado, que você acessa da sua máquina.
+
+**Ciclo de vida da licença:**
+
+```mermaid
+stateDiagram-v2
+    [*] --> Trial: cliente criado
+    Trial --> Ativa: pagamento registrado
+    Ativa --> Ativa: mensalidade paga (estende "pago até")
+    Ativa --> Carencia: venceu sem pagamento
+    Carencia --> Ativa: pagamento registrado
+    Carencia --> Suspensa: fim da carência
+    Suspensa --> Ativa: pagamento registrado (liberação imediata)
+    Suspensa --> Cancelada: cancelamento
+    Cancelada --> Ativa: reativação manual
+```
+
+| Estado | O que o cliente vê |
+|---|---|
+| **Trial** | Uso completo + aviso "período de teste até dd/mm" |
+| **Ativa** | Uso normal |
+| **Carência** (ex.: 5 dias após o vencimento) | Uso normal + **banner** "mensalidade vencida" + notificação no sininho |
+| **Suspensa** | **Tela de bloqueio** com instruções de pagamento/contato. Dados **preservados**, nada é apagado |
+| **Cancelada** | Acesso bloqueado; dados mantidos pelo prazo da política de retenção (LGPD) e depois removidos |
+
+**Como funciona tecnicamente:**
+- Módulo **Licenciamento** no backend com a entidade `Licenca` por tenant: plano, estado, **pago até**, dias de carência, limites do plano (nº de CNPJs, lojas, usuários) e histórico de pagamentos.
+- **Middleware** em toda requisição verifica a licença do tenant (com cache curto, ex.: 1 min). Se suspensa, a API responde **HTTP 402** com código `LICENCA_SUSPENSA`; o frontend mostra a tela de bloqueio. Login e a tela de status continuam acessíveis.
+- **Liberação = você registra o pagamento no Painel Admin** → "pago até" avança → o cache é invalidado → **o cliente volta a usar na hora** (o SignalR avisa o navegador para recarregar).
+- Uma rotina diária move licenças vencidas para Carência/Suspensa e gera notificações "sua licença vence em X dias".
+- **Limites do plano** aplicados no backend (ex.: não deixa cadastrar o 3º CNPJ num plano de 2).
+
+**Painel Administrativo (o "outro lado"):**
+- **Aplicação separada** (`src/admin`) com **API própria** (`Kamus.Admin.Api`), em outro domínio/porta (ex.: `admin.kamus...`).
+- Autenticação **independente** dos clientes: usuário "SuperAdmin" com **2FA obrigatório** e, se possível, **restrição por IP** (só a sua máquina/VPN).
+- Funções: criar cliente (tenant + primeiro usuário + empresas), ver estado das licenças, **registrar pagamento / estender validade**, suspender/reativar, trocar plano, ver uso (último acesso, nº de usuários).
+- **Auditoria** de toda ação no painel (quem, quando, o quê, valor anterior/novo).
+- O ERP do cliente **nunca** tem endpoint para alterar a própria licença.
+- **Futuro:** integração com gateway de cobrança recorrente (ex.: Asaas, Iugu, Mercado Pago, Stripe) — o webhook "pagamento confirmado" faz automaticamente o que hoje você faz manualmente no painel.
+
+> Alternativa considerada: licença como **arquivo/token assinado** (chave privada só na sua máquina, sistema valida com a chave pública). Faz sentido para sistema instalado na máquina do cliente (on-premise); para SaaS, o estado no servidor é mais simples e permite liberar/bloquear na hora. Se no futuro houver versão on-premise, o módulo de licença já estará isolado para receber essa variação.
+
+### 5.9 Dashboard principal
+
+Objetivo: **entender a saúde da loja em 5 segundos**, sem treinamento.
+
+```
+┌───────────────┬───────────────┬───────────────┬───────────────┐
+│ Vendas hoje   │ Vendas no mês │ A receber     │ A pagar       │
+│ R$ 2.340      │ R$ 48.900     │ hoje R$ 1.200 │ hoje R$ 850   │
+│ ▲ 12% vs ontem│ ▲ 5% vs mês ant│ 7 dias R$ 6k  │ ⚠ 2 vencidas  │
+├───────────────┴───────────────┴───────┬───────┴───────────────┤
+│ Vendas — últimos 30 dias (gráfico)    │ Saldo das contas       │
+│                                       │ Caixa / Banco          │
+├───────────────────────────────────────┼───────────────────────┤
+│ Mais vendidos (produto/cor/tamanho)   │ Alertas de estoque     │
+│                                       │ (estoque baixo, quebra │
+│                                       │ de grade)              │
+└───────────────────────────────────────┴───────────────────────┘
+```
+
+- **Cards de indicadores** com comparação (seta verde/vermelha) e clique levando ao detalhe.
+- Filtro de período simples (Hoje / 7 dias / Mês) e respeita a empresa ativa (ou "Todas").
+- **Estados vazios que ensinam:** cliente novo vê "Cadastre seu primeiro produto →" em vez de gráficos zerados.
+- Os mesmos endpoints de leitura alimentam o **app mobile**.
+- No dia 1 o dashboard nasce com a estrutura e os cards que já têm dados (estoque, financeiro); os de vendas acendem quando o registro de vendas existir.
+
+---
+
+## 6. Fluxo integrado
 
 ```mermaid
 flowchart LR
@@ -273,7 +450,7 @@ flowchart LR
 
 ---
 
-## 6. Qualidade — TDD first
+## 7. Qualidade — TDD first
 
 **Ciclo:** Red → Green → Refactor. Nenhum código de produção sem um teste que falhe antes.
 
@@ -292,7 +469,7 @@ flowchart LR
 
 ---
 
-## 7. GitHub e CI/CD
+## 8. GitHub e CI/CD
 
 **Fluxo de trabalho:**
 - Branch `main` protegida: merge só via PR, com CI verde.
@@ -306,13 +483,14 @@ flowchart LR
 |---|---|---|
 | `backend-ci` | PR / push em `main` (paths `src/backend/**`) | restore, build, format check, testes (com Testcontainers) |
 | `web-ci` | PR / push (paths `src/web/**`) | install, lint, typecheck, testes, build |
+| `admin-ci` | PR / push (paths `src/admin/**`) | install, lint, typecheck, testes, build |
 | `mobile-ci` | PR / push (paths `src/mobile/**`) | lint, typecheck, testes |
 | `release` | push em `main` / tag | build das imagens Docker → push no GHCR |
 | `deploy` | manual ou tag | SSH na VPS → `docker compose pull && up -d` → migrations |
 
 ---
 
-## 8. Infraestrutura
+## 9. Infraestrutura
 
 **Local (Docker Compose):** `api`, `web`, `postgres`, `pgadmin` (opcional), volumes para dados.
 
@@ -325,7 +503,7 @@ flowchart LR
 
 ---
 
-## 9. Estrutura proposta do repositório (monorepo)
+## 10. Estrutura proposta do repositório (monorepo)
 
 ```
 kamusErp/
@@ -336,15 +514,20 @@ kamusErp/
 │   └── adr/                    # registros de decisões de arquitetura
 ├── src/
 │   ├── backend/
-│   │   ├── Kamus.Api/
+│   │   ├── Kamus.Api/          # API do ERP (clientes)
+│   │   ├── Kamus.Admin.Api/    # API do Painel Administrativo (licenças)
 │   │   ├── Modules/
 │   │   │   ├── Cadastros/
 │   │   │   ├── Estoque/
 │   │   │   ├── Financeiro/
 │   │   │   ├── Vendas/         # registro de vendas (PDV no futuro)
-│   │   │   └── Identidade/
+│   │   │   ├── Identidade/
+│   │   │   ├── Licenciamento/
+│   │   │   ├── Notificacoes/
+│   │   │   └── Relatorios/     # infraestrutura de exportação PDF/Excel
 │   │   └── Shared/             # kernel compartilhado (Result, tenant, eventos)
-│   ├── web/                    # React + TS + Tailwind (Vite)
+│   ├── web/                    # React + TS + Tailwind (Vite) — ERP do cliente
+│   ├── admin/                  # React + TS + Tailwind — Painel Administrativo
 │   └── mobile/                 # React Native (Expo)
 ├── tests/
 │   ├── backend/                # unit, integration, architecture
@@ -356,11 +539,12 @@ kamusErp/
 
 ---
 
-## 10. Roadmap do piloto (loja de roupas)
+## 11. Roadmap do piloto (loja de roupas)
 
 | Fase | Entrega |
 |---|---|
-| **0 — Fundação** | Repositório, solução .NET, Docker Compose, CI, auth (Identity + JWT), multi-tenancy (`tenant_id` + RLS), primeiro teste verde |
+| **0a — Infra** | Repositório, solução .NET, Docker Compose, CI, multi-tenancy (`tenant_id` + RLS), primeiro teste verde |
+| **0b — Fundação da aplicação** | Login + seed de teste, shell (sidebar/topbar), seletor de empresa, pesquisa global (estrutura), notificações + SignalR, tema claro/escuro, infraestrutura de exportação PDF/Excel, licenciamento + Painel Admin, dashboard (estrutura) |
 | **1 — Cadastros** | Tenant/empresas (multi-CNPJ)/lojas, usuários e perfis, clientes/fornecedores, **produtos com grade** (tamanho × cor), geração de SKUs, códigos de barras internos |
 | **2 — Estoque** | Movimentações, saldo, custo médio, entrada de mercadoria em matriz, ajustes, transferência entre lojas, inventário, kardex, etiquetas, alertas |
 | **3 — Financeiro** | Contas a pagar/receber, parcelas, baixas, contas financeiras, plano de contas, formas de pagamento com taxa, recorrência, fluxo de caixa, DRE simplificado |
@@ -371,7 +555,7 @@ kamusErp/
 
 ---
 
-## 11. Perguntas em aberto (para a próxima conversa)
+## 12. Perguntas em aberto (para a próxima conversa)
 
 1. **Como as vendas entram no sistema sem PDV?** Sem vendas, o estoque não baixa e o dashboard não tem faturamento. Opções:
    - **A)** Tela simples de **"registro de venda"** no backoffice (itens + forma de pagamento), sem emissão fiscal — a loja continua emitindo nota no sistema que já usa.
@@ -386,16 +570,23 @@ kamusErp/
 6. **Crediário próprio / "fiado":** a loja vende a prazo direto ao cliente? (impacta contas a receber e cadastro de cliente)
 7. **Modelo de cobrança do SaaS:** por loja, por usuário, por plano/módulos?
 8. **Idioma/moeda:** só Brasil (pt-BR, BRL) ou pensar em internacionalização?
+9. **Licença — carência:** quantos dias após o vencimento até suspender? Durante a carência, uso normal ou **somente leitura**?
+10. **Licença — suspensão:** cliente suspenso pode ao menos **exportar os próprios dados**? (boa prática e argumento de confiança na venda)
+11. **Planos:** haverá planos diferentes (ex.: por nº de CNPJs/lojas/usuários) ou preço único no piloto?
+12. **Painel Admin:** só você vai usar, ou haverá outras pessoas (suporte, financeiro)?
 
 ---
 
-## 12. Glossário
+## 13. Glossário
 
 | Termo | Significado |
 |---|---|
 | **SKU** | Unidade de controle de estoque (produto + variação) |
 | **Grade** | Conjunto de variações de um produto (tamanhos × cores) |
 | **Quebra de grade** | Quando faltam tamanhos/cores-chave de um produto que ainda tem estoque em outros |
+| **Carência** | Dias após o vencimento da mensalidade em que o cliente ainda usa o sistema normalmente |
+| **SignalR** | Biblioteca .NET para comunicação em tempo real (WebSocket) com o navegador/app |
+| **Command palette** | Caixa de pesquisa/ações aberta por atalho (Ctrl+K) |
 | **Markup** | Multiplicador aplicado ao custo para formar o preço de venda |
 | **Condicional** | Cliente leva peças para provar em casa e devolve o que não quiser |
 | **Kardex** | Extrato de movimentações de um produto |
@@ -416,7 +607,7 @@ kamusErp/
 
 ---
 
-## 13. Registro de decisões
+## 14. Registro de decisões
 
 | Data | Decisão | Status |
 |---|---|---|
@@ -434,3 +625,11 @@ kamusErp/
 | 2026-10-13 | Segmento do piloto: **loja de roupas** (grade tamanho × cor obrigatória) | Aceita |
 | 2026-10-13 | Lote e validade fora do escopo | Aceita |
 | 2026-10-13 | **PDV e Fiscal fora do piloto** — em estudo separado | Aceita |
+| 2026-10-13 | Login + usuário de teste via seed (somente Development) desde o dia 1 | Aceita |
+| 2026-10-13 | Exportação PDF/Excel no backend desde o dia 1 (QuestPDF + ClosedXML) | Aceita (libs propostas) |
+| 2026-10-13 | Shell com sidebar, topbar, pesquisa global, sininho e seletor de CNPJ | Aceita |
+| 2026-10-13 | Tema claro/escuro/sistema via tokens CSS desde o dia 1 | Aceita |
+| 2026-10-13 | Dashboard principal intuitivo, com estados vazios guiados | Aceita |
+| 2026-10-13 | Licenciamento por tenant no servidor + Painel Admin separado | Aceita (modelo proposto) |
+| 2026-10-13 | Componentes de UI com shadcn/ui | Proposta |
+| 2026-10-13 | Notificações em tempo real com SignalR | Proposta |
