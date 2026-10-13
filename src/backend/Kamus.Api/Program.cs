@@ -7,6 +7,7 @@ builder.Services.AddKamusHealthChecks(builder.Configuration);
 var app = builder.Build();
 
 app.MapHealthChecks("/health");
+app.MapVersao();
 
 app.Run();
 
