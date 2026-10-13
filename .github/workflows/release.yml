@@ -29,7 +29,7 @@ jobs:
       versao: ${{ steps.versao.outputs.versao }}
       tag: ${{ steps.versao.outputs.tag }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # histórico e tags completos para calcular a versão
 
@@ -91,7 +91,7 @@ jobs:
             context: src/web
             dockerfile: src/web/Dockerfile
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.preparar.outputs.tag }}
 
