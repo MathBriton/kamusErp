@@ -84,7 +84,7 @@ Tenant (cliente do SaaS / assinatura)
            └── Usuários com perfis (Dono, Gerente, Operador de caixa, Estoquista, Financeiro)
 ```
 
-**Decidido:** um tenant pode ter **mais de um CNPJ** (ex.: dono com duas lojas em CNPJs diferentes). Já modelar assim desde o início.
+**Decidido:** um tenant pode ter **mais de um CNPJ** (ex.: dono com duas lojas em CNPJs diferentes). O sistema aceita o **CNPJ alfanumérico** (IN RFB 2.229/2024, vigente desde julho/2026) além do numérico. Já modelar assim desde o início.
 
 ---
 
@@ -545,7 +545,7 @@ kamusErp/
 
 | Fase | Entrega |
 |---|---|
-| **0a — Infra** | Repositório, solução .NET, Docker Compose, CI, multi-tenancy (`tenant_id` + RLS), primeiro teste verde |
+| **0a — Infra** ✅ | Repositório, solução .NET, Docker Compose, CI, multi-tenancy (`tenant_id` + RLS), primeiro teste verde |
 | **0b — Fundação da aplicação** | Login + seed de teste, shell (sidebar/topbar), seletor de empresa, pesquisa global (estrutura), notificações + SignalR, tema claro/escuro, infraestrutura de exportação PDF/Excel, licenciamento + Painel Admin, dashboard (estrutura) |
 | **1 — Cadastros** | Tenant/empresas (multi-CNPJ)/lojas, usuários e perfis, clientes/fornecedores, **produtos com grade** (tamanho × cor), geração de SKUs, códigos de barras internos |
 | **2 — Estoque** | Movimentações, saldo, custo médio, entrada de mercadoria em matriz, ajustes, transferência entre lojas, inventário, kardex, etiquetas, alertas |
@@ -635,3 +635,8 @@ kamusErp/
 | 2026-10-13 | Licenciamento por tenant no servidor + Painel Admin separado | Aceita (modelo proposto) |
 | 2026-10-13 | Componentes de UI com shadcn/ui | Proposta |
 | 2026-10-13 | Notificações em tempo real com SignalR | Proposta |
+| 2026-10-13 | **.NET 10 (LTS)**, PostgreSQL 17, React 19 + Vite + Tailwind 4 | Aceita (Fase 0a) |
+| 2026-10-13 | Testes: xUnit v3 (Microsoft Testing Platform) + Shouldly + Testcontainers; Vitest + Testing Library | Aceita (Fase 0a) |
+| 2026-10-13 | Banco em `snake_case` (EFCore.NamingConventions) | Aceita (Fase 0a) |
+| 2026-10-13 | Aplicação conecta com papel `kamus_app` (sem superusuário) para o RLS valer; superusuário só para migrations | Aceita (Fase 0a) |
+| 2026-10-13 | Um DbContext por módulo, todos herdando de `KamusDbContext` (isolamento por tenant embutido) | Aceita (Fase 0a) |
