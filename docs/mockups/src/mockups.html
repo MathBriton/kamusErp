@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>KamusERP — Mockups</title>
+<style>
+/* ===== Tokens (mesmo conceito que será usado no frontend real) ===== */
+:root{
+  --bg:#F6F6F8; --surface:#FFFFFF; --surface-2:#F2F2F5; --border:#E5E5EA; --text:#16161D; --muted:#6B6B78;
+  --primary:#4F46E5; --primary-fg:#FFFFFF; --primary-soft:#EEEFFE;
+  --success:#15803D; --success-soft:#E7F6EC; --danger:#DC2626; --danger-soft:#FDECEC;
+  --warning:#B45309; --warning-soft:#FEF3DD; --info:#2563EB; --info-soft:#E6EEFE;
+  --shadow:0 1px 2px rgba(16,16,29,.05),0 1px 3px rgba(16,16,29,.05);
+  --shadow-lg:0 12px 32px rgba(16,16,29,.14),0 2px 6px rgba(16,16,29,.06);
+  --overlay:rgba(18,18,30,.32);
+}
+[data-theme=dark]{
+  --bg:#0C0C11; --surface:#15151C; --surface-2:#1D1D26; --border:#2A2A36; --text:#F2F2F6; --muted:#9A9AA8;
+  --primary:#8B85FF; --primary-fg:#0C0C11; --primary-soft:#23213F;
+  --success:#4ADE80; --success-soft:#11291B; --danger:#F87171; --danger-soft:#351616;
+  --warning:#FBBF24; --warning-soft:#33270C; --info:#60A5FA; --info-soft:#0F2240;
+  --shadow:0 1px 2px rgba(0,0,0,.4); --shadow-lg:0 16px 40px rgba(0,0,0,.55);
+  --overlay:rgba(0,0,0,.55);
+}
+[data-accent=admin]{ --primary:#D97706; --primary-soft:#FEF3DD; }
+[data-theme=dark][data-accent=admin]{ --primary:#F59E0B; --primary-fg:#111; --primary-soft:#33270C; }
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,sans-serif;background:#888;-webkit-font-smoothing:antialiased}
+.screen{width:1440px;height:900px;position:relative;overflow:hidden;background:var(--bg);color:var(--text);font-size:14px;margin-bottom:40px}
+svg.i{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.muted{color:var(--muted)} .small{font-size:12px} .xs{font-size:11px}
+.row{display:flex;align-items:center} .gap4{gap:4px}.gap6{gap:6px}.gap8{gap:8px}.gap12{gap:12px}.gap16{gap:16px}
+.grow{flex:1} .num{font-variant-numeric:tabular-nums}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
+.btn{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-weight:500;font-size:13px}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:var(--primary-fg)}
+.btn.ghost{background:transparent;border-color:transparent}
+.badge{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:999px;font-size:11.5px;font-weight:600}
+.b-success{background:var(--success-soft);color:var(--success)} .b-danger{background:var(--danger-soft);color:var(--danger)}
+.b-warning{background:var(--warning-soft);color:var(--warning)} .b-info{background:var(--info-soft);color:var(--info)}
+.b-neutral{background:var(--surface-2);color:var(--muted)} .b-primary{background:var(--primary-soft);color:var(--primary)}
+kbd{font-family:inherit;font-size:11px;border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;padding:1px 6px;color:var(--muted);background:var(--surface)}
+
+/* ===== Shell ===== */
+.shell{display:grid;grid-template-columns:248px 1fr;height:100%}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 12px}
+.logo{display:flex;align-items:center;gap:10px;padding:4px 8px 18px;font-weight:700;font-size:17px;letter-spacing:-.02em}
+.logo .mark{width:30px;height:30px;border-radius:9px;background:var(--primary);color:var(--primary-fg);display:grid;place-items:center;font-weight:800;font-size:15px}
+.nav-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:14px 10px 6px}
+.nav a{display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border-radius:9px;color:var(--muted);font-weight:500;text-decoration:none}
+.nav a.active{background:var(--primary-soft);color:var(--primary)}
+.nav a .chev{margin-left:auto;width:15px;height:15px}
+.nav .sub{padding-left:38px} .nav .sub a{height:30px;font-size:13px;padding-left:10px}
+.nav .sub a.active{background:transparent;color:var(--text);font-weight:600;position:relative}
+.nav .sub a.active:before{content:"";position:absolute;left:-12px;top:7px;bottom:7px;width:2px;border-radius:2px;background:var(--primary)}
+.side-foot{margin-top:auto;border-top:1px solid var(--border);padding-top:12px}
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{height:64px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;padding:0 24px;gap:12px}
+.search{width:440px;height:38px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);display:flex;align-items:center;gap:10px;padding:0 10px 0 12px;color:var(--muted)}
+.iconbtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);display:grid;place-items:center;color:var(--muted);position:relative;background:var(--surface)}
+.iconbtn.on{border-color:var(--primary);color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.dot{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;border-radius:9px;background:var(--danger);color:#fff;font-size:10.5px;font-weight:700;display:grid;place-items:center;border:2px solid var(--surface)}
+.company{display:flex;align-items:center;gap:10px;height:38px;border:1px solid var(--border);border-radius:10px;padding:0 10px;background:var(--surface)}
+.company.on{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.company .t{line-height:1.15}.company .t b{font-size:13px;font-weight:600;display:block}.company .t span{font-size:11px;color:var(--muted)}
+.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#F472B6,#8B5CF6);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12.5px}
+.content{padding:20px 28px;overflow:hidden;flex:1;position:relative}
+.crumb{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);margin-bottom:6px}
+.crumb svg.i{width:13px;height:13px}
+h1{font-size:23px;font-weight:700;letter-spacing:-.02em}
+h2{font-size:15px;font-weight:600}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:3px}
+.seg span{padding:5px 12px;border-radius:7px;font-size:12.5px;font-weight:500;color:var(--muted)}
+.seg span.on{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
+.kpi{padding:16px 18px}
+.kpi .lbl{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12.5px;font-weight:500}
+.kpi .ico{width:30px;height:30px;border-radius:8px;display:grid;place-items:center}
+.kpi .val{font-size:24px;font-weight:700;letter-spacing:-.02em;margin:8px 0 4px}
+.delta{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:600}
+.delta svg.i{width:14px;height:14px}
+.up{color:var(--success)} .down{color:var(--danger)}
+.grid-2{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px}
+.card-h{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 0}
+.card-b{padding:12px 18px 16px}
+table{width:100%;border-collapse:collapse}
+th{font-size:11.5px;font-weight:600;color:var(--muted);text-align:left;padding:8px 10px;text-transform:uppercase;letter-spacing:.04em}
+td{padding:8px 10px;border-top:1px solid var(--border);font-size:13px}
+td.r,th.r{text-align:right}
+.thumb{width:32px;height:32px;border-radius:8px;display:grid;place-items:center}
+.alert-item{display:flex;gap:12px;padding:9px 0;border-top:1px solid var(--border)}
+.alert-item:first-child{border-top:0}
+.alert-item .ai{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none}
+.alert-item b{font-weight:600;font-size:13px;display:block}
+.alert-item span{font-size:12px;color:var(--muted)}
+
+/* Overlays */
+.overlay{position:absolute;inset:0;background:var(--overlay);backdrop-filter:blur(2px)}
+.pop{position:absolute;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden}
+.pop-sec{padding:6px}
+.pop-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:10px 12px 6px}
+.pop-item{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:9px}
+.pop-item.sel{background:var(--primary-soft)}
+.pop-item .pi{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;background:var(--surface-2);color:var(--muted);flex:none}
+.hr{height:1px;background:var(--border)}
+mark{background:var(--warning-soft);color:inherit;border-radius:3px;padding:0 1px}
+
+/* Grade */
+.matrix th,.matrix td{text-align:center}
+.matrix td{font-size:14px;font-weight:600;padding:0;height:46px}
+.matrix td .c{margin:4px;height:38px;border-radius:9px;display:grid;place-items:center;background:var(--surface-2)}
+.matrix td .c.zero{background:var(--danger-soft);color:var(--danger)}
+.matrix td .c.low{background:var(--warning-soft);color:var(--warning)}
+.matrix td.tot .c{background:transparent;color:var(--muted)}
+.swatch{width:16px;height:16px;border-radius:50%;border:1px solid var(--border);flex:none}
+.tabs{display:flex;gap:24px;border-bottom:1px solid var(--border);margin-bottom:18px}
+.tabs span{padding:10px 0;font-weight:500;color:var(--muted);font-size:13.5px}
+.tabs span.on{color:var(--text);box-shadow:inset 0 -2px 0 var(--primary)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:7px;background:var(--surface-2);font-size:12px;color:var(--muted);font-weight:500}
+.input{height:38px;border:1px solid var(--border);border-radius:10px;background:var(--surface);display:flex;align-items:center;gap:10px;padding:0 12px;color:var(--text)}
+.field label{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px}
+.banner{display:flex;align-items:center;gap:12px;padding:10px 28px;background:var(--warning-soft);color:var(--warning);border-bottom:1px solid var(--border);font-size:13px}
+.banner b{font-weight:600}
+
+/* Mobile */
+.phone{width:360px;height:760px;border-radius:52px;background:#0A0A0A;padding:11px;box-shadow:0 30px 60px rgba(0,0,0,.25)}
+.phone .scr{width:100%;height:100%;border-radius:42px;overflow:hidden;background:var(--bg);color:var(--text);position:relative;display:flex;flex-direction:column;font-size:13px}
+.notch{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:110px;height:30px;border-radius:20px;background:#0A0A0A;z-index:5}
+.status{height:46px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 28px 6px;font-size:13px;font-weight:600}
+.m-tab{height:72px;border-top:1px solid var(--border);background:var(--surface);display:flex;justify-content:space-around;align-items:flex-start;padding-top:10px}
+.m-tab div{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;color:var(--muted);font-weight:500}
+.m-tab div.on{color:var(--primary)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+/* ===== Ícones (traço estilo Lucide) ===== */
+const P={
+ dash:'<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+ box:'<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/>',
+ shirt:'<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/>',
+ users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+ wallet:'<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+ bag:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+ file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>',
+ sheet:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M12 13v4"/>',
+ sliders:'<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
+ search:'<circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.3-4.3"/>',
+ bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+ sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+ moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+ cd:'<path d="m6 9 6 6 6-6"/>', cr:'<path d="m9 18 6-6-6-6"/>', cl2:'<path d="m11 17-5-5 5-5M18 17l-5-5 5-5"/>',
+ building:'<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/>',
+ check:'<path d="M20 6 9 17l-5-5"/>',
+ download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+ up:'<path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>', down:'<path d="m22 17-8.5-8.5-5 5L2 7"/><path d="M16 17h6v-6"/>',
+ alert:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/>',
+ lock:'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+ mail:'<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/>',
+ eye:'<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>', filter:'<path d="M22 3H2l8 9.46V19l4 2v-8.54z"/>',
+ arrow:'<path d="M5 12h14M12 5l7 7-7 7"/>', shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/>',
+ menu:'<path d="M4 6h16M4 12h16M4 18h16"/>', bank:'<path d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l8 5H4z"/>',
+ tag:'<path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+ more:'<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+ clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>', refresh:'<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
+ card:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>', cash:'<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+ printer:'<path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
+ logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+ x:'<path d="M18 6 6 18M6 6l12 12"/>', key:'<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/>',
+ history:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>', layers:'<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/>',
+ truck:'<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62L18.3 9.38a1 1 0 0 0-.78-.38H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>',
+ cmd:'<path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/>',
+ wifi:'<path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>',
+};
+const I=(n,s)=>`<svg class="i" viewBox="0 0 24 24" ${s?`style="width:${s}px;height:${s}px"`:''}>${P[n]}</svg>`;
+
+/* ===== Shell ===== */
+function sidebar(active, sub){
+  const items=[
+    ['dash','Dashboard'],
+    ['shirt','Cadastros',['Produtos','Grades e cores','Clientes','Fornecedores']],
+    ['box','Estoque',['Posição de estoque','Entrada de mercadoria','Ajustes','Transferências','Inventário']],
+    ['wallet','Financeiro',['Contas a pagar','Contas a receber','Fluxo de caixa','Contas financeiras']],
+    ['bag','Vendas'],
+    ['file','Relatórios'],
+  ];
+  let h=`<aside class="sidebar"><div class="logo"><div class="mark">K</div>kamus<span class="badge b-neutral" style="margin-left:auto;height:20px">ERP</span></div>
+  <div class="nav"><div class="nav-label">Menu</div>`;
+  for(const [ic,label,subs] of items){
+    const on=label===active;
+    h+=`<a class="${on?'active':''}">${I(ic)}${label}${subs?`<svg class="i chev" viewBox="0 0 24 24">${on?P.cd:P.cr}</svg>`:''}</a>`;
+    if(on&&subs) h+=`<div class="sub">${subs.map(s=>`<a class="${s===sub?'active':''}">${s}</a>`).join('')}</div>`;
+  }
+  h+=`<div class="nav-label">Sistema</div><a>${I('sliders')}Configurações</a></div>
+  <div class="side-foot nav"><a>${I('cl2')}Recolher menu</a></div></aside>`;
+  return h;
+}
+function topbar(o={}){
+  return `<header class="topbar">
+    <div class="search">${I('search',17)}<span class="grow">Pesquisar produtos, SKU, clientes, telas...</span><kbd>Ctrl</kbd><kbd>K</kbd></div>
+    <div class="grow"></div>
+    <div class="company ${o.companyOn?'on':''}"><div class="thumb" style="width:26px;height:26px;background:var(--primary-soft);color:var(--primary)">${I('building',15)}</div>
+      <div class="t"><b>Kamus Moda Centro</b><span>12.345.678/0001-90</span></div>${I('cd',16)}</div>
+    <div class="iconbtn ${o.bellOn?'on':''}">${I('bell')}<span class="dot">3</span></div>
+    <div class="iconbtn">${I(o.dark?'sun':'moon')}</div>
+    <div class="row gap8" style="margin-left:4px"><div class="avatar">AD</div><div style="line-height:1.2"><div style="font-weight:600;font-size:13px">Admin Demo</div><div class="xs muted">Dono</div></div></div>
+  </header>`;
+}
+function screen(id,theme,inner,attrs=''){return `<section class="screen" id="${id}" data-theme="${theme}" ${attrs}>${inner}</section>`}
+function app(id,theme,{active,sub,content,overlay='',banner='',top={}}){
+  return screen(id,theme,`<div class="shell">${sidebar(active,sub)}<div class="main">${topbar({...top,dark:theme==='dark'})}${banner}<div class="content">${content}</div></div></div>${overlay}`);
+}
+
+/* ===== Gráfico ===== */
+let gid=0;
+function areaChart(w,h,data,{grid=true,labels=true}={}){
+  const id='ga'+(++gid);
+  const max=Math.max(...data)*1.15, pad=labels?28:4, ph=h-(labels?22:4);
+  const x=i=>pad+i*(w-pad-4)/(data.length-1), y=v=>ph-(v/max)*(ph-8);
+  const line=data.map((v,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const area=`${line} L${x(data.length-1)},${ph} L${x(0)},${ph} Z`;
+  let g='';
+  if(grid) for(let k=0;k<=3;k++){const yy=8+k*(ph-8)/3; g+=`<line x1="${pad}" x2="${w}" y1="${yy}" y2="${yy}" stroke="var(--border)" stroke-dasharray="3 4"/>`;
+    if(labels) g+=`<text x="0" y="${yy+4}" font-size="10.5" fill="var(--muted)">${Math.round(max*(1-k/3)/100)/10}k</text>`;}
+  let lb=''; if(labels){ ['14/09','21/09','28/09','05/10','12/10'].forEach((t,k)=>{lb+=`<text x="${Math.min(x(Math.round(k*(data.length-1)/4))-14,w-34)}" y="${h-4}" font-size="10.5" fill="var(--muted)">${t}</text>`});}
+  const li=data.length-1;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><defs><linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--primary)" stop-opacity=".28"/><stop offset="1" stop-color="var(--primary)" stop-opacity="0"/></linearGradient></defs>
+  ${g}<path d="${area}" fill="url(#${id})"/><path d="${line}" fill="none" stroke="var(--primary)" stroke-width="2.2" stroke-linejoin="round"/>
+  <circle cx="${x(li)}" cy="${y(data[li])}" r="4.5" fill="var(--surface)" stroke="var(--primary)" stroke-width="2.4"/>${lb}</svg>`;
+}
+const sales=[1210,1480,1320,1890,2410,2980,1100,1350,1520,1460,1980,2650,3120,1240,1390,1610,1580,2110,2890,3340,1300,1450,1720,1680,2230,3010,3460,1520,1980,2340];
+
+/* ===== Conteúdo: Dashboard ===== */
+function kpi(icon,tone,label,val,delta,sub){
+  return `<div class="card kpi"><div class="lbl"><div class="ico" style="background:var(--${tone}-soft);color:var(--${tone})">${I(icon,16)}</div>${label}</div>
+  <div class="val num">${val}</div><div class="row gap8 small">${delta}<span class="muted">${sub}</span></div></div>`;
+}
+const up=t=>`<span class="delta up">${I('up')}${t}</span>`, dn=t=>`<span class="delta down">${I('down')}${t}</span>`;
+function dashboard(){
+  const top=[['Camiseta Básica Gola V','Preto · M',38,'R$ 2.276,20','#64748B'],['Calça Jeans Skinny','Azul médio · 40',21,'R$ 3.127,90','#3B5B8C'],['Vestido Midi Floral','Estampado · P',17,'R$ 2.533,00','#D9778F'],['Blusa Tricot Canelada','Off-white · U',15,'R$ 1.348,50','#B8A27E'],['Jaqueta Jeans Oversized','Azul claro · G',9,'R$ 1.889,10','#7FA1C9']];
+  return `<div class="page-head"><div><div class="crumb">Início</div><h1>Olá, Admin 👋</h1><div class="muted" style="margin-top:4px">Resumo da <b style="color:var(--text);font-weight:600">Kamus Moda Centro</b> · terça-feira, 13 de outubro</div></div>
+  <div class="row gap12"><div class="seg"><span class="on">Hoje</span><span>7 dias</span><span>Mês</span></div><span class="btn">${I('download',16)}Exportar${I('cd',15)}</span></div></div>
+  <div class="kpis">
+   ${kpi('bag','primary','Vendas hoje','R$ 2.340,00',up('12%'),'vs. ontem')}
+   ${kpi('up','success','Vendas no mês','R$ 48.912,40',up('5,3%'),'vs. set/26')}
+   ${kpi('wallet','info','A receber · 7 dias','R$ 6.120,00','<b class="num" style="font-weight:600">R$ 1.200,00</b>','vencem hoje')}
+   ${kpi('alert','warning','A pagar · 7 dias','R$ 4.380,00','<span class="badge b-danger">2 vencidas</span>','R$ 1.240,00')}
+  </div>
+  <div class="grid-2">
+   <div class="card"><div class="card-h"><div><h2>Vendas — últimos 30 dias</h2><div class="small muted" style="margin-top:2px">Total <b class="num" style="color:var(--text)">R$ 58.640,00</b> · ticket médio R$ 146,60</div></div><div class="seg"><span class="on">Faturamento</span><span>Peças</span></div></div>
+   <div class="card-b" style="padding-top:8px">${areaChart(700,172,sales)}</div></div>
+   <div class="card"><div class="card-h"><h2>Saldo das contas</h2><span class="small muted">agora</span></div><div class="card-b">
+     <div class="num" style="font-size:26px;font-weight:700;letter-spacing:-.02em;margin:2px 0 14px">R$ 27.385,40</div>
+     ${[['cash','Caixa da loja','R$ 1.850,00','success'],['bank','Banco · Conta corrente','R$ 23.410,40','info'],['card','Recebíveis de cartão','R$ 2.125,00','primary']].map(([ic,l,v,t])=>`<div class="row gap12" style="padding:7px 0;border-top:1px solid var(--border)"><div class="thumb" style="background:var(--${t}-soft);color:var(--${t})">${I(ic,16)}</div><div class="grow">${l}</div><b class="num" style="font-weight:600">${v}</b></div>`).join('')}
+     <div class="small muted" style="margin-top:8px">Recebíveis: D+30 já descontada a taxa da maquininha</div>
+   </div></div>
+  </div>
+  <div class="grid-2" style="margin-bottom:0">
+   <div class="card"><div class="card-h"><h2>Mais vendidos no mês</h2><span class="small" style="color:var(--primary);font-weight:600">Ver relatório →</span></div><div class="card-b" style="padding-top:4px">
+    <table><tr><th>Produto</th><th>Variação mais vendida</th><th class="r">Peças</th><th class="r">Receita</th></tr>
+    ${top.slice(0,4).map(([n,v,q,r,c])=>`<tr><td><div class="row gap12"><div class="thumb" style="background:${c}22;color:${c}">${I('shirt',16)}</div><b style="font-weight:600">${n}</b></div></td><td class="muted">${v}</td><td class="r num">${q}</td><td class="r num"><b style="font-weight:600">${r}</b></td></tr>`).join('')}</table></div></div>
+   <div class="card"><div class="card-h"><h2>Alertas</h2><span class="badge b-danger">4 novos</span></div><div class="card-b" style="padding-top:6px">
+    ${[['layers','danger','Quebra de grade','Calça Jeans Skinny · sem 38 e 40'],['box','warning','Estoque baixo','Camiseta Gola V Preto M · 2 un. (mín. 5)'],['clock','warning','Conta vence hoje','Malharia Sul · R$ 850,00'],['history','info','Sem giro há 45 dias','Vestido Longo Cetim · 14 peças']].map(([ic,t,a,b])=>`<div class="alert-item"><div class="ai" style="background:var(--${t}-soft);color:var(--${t})">${I(ic,16)}</div><div><b>${a}</b><span>${b}</span></div></div>`).join('')}
+   </div></div>
+  </div>`;
+}
+
+/* ===== Telas ===== */
+const S=[];
+
+// 01 Login
+S.push(screen('01-login','light',`
+ <div style="display:grid;grid-template-columns:1fr 1fr;height:100%">
+  <div style="background:linear-gradient(150deg,#4F46E5 0%,#6D28D9 55%,#9D174D 100%);color:#fff;padding:56px 64px;display:flex;flex-direction:column;position:relative;overflow:hidden">
+   <div class="row gap12" style="font-weight:700;font-size:20px"><div style="width:36px;height:36px;border-radius:10px;background:#fff;color:#4F46E5;display:grid;place-items:center;font-weight:800">K</div>kamus</div>
+   <div style="margin-top:auto;max-width:480px">
+    <div style="font-size:40px;font-weight:700;letter-spacing:-.03em;line-height:1.1">Sua loja de roupas,<br>organizada de ponta a ponta.</div>
+    <div style="opacity:.82;font-size:16px;margin-top:16px;line-height:1.5">Estoque em grade (cor × tamanho), financeiro e indicadores em tempo real — na web e no celular.</div>
+   </div>
+   <div style="position:absolute;right:-40px;top:150px;width:330px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:16px;padding:18px;backdrop-filter:blur(6px)">
+    <div style="font-size:12px;opacity:.8">Vendas hoje</div><div style="font-size:26px;font-weight:700;margin:4px 0">R$ 2.340,00</div>
+    <div style="font-size:12px;color:#BBF7D0;font-weight:600">▲ 12% vs. ontem</div>
+    <div style="margin-top:10px;opacity:.95">${areaChart(290,70,sales.slice(-14),{grid:false,labels:false}).replaceAll('var(--primary)','#fff').replace('var(--surface)','#7C3AED')}</div>
+   </div>
+   <div style="margin-top:40px;font-size:12.5px;opacity:.7">© 2026 Kamus · Termos · Privacidade</div>
+  </div>
+  <div style="display:flex;flex-direction:column;padding:40px 56px;background:var(--surface)">
+   <div class="row" style="justify-content:flex-end"><div class="seg"><span class="on">${I('sun',14)}</span><span>${I('moon',14)}</span><span class="xs">Sistema</span></div></div>
+   <div style="margin:auto;width:380px">
+    <h1 style="font-size:28px">Entrar</h1><div class="muted" style="margin:6px 0 28px">Acesse o painel da sua loja.</div>
+    <div class="field" style="margin-bottom:16px"><label>E-mail</label><div class="input" style="border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)">${I('mail',16)}<span>admin@kamus.local</span></div></div>
+    <div class="field" style="margin-bottom:12px"><div class="row" style="justify-content:space-between"><label>Senha</label><span class="small" style="color:var(--primary);font-weight:600;margin-bottom:6px">Esqueci minha senha</span></div><div class="input">${I('lock',16)}<span class="grow" style="letter-spacing:3px">••••••••••</span><span class="muted">${I('eye',16)}</span></div></div>
+    <div class="row gap8 small" style="margin-bottom:22px"><span style="width:16px;height:16px;border-radius:4px;background:var(--primary);color:#fff;display:grid;place-items:center">${I('check',12)}</span>Manter conectado</div>
+    <div class="btn primary" style="width:100%;justify-content:center;height:42px;font-size:14px">Entrar ${I('arrow',16)}</div>
+    <div style="margin-top:28px;border:1px dashed var(--warning);background:var(--warning-soft);color:var(--warning);border-radius:10px;padding:12px 14px;font-size:12.5px;line-height:1.5">
+     <b>Ambiente de desenvolvimento</b><br>Usuário de teste criado pelo seed: <b>admin@kamus.local</b> · senha definida em <code>SEED_ADMIN_PASSWORD</code> (.env)</div>
+   </div>
+   <div class="xs muted row gap6" style="justify-content:center">${I('shield',14)}Conexão segura · bloqueio após 5 tentativas</div>
+  </div>
+ </div>`));
+
+// 02 / 03 Dashboard claro e escuro
+S.push(app('02-dashboard-claro','light',{active:'Dashboard',content:dashboard()}));
+S.push(app('03-dashboard-escuro','dark',{active:'Dashboard',content:dashboard()}));
+
+// 04 Pesquisa global
+S.push(app('04-pesquisa-global','light',{active:'Dashboard',content:dashboard(),overlay:`<div class="overlay"></div>
+ <div class="pop" style="left:50%;transform:translateX(-50%);top:96px;width:660px">
+  <div class="row gap12" style="padding:16px 18px;border-bottom:1px solid var(--border);font-size:16px">${I('search',20)}<span>cami</span><span style="width:2px;height:20px;background:var(--primary);margin-left:-10px"></span><span class="grow"></span><span class="chip">Empresa: Kamus Moda Centro</span><kbd>Esc</kbd></div>
+  <div class="pop-sec"><div class="pop-label">Produtos</div>
+   <div class="pop-item sel"><div class="pi" style="background:#64748B22;color:#64748B">${I('shirt',16)}</div><div class="grow"><b style="font-weight:600"><mark>Cami</mark>seta Básica Gola V</b><div class="small muted">Ref. CB-001 · 5 cores × 5 tamanhos · 25 SKUs</div></div><span class="badge b-neutral">87 un.</span>${I('cr',16)}</div>
+   <div class="pop-item"><div class="pi" style="background:#C2410C22;color:#C2410C">${I('shirt',16)}</div><div class="grow"><b style="font-weight:600"><mark>Cami</mark>sa Linho Manga Longa</b><div class="small muted">Ref. CL-014 · 3 cores × 4 tamanhos</div></div><span class="badge b-warning">6 un.</span></div>
+   <div class="pop-item"><div class="pi">${I('tag',16)}</div><div class="grow"><b style="font-weight:600"><mark>Cami</mark>seta Básica Gola V · Preto · M</b><div class="small muted">SKU CB-001-PRT-M · EAN 2000012345678</div></div><span class="badge b-danger">2 un.</span></div>
+  </div><div class="hr"></div>
+  <div class="pop-sec"><div class="pop-label">Clientes</div>
+   <div class="pop-item"><div class="pi">${I('users',16)}</div><div class="grow"><b style="font-weight:600"><mark>Cami</mark>la Rocha</b><div class="small muted">CPF ***.456.789-** · última compra 02/10</div></div></div>
+  </div><div class="hr"></div>
+  <div class="pop-sec"><div class="pop-label">Telas e ações</div>
+   <div class="pop-item"><div class="pi">${I('plus',16)}</div><div class="grow">Novo produto <span class="muted">— Cadastros</span></div><kbd>N</kbd><kbd>P</kbd></div>
+   <div class="pop-item"><div class="pi">${I('truck',16)}</div><div class="grow">Entrada de mercadoria <span class="muted">— Estoque</span></div></div>
+  </div>
+  <div class="row gap16 xs muted" style="padding:10px 18px;border-top:1px solid var(--border);background:var(--surface-2)"><span><kbd>↑</kbd> <kbd>↓</kbd> navegar</span><span><kbd>↵</kbd> abrir</span><span><kbd>Esc</kbd> fechar</span><span class="grow"></span><span>Busca ignora acentos e tolera erros de digitação</span></div>
+ </div>`}));
+
+// 05 Seletor de empresa
+S.push(app('05-seletor-empresa','light',{active:'Dashboard',content:dashboard(),top:{companyOn:true},overlay:`
+ <div class="pop" style="right:236px;top:58px;width:360px">
+  <div class="pop-label" style="padding-top:12px">Trocar empresa</div>
+  <div class="pop-sec" style="padding-top:0">
+   <div class="pop-item sel"><div class="pi" style="background:var(--primary);color:var(--primary-fg)">${I('building',16)}</div><div class="grow"><b style="font-weight:600">Kamus Moda Centro LTDA</b><div class="small muted num">12.345.678/0001-90 · Dono</div></div><span style="color:var(--primary)">${I('check')}</span></div>
+   <div class="pop-item"><div class="pi">${I('building',16)}</div><div class="grow"><b style="font-weight:600">Kamus Moda Shopping LTDA</b><div class="small muted num">98.765.432/0001-10 · Dono</div></div></div>
+  </div><div class="hr"></div>
+  <div class="pop-sec"><div class="pop-item"><div class="pi">${I('layers',16)}</div><div class="grow"><b style="font-weight:600">Todas as empresas</b><div class="small muted">Visão consolidada · somente leitura</div></div><span class="badge b-info">Dono</span></div></div>
+  <div class="xs muted" style="padding:10px 14px;border-top:1px solid var(--border);background:var(--surface-2)">Ao trocar, a tela recarrega no contexto da empresa escolhida.</div>
+ </div>`}));
+
+// 06 Notificações (escuro)
+const notif=[['layers','danger','Quebra de grade','Calça Jeans Skinny ficou sem os tamanhos 38 e 40.','há 5 min',1],
+ ['clock','warning','Conta vence hoje','Malharia Sul · NF 4521 · R$ 850,00','há 1 h',1],
+ ['download','success','Relatório pronto','"Posição de estoque — outubro" (Excel) está pronto para baixar.','há 2 h',1],
+ ['key','info','Licença vence em 5 dias','Plano Loja · próximo vencimento 18/10/2026.','ontem',0],
+ ['box','warning','Estoque baixo','Blusa Tricot Canelada Off-white · 3 un.','ontem',0]];
+S.push(app('06-notificacoes-escuro','dark',{active:'Dashboard',content:dashboard(),top:{bellOn:true},overlay:`
+ <div class="pop" style="right:150px;top:58px;width:410px">
+  <div class="row" style="padding:14px 16px 10px"><h2 class="grow">Notificações</h2><span class="small" style="color:var(--primary);font-weight:600">Marcar todas como lidas</span></div>
+  <div class="row gap16" style="padding:0 16px;border-bottom:1px solid var(--border)"><span class="small" style="padding:8px 0;font-weight:600;box-shadow:inset 0 -2px 0 var(--primary)">Não lidas <span class="badge b-primary" style="height:18px">3</span></span><span class="small muted" style="padding:8px 0">Todas</span></div>
+  ${notif.map(([ic,t,a,b,w,u])=>`<div class="row gap12" style="align-items:flex-start;padding:12px 16px;border-bottom:1px solid var(--border);${u?'':'opacity:.6'}"><div class="thumb" style="background:var(--${t}-soft);color:var(--${t})">${I(ic,16)}</div><div class="grow"><b style="font-weight:600;font-size:13px">${a}</b><div class="small muted" style="margin-top:2px;line-height:1.4">${b}</div>${ic==='download'?`<span class="btn" style="height:28px;margin-top:8px;font-size:12px">${I('sheet',14)}Baixar .xlsx</span>`:''}</div><div class="xs muted" style="white-space:nowrap">${w}</div>${u?'<span style="width:8px;height:8px;border-radius:50%;background:var(--primary);margin-top:5px"></span>':''}</div>`).join('')}
+  <div class="small" style="text-align:center;padding:12px;color:var(--primary);font-weight:600">Ver todas as notificações</div>
+ </div>`}));
+
+// 07 Produto com grade
+const sizes=['PP','P','M','G','GG'];
+const colors=[['Branco','#FFFFFF',[2,5,6,4,1]],['Preto','#18181B',[3,6,2,5,2]],['Azul Marinho','#1E3A8A',[1,4,5,3,0]],['Cinza Mescla','#9CA3AF',[2,3,4,4,2]],['Verde Musgo','#4D5B2A',[2,0,0,0,1]]];
+const cell=v=>`<td><div class="c ${v===0?'zero':v<=2?'low':''} num">${v}</div></td>`;
+const colTot=sizes.map((_,i)=>colors.reduce((a,c)=>a+c[2][i],0));
+S.push(app('07-produto-grade','light',{active:'Cadastros',sub:'Produtos',content:`
+ <div class="page-head" style="align-items:center"><div class="row gap16">
+  <div style="width:64px;height:64px;border-radius:14px;background:linear-gradient(135deg,#E0E7FF,#F5F3FF);display:grid;place-items:center;color:#4F46E5">${I('shirt',30)}</div>
+  <div><div class="crumb">Cadastros ${I('cr')} Produtos ${I('cr')} <span style="color:var(--text)">Camiseta Básica Gola V</span></div>
+  <div class="row gap12"><h1>Camiseta Básica Gola V</h1><span class="badge b-success">Ativo</span></div>
+  <div class="row gap8" style="margin-top:6px"><span class="chip">Ref. CB-001</span><span class="chip">${I('tag',13)}Camisetas</span><span class="chip">Coleção Verão 2027</span><span class="chip">Kamus Basics</span></div></div></div>
+  <div class="row gap8"><span class="btn">${I('printer',16)}Imprimir etiquetas</span><span class="btn">${I('download',16)}Exportar${I('cd',15)}</span><span class="btn primary">${I('truck',16)}Nova entrada</span></div></div>
+ <div class="tabs"><span>Dados gerais</span><span class="on">Grade e estoque</span><span>Preços</span><span>Movimentações (kardex)</span><span>Fiscal <span class="badge b-neutral" style="height:18px;vertical-align:1px">futuro</span></span></div>
+ <div class="kpis" style="margin-bottom:16px">
+  ${[['Estoque total','87 peças','25 SKUs ativos'],['Valor em estoque (custo)','R$ 2.088,00','custo médio R$ 24,00'],['Preço de venda','R$ 59,90','markup 2,50 · margem 59,9%'],['Vendidas (30 dias)','64 peças','giro: 22 dias']].map(([a,b,c])=>`<div class="card kpi"><div class="lbl">${a}</div><div class="val num" style="font-size:21px">${b}</div><div class="small muted">${c}</div></div>`).join('')}
+ </div>
+ <div class="grid-2" style="grid-template-columns:1.75fr 1fr">
+  <div class="card"><div class="card-h"><div><h2>Estoque por cor × tamanho</h2><div class="small muted" style="margin-top:2px">Grade de tamanhos: <b style="color:var(--text);font-weight:600">PP–GG (adulto)</b> · Loja: Centro</div></div>
+   <div class="row gap12 xs muted"><span class="row gap4"><span class="swatch" style="background:var(--danger-soft);border-color:var(--danger)"></span>zerado</span><span class="row gap4"><span class="swatch" style="background:var(--warning-soft);border-color:var(--warning)"></span>≤ mínimo</span></div></div>
+   <div class="card-b"><table class="matrix"><tr><th style="text-align:left">Cor</th>${sizes.map(s=>`<th>${s}</th>`).join('')}<th>Total</th></tr>
+   ${colors.map(([n,c,v])=>`<tr><td style="text-align:left;font-size:13px;font-weight:500;padding-left:10px"><div class="row gap8"><span class="swatch" style="background:${c}"></span>${n}</div></td>${v.map(cell).join('')}<td class="tot"><div class="c num">${v.reduce((a,b)=>a+b,0)}</div></td></tr>`).join('')}
+   <tr><td style="text-align:left;padding-left:10px;font-size:12px" class="muted">Total</td>${colTot.map(t=>`<td class="tot"><div class="c num">${t}</div></td>`).join('')}<td class="tot"><div class="c num" style="color:var(--text)">87</div></td></tr></table></div></div>
+  <div class="card"><div class="card-h"><h2>Atenção nesta grade</h2></div><div class="card-b">
+   ${[['layers','danger','Quebra de grade · Verde Musgo','Sem P, M e G — só restam PP e GG. Sugestão: repor ou liquidar.'],['alert','warning','Preto M abaixo do mínimo','2 un. · mínimo 5 · é o SKU mais vendido do produto'],['alert','warning','Azul Marinho GG zerado','Última venda há 3 dias']].map(([ic,t,a,b])=>`<div class="alert-item"><div class="ai" style="background:var(--${t}-soft);color:var(--${t})">${I(ic,16)}</div><div><b>${a}</b><span>${b}</span></div></div>`).join('')}
+   <div class="hr" style="margin:6px 0 12px"></div>
+   <div class="small muted" style="margin-bottom:8px">Ações rápidas</div>
+   <div class="row gap8" style="flex-wrap:wrap"><span class="btn" style="height:32px">${I('plus',15)}Adicionar cor</span><span class="btn" style="height:32px">${I('refresh',15)}Transferir entre lojas</span></div>
+  </div></div>
+ </div>`}));
+
+// 08 Contas a pagar + exportação + banner de carência (escuro)
+const contas=[['08/10/2026','Aluguel — outubro','Ocupação','1/1','R$ 3.200,00','Vencida','danger'],['11/10/2026','Energia elétrica','Utilidades','1/1','R$ 412,30','Vencida','danger'],['13/10/2026','Malharia Sul · NF 4521','Fornecedores','2/3','R$ 850,00','Vence hoje','warning'],['15/10/2026','Jeans & Cia Confecções · NF 1188','Fornecedores','1/2','R$ 1.940,00','Em aberto','neutral'],['18/10/2026','Kamus ERP — mensalidade','Software','1/1','R$ 199,90','Em aberto','neutral'],['20/10/2026','Simples Nacional (DAS)','Impostos','1/1','R$ 1.126,45','Em aberto','neutral'],['22/10/2026','Embalagens Lima','Fornecedores','1/1','R$ 380,00','Em aberto','neutral'],['25/10/2026','Tecelagem Aurora · NF 990','Fornecedores','3/4','R$ 1.275,00','Em aberto','neutral'],['30/10/2026','Folha de pagamento','Pessoal','1/1','R$ 4.860,00','Em aberto','neutral']];
+S.push(app('08-contas-pagar-exportar','dark',{active:'Financeiro',sub:'Contas a pagar',
+ banner:`<div class="banner">${I('alert',17)}<span class="grow"><b>Mensalidade vencida em 10/10/2026.</b> Você está no período de carência — regularize até <b>15/10</b> para evitar a suspensão do acesso.</span><span class="btn" style="height:30px;background:transparent;border-color:var(--warning);color:var(--warning)">Ver detalhes</span></div>`,
+ content:`<div class="page-head"><div><div class="crumb">Financeiro ${I('cr')} <span style="color:var(--text)">Contas a pagar</span></div><h1>Contas a pagar</h1></div>
+  <div class="row gap8"><span class="btn" style="border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)">${I('download',16)}Exportar${I('cd',15)}</span><span class="btn primary">${I('plus',16)}Nova conta</span></div></div>
+ <div class="kpis">${[['Vencidas','R$ 3.612,30','2 títulos','danger'],['Vencem hoje','R$ 850,00','1 título','warning'],['Próximos 7 dias','R$ 3.519,90','3 títulos','info'],['Total em aberto (mês)','R$ 14.243,65','9 títulos','primary']].map(([a,b,c,t])=>`<div class="card kpi" style="border-left:3px solid var(--${t})"><div class="lbl">${a}</div><div class="val num" style="font-size:21px">${b}</div><div class="small muted">${c}</div></div>`).join('')}</div>
+ <div class="card"><div class="row gap8" style="padding:12px 14px;border-bottom:1px solid var(--border)">
+   <div class="input" style="width:280px;height:34px;background:var(--surface-2)">${I('search',15)}<span class="muted small">Buscar descrição, fornecedor, NF...</span></div>
+   <span class="chip" style="height:34px">${I('clock',13)}01/10/2026 – 31/10/2026</span><span class="chip" style="height:34px">Status: Em aberto ${I('cd',13)}</span><span class="chip" style="height:34px">${I('filter',13)}Categoria</span><span class="grow"></span><span class="small muted">9 registros</span></div>
+  <table><tr><th style="padding-left:16px">Vencimento</th><th>Descrição</th><th>Categoria</th><th>Parcela</th><th class="r">Valor</th><th>Status</th><th></th></tr>
+  ${contas.map(([d,ds,c,p,v,s,t])=>`<tr><td class="num" style="padding-left:16px">${d}</td><td><b style="font-weight:600">${ds}</b></td><td class="muted">${c}</td><td class="muted num">${p}</td><td class="r num"><b style="font-weight:600">${v}</b></td><td><span class="badge b-${t}">${s}</span></td><td class="muted">${I('more',16)}</td></tr>`).join('')}
+  </table></div>`,
+ overlay:`<div class="pop" style="right:150px;top:182px;width:330px">
+  <div class="pop-label" style="padding-top:12px">Exportar com os filtros atuais</div>
+  <div class="pop-sec" style="padding-top:0">
+   <div class="pop-item sel"><div class="pi" style="background:var(--danger-soft);color:var(--danger)">${I('file',16)}</div><div class="grow"><b style="font-weight:600">PDF</b><div class="small muted">Relatório formatado para impressão</div></div></div>
+   <div class="pop-item"><div class="pi" style="background:var(--success-soft);color:var(--success)">${I('sheet',16)}</div><div class="grow"><b style="font-weight:600">Excel (.xlsx)</b><div class="small muted">Valores numéricos, filtros e totais</div></div></div>
+   <div class="pop-item"><div class="pi">${I('file',16)}</div><div class="grow"><b style="font-weight:600">CSV</b><div class="small muted">Para importar em outros sistemas</div></div></div>
+  </div>
+  <div class="xs muted" style="padding:10px 14px;border-top:1px solid var(--border);background:var(--surface-2);line-height:1.5">PDF sempre no tema claro. Relatórios grandes são gerados em segundo plano e avisados no 🔔.</div>
+ </div>`}));
+
+// 09 Licença suspensa
+S.push(screen('09-licenca-suspensa','light',`
+ <div style="position:absolute;inset:0;background:radial-gradient(circle at 20% 10%,var(--primary-soft),transparent 45%),radial-gradient(circle at 85% 90%,var(--danger-soft),transparent 40%)"></div>
+ <div style="position:absolute;top:28px;left:36px" class="logo"><div class="mark">K</div>kamus</div>
+ <div style="position:absolute;top:30px;right:36px" class="row gap12"><span class="small muted">admin@kamus.local</span><span class="btn">${I('logout',15)}Sair</span></div>
+ <div class="card" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:560px;padding:40px 44px;box-shadow:var(--shadow-lg)">
+  <div style="width:56px;height:56px;border-radius:16px;background:var(--danger-soft);color:var(--danger);display:grid;place-items:center;margin-bottom:20px">${I('lock',26)}</div>
+  <h1>Acesso temporariamente suspenso</h1>
+  <p class="muted" style="margin-top:10px;line-height:1.6;font-size:14.5px">A mensalidade da <b style="color:var(--text)">Kamus Moda</b> está em aberto desde 10/10/2026 e o período de carência terminou. <b style="color:var(--text)">Seus dados estão preservados</b> e o acesso volta imediatamente após a confirmação do pagamento.</p>
+  <div style="margin:24px 0;border:1px solid var(--border);border-radius:12px;overflow:hidden">
+   ${[['Plano','Loja · até 2 CNPJs, 5 usuários'],['Vencimento','10/10/2026'],['Valor','R$ 199,90 / mês'],['Situação','<span class="badge b-danger">Suspensa</span>']].map(([a,b],i)=>`<div class="row" style="padding:11px 16px;${i?'border-top:1px solid var(--border)':''}"><span class="muted grow">${a}</span><b style="font-weight:600" class="num">${b}</b></div>`).join('')}
+  </div>
+  <div class="row gap8"><span class="btn primary" style="flex:1;justify-content:center;height:40px">${I('refresh',16)}Já paguei — verificar novamente</span><span class="btn" style="height:40px">${I('mail',16)}Falar com o suporte</span></div>
+  <div class="row gap6 small" style="margin-top:18px;color:var(--primary);font-weight:600;justify-content:center">${I('download',15)}Exportar meus dados <span class="badge b-neutral">a confirmar</span></div>
+ </div>`));
+
+// 10 Painel Admin — licenças (claro, acento âmbar)
+const tenants=[['Kamus Moda (Demo)','2','Loja','Suspensa','danger','10/10/2026','há 2 dias'],['Ateliê Flor de Lis','1','Essencial','Ativa','success','04/11/2026','há 12 min'],['Bella Moda Infantil','3','Rede','Ativa','success','21/11/2026','há 1 h'],['Estilo Urbano Store','1','Essencial','Carência','warning','09/10/2026','há 3 h'],['Closet da Ana','1','Essencial','Trial','info','27/10/2026','ontem'],['Jeans & Cia Outlet','2','Loja','Ativa','success','15/11/2026','há 30 min'],['Vista Bem Modas','1','Essencial','Cancelada','neutral','02/08/2026','há 74 dias']];
+S.push(screen('10-admin-licencas','light',`<div class="shell">
+ <aside class="sidebar"><div class="logo"><div class="mark">K</div>kamus<span class="badge b-primary" style="margin-left:auto;height:20px">ADMIN</span></div>
+  <div class="nav"><div class="nav-label">Gestão do SaaS</div>
+  ${[['building','Clientes'],['key','Licenças',1],['wallet','Pagamentos'],['layers','Planos'],['history','Auditoria'],['shield','Administradores']].map(([ic,l,a])=>`<a class="${a?'active':''}">${I(ic)}${l}</a>`).join('')}</div>
+  <div class="side-foot"><div class="small muted" style="padding:0 8px;line-height:1.5">Painel Administrativo<br>admin.kamus · acesso restrito</div></div></aside>
+ <div class="main"><header class="topbar"><h2 class="grow">Licenças</h2>
+  <span class="badge b-success" style="height:28px;padding:0 10px">${I('shield',14)}2FA ativo</span><span class="badge b-neutral" style="height:28px;padding:0 10px">IP autorizado · 189.40.xx.xx</span>
+  <div class="row gap8"><div class="avatar" style="background:linear-gradient(135deg,#F59E0B,#B45309)">SA</div><div class="small" style="font-weight:600">Super Admin</div></div></header>
+  <div class="content">
+   <div class="kpis" style="grid-template-columns:repeat(5,1fr)">${[['Ativas','18','success'],['Trial','4','info'],['Em carência','2','warning'],['Suspensas','1','danger'],['Receita recorrente (MRR)','R$ 3.598,20','primary']].map(([a,b,t])=>`<div class="card kpi"><div class="lbl"><span style="width:8px;height:8px;border-radius:50%;background:var(--${t})"></span>${a}</div><div class="val num" style="font-size:22px">${b}</div></div>`).join('')}</div>
+   <div class="card"><div class="row gap8" style="padding:12px 14px;border-bottom:1px solid var(--border)"><div class="input" style="width:300px;height:34px;background:var(--surface-2)">${I('search',15)}<span class="muted small">Buscar cliente ou CNPJ...</span></div><span class="chip" style="height:34px">Estado: Todos ${I('cd',13)}</span><span class="grow"></span><span class="btn primary">${I('plus',16)}Novo cliente</span></div>
+   <table><tr><th style="padding-left:16px">Cliente</th><th>CNPJs</th><th>Plano</th><th>Estado</th><th>Pago até</th><th>Último acesso</th><th class="r" style="padding-right:16px">Ações</th></tr>
+   ${tenants.map(([n,c,p,s,t,d,u])=>`<tr><td style="padding-left:16px"><b style="font-weight:600">${n}</b></td><td class="num">${c}</td><td>${p}</td><td><span class="badge b-${t}">${s}</span></td><td class="num">${d}</td><td class="muted">${u}</td><td class="r" style="padding-right:16px"><span class="btn" style="height:30px;font-size:12px">Registrar pagamento</span></td></tr>`).join('')}
+   </table></div>
+  </div></div></div>
+ <div class="overlay"></div>
+ <div class="pop" style="left:50%;top:50%;transform:translate(-50%,-50%);width:500px">
+  <div class="row" style="padding:18px 20px;border-bottom:1px solid var(--border)"><div class="grow"><h2 style="font-size:17px">Registrar pagamento</h2><div class="small muted" style="margin-top:2px">Kamus Moda (Demo) · Plano Loja · <span class="badge b-danger" style="height:18px">Suspensa</span></div></div><span class="muted">${I('x')}</span></div>
+  <div style="padding:18px 20px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+   <div class="field"><label>Valor recebido</label><div class="input num">R$ 199,90</div></div>
+   <div class="field"><label>Data do pagamento</label><div class="input num">13/10/2026</div></div>
+   <div class="field"><label>Forma</label><div class="input">PIX<span class="grow"></span>${I('cd',15)}</div></div>
+   <div class="field"><label>Estender "pago até" para</label><div class="input num" style="border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)">10/11/2026<span class="grow"></span><span class="badge b-primary">+1 mês</span></div></div>
+   <div class="field" style="grid-column:1/-1"><label>Observação</label><div class="input muted">Comprovante recebido por WhatsApp</div></div>
+   <div style="grid-column:1/-1;background:var(--success-soft);color:var(--success);border-radius:10px;padding:10px 12px;font-size:12.5px" class="row gap8">${I('check',16)}O cliente será liberado imediatamente. A ação fica registrada na auditoria.</div>
+  </div>
+  <div class="row gap8" style="justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--border);background:var(--surface-2)"><span class="btn">Cancelar</span><span class="btn primary">${I('key',16)}Registrar e liberar</span></div>
+ </div>`,'data-accent="admin"'));
+
+// 11 Mobile
+function phone(theme,body,tab='Início'){
+  return `<div class="phone" data-theme="${theme}"><div class="scr"><div class="notch"></div>
+   <div class="status"><span>9:41</span><span class="row gap4">${I('wifi',15)}<span style="width:24px;height:12px;border:1.5px solid currentColor;border-radius:4px;display:inline-block;position:relative"><span style="position:absolute;inset:1.5px;right:5px;background:currentColor;border-radius:1.5px"></span></span></span></div>
+   <div style="flex:1;overflow:hidden;padding:6px 18px 0">${body}</div>
+   <div class="m-tab">${[['dash','Início'],['bag','Vendas'],['box','Estoque'],['wallet','Financeiro'],['bell','Alertas']].map(([i,l])=>`<div class="${l===tab?'on':''}">${I(i,21)}${l}</div>`).join('')}</div></div></div>`;
+}
+const mHead=`<div class="row" style="margin-bottom:14px"><div class="grow"><div class="xs muted">Empresa</div><div class="row gap4" style="font-weight:700;font-size:15px">Kamus Moda Centro ${I('cd',15)}</div></div><div class="iconbtn" style="width:36px;height:36px">${I('bell',18)}<span class="dot">3</span></div></div>`;
+const mDash=`${mHead}<div class="seg" style="width:100%;margin-bottom:14px"><span class="on" style="flex:1;text-align:center">Hoje</span><span style="flex:1;text-align:center">7 dias</span><span style="flex:1;text-align:center">Mês</span></div>
+ <div class="card" style="padding:16px;margin-bottom:12px"><div class="small muted">Vendas hoje</div><div class="row" style="align-items:baseline;gap:8px"><div class="num" style="font-size:28px;font-weight:700;letter-spacing:-.02em">R$ 2.340,00</div>${up('12%')}</div><div class="xs muted">16 vendas · ticket médio R$ 146,25</div>
+ <div style="margin-top:8px">${areaChart(270,64,sales.slice(-14),{grid:false,labels:false})}</div></div>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+  <div class="card" style="padding:12px"><div class="xs muted">A receber hoje</div><div class="num" style="font-weight:700;font-size:16px;margin-top:4px">R$ 1.200</div></div>
+  <div class="card" style="padding:12px"><div class="xs muted">A pagar hoje</div><div class="num" style="font-weight:700;font-size:16px;margin-top:4px">R$ 850</div><span class="badge b-danger" style="margin-top:4px;height:18px">2 vencidas</span></div>
+  <div class="card" style="padding:12px"><div class="xs muted">Saldo em contas</div><div class="num" style="font-weight:700;font-size:16px;margin-top:4px">R$ 27,4 mil</div></div>
+  <div class="card" style="padding:12px"><div class="xs muted">Estoque (custo)</div><div class="num" style="font-weight:700;font-size:16px;margin-top:4px">R$ 84,2 mil</div></div>
+ </div>
+ <div class="card" style="padding:4px 12px;margin-bottom:10px">${[['Camiseta Gola V · Preto M','6 peças'],['Calça Skinny · Azul 40','4 peças']].map(([a,b],i)=>`<div class="row" style="padding:8px 0;${i?'border-top:1px solid var(--border)':''}"><span class="grow small" style="font-weight:500">${a}</span><span class="xs muted">${b}</span></div>`).join('')}</div>
+ <div class="row xs muted gap4" style="justify-content:center">${I('eye',13)}Somente leitura · atualizado agora</div>`;
+const mAlerts=`${mHead}<h1 style="font-size:20px;margin-bottom:12px">Alertas</h1>
+ ${[['layers','danger','Quebra de grade','Calça Jeans Skinny · sem 38 e 40','5 min'],['clock','warning','Conta vence hoje','Malharia Sul · R$ 850,00','1 h'],['box','warning','Estoque baixo','Camiseta Gola V Preto M · 2 un.','3 h'],['history','info','Sem giro há 45 dias','Vestido Longo Cetim · 14 peças','ontem'],['key','info','Licença vence em 5 dias','Plano Loja · 18/10','ontem']].map(([ic,t,a,b,w])=>`<div class="card row gap12" style="padding:12px;margin-bottom:8px;align-items:flex-start"><div class="thumb" style="background:var(--${t}-soft);color:var(--${t})">${I(ic,16)}</div><div class="grow"><b style="font-weight:600;font-size:13px">${a}</b><div class="xs muted" style="margin-top:2px">${b}</div></div><span class="xs muted">${w}</span></div>`).join('')}`;
+S.push(screen('11-mobile','light',`<div style="position:absolute;inset:0;background:linear-gradient(135deg,#ECEBFF,#F6F6F8 50%,#E9E8F0)"></div>
+ <div style="position:absolute;left:44px;top:56px;width:224px"><div class="logo" style="padding:0 0 16px"><div class="mark">K</div>kamus <span class="muted" style="font-weight:500">mobile</span></div>
+ <h1 style="font-size:30px;line-height:1.15">O dono acompanha a loja em tempo real.</h1><p class="muted" style="margin-top:12px;line-height:1.55">App em React Native, <b style="color:var(--text)">somente leitura</b>: mesmos endpoints do dashboard web, troca de CNPJ, alertas com push e tema claro/escuro.</p>
+ <div class="row gap8" style="margin-top:18px;flex-wrap:wrap"><span class="badge b-primary">React Native</span><span class="badge b-success">Somente leitura</span><span class="badge b-info">Push</span></div></div>
+ <div class="row" style="position:absolute;left:292px;top:70px;gap:24px">${phone('light',mDash)}${phone('dark',mDash)}${phone('light',mAlerts,'Alertas')}</div>`));
+
+document.getElementById('root').innerHTML=S.join('');
+</script>
+</body>
+</html>

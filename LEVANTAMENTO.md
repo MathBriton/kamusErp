@@ -258,6 +258,8 @@ O que o dono quer ver no celular:
 
 Itens transversais que existem **antes** de qualquer módulo de negócio. Todos entram na Fase 0 do roadmap e seguem TDD como o resto.
 
+> 🎨 **Mockups visuais** de todas as telas desta seção: [docs/mockups](docs/mockups/README.md).
+
 ### 5.1 Login e usuário de teste
 
 - **Tela de login** (e-mail + senha) com ASP.NET Core Identity.
