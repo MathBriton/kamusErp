@@ -1,0 +1,50 @@
+name: backend-ci
+
+on:
+  pull_request:
+    paths:
+      - "src/backend/**"
+      - "tests/**"
+      - "Kamus.slnx"
+      - "Directory.*.props"
+      - "global.json"
+      - ".editorconfig"
+      - ".github/workflows/backend-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/backend/**"
+      - "tests/**"
+      - "Kamus.slnx"
+      - "Directory.*.props"
+      - "global.json"
+      - ".editorconfig"
+      - ".github/workflows/backend-ci.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore Kamus.slnx
+
+      - name: Formatação
+        run: dotnet format Kamus.slnx --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build Kamus.slnx --no-restore -c Release
+
+      # Testes de integração usam Testcontainers (Docker já disponível no runner)
+      - name: Testes
+        run: dotnet test --solution Kamus.slnx --no-build -c Release
