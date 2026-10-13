@@ -252,6 +252,102 @@ O que o dono quer ver no celular:
 - **Push notifications** (Expo Notifications) para alertas importantes.
 - Mesmo backend e mesma autenticação da web; perfil "Dono" com acesso de leitura a tudo.
 
+### 4.7 Funcionalidades escolhidas para o piloto
+
+> Decisão de 2026-10-13. Várias dependem do **registro de venda simples** (4.7.1), que passa a ser o núcleo de vendas do piloto e, no futuro, a base do PDV.
+
+#### 4.7.1 Registro de venda simples (backoffice)
+
+Pressuposto para troca, crediário, condicional e comissão. Responde à pergunta 1 da seção 12 com a **opção A** *(confirmar)*.
+
+- Tela de venda no sistema web: cliente (opcional, obrigatório no crediário), **vendedor**, itens por SKU (leitor de código de barras funciona como teclado), desconto por item/total com limite por perfil, uma ou mais formas de pagamento (dinheiro, PIX, cartão, **vale-troca**, **crediário**).
+- **Sem emissão fiscal**: a loja continua emitindo a nota no sistema atual. A venda guarda um campo opcional "nº do cupom/nota externo".
+- Ao confirmar: baixa de estoque, lançamento no caixa ou recebível, comissão calculada e histórico de alterações.
+- Cancelamento com motivo e permissão; estorna estoque, financeiro e comissão.
+
+#### 4.7.2 Histórico de alterações (auditoria)
+
+- **O que registra:** inclusão, alteração e exclusão de registros de negócio, com **valores antes/depois** de cada campo alterado, usuário, data/hora, IP, empresa e tela/origem.
+- **Eventos sensíveis** registrados mesmo sem alteração de dados: login (sucesso/falha), exportação de relatório, troca de permissão, cancelamento de venda, ajuste de estoque, alteração de preço, baixa manual de título.
+- **Imutável:** tabela só de inserção (append-only); nem o Dono consegue apagar. Também protegida por RLS.
+- **Onde aparece:** aba "Histórico" em cada registro (produto, cliente, título...) e relatório geral com filtros (período, usuário, tipo, entidade), exportável em PDF/Excel.
+- **Técnico:** gravado automaticamente no `SaveChanges` do `KamusDbContext` (mesmo ponto do controle de tenant), portanto nenhum módulo "esquece" de auditar. Campos sensíveis (senha, tokens) nunca são gravados; CPF aparece mascarado.
+- **Retenção:** configurável por plano (ex.: 12 meses), com exportação antes do expurgo.
+
+#### 4.7.3 Resumo diário (configurável)
+
+- Enviado ao fim do dia com: vendas (total, nº, ticket médio, comparação), top 3 produtos, formas de pagamento, contas a pagar/receber do dia seguinte, condicionais atrasadas, parcelas de crediário vencidas, alertas de estoque.
+- **Configurável por usuário:** ligado/desligado, **horário** (padrão 20h), **dias da semana**, **canais** (push no app, e-mail, sininho), **empresas** (uma, várias ou consolidado), **blocos de conteúdo** que quer receber e "enviar mesmo sem movimento".
+- Fuso horário da empresa (padrão `America/Sao_Paulo`).
+- **Técnico:** job agendado em segundo plano, que reaproveita os read models do dashboard e gera um registro no histórico de notificações.
+
+#### 4.7.4 Importação por planilha e por XML
+
+**Planilha (Excel/CSV):**
+- **Modelos para download** (.xlsx com instruções e validações): produtos com grade, clientes, fornecedores, **estoque inicial por SKU**, contas a pagar/receber em aberto e saldos de crediário.
+- **Fluxo em 4 passos:** upload → **pré-visualização com validação linha a linha** (erros e avisos destacados, ex.: "CNPJ inválido na linha 12") → confirmação → processamento em segundo plano com notificação no sininho e relatório de resultado.
+- **Modo simulação** (valida sem gravar) e **reimportação segura**: registros identificados por código/referência são atualizados, não duplicados.
+- Importação de produtos aceita uma linha por SKU (referência + cor + tamanho) e monta a grade automaticamente.
+
+**XML da NF-e de entrada (nota do fornecedor):**
+- Upload de um ou vários XMLs (ou .zip). **Apenas leitura**: não há comunicação com a SEFAZ nem risco fiscal.
+- **Fornecedor** identificado pelo CNPJ do emitente (cadastrado automaticamente se não existir).
+- **Duplicidade:** a chave de acesso (44 dígitos) impede importar a mesma nota duas vezes.
+- **De-para de produtos:** cada item da nota (código do fornecedor, descrição, EAN, NCM) é vinculado a um SKU nosso. **O vínculo é memorizado**, então na próxima nota do mesmo fornecedor o casamento é automático. Itens novos podem virar produto/grade ali mesmo.
+- **Conversão de unidade:** nota em CX com 12 → entra 12 UN.
+- **Custo de aquisição** por item: valor do produto + IPI + frete + seguro + ST + outras despesas − desconto (rateados por item). É a base do custo médio.
+- **Gera automaticamente:** entrada de estoque e **contas a pagar a partir das duplicatas** da nota (número, vencimento, valor).
+- **Futuro:** importar XMLs de NFC-e emitidas pelo sistema fiscal atual da loja como vendas (opção B da pergunta 1).
+
+#### 4.7.5 Ficha do cliente
+
+- **Dados:** nome, CPF (opcional), telefone/WhatsApp, e-mail, data de nascimento, endereço, observações.
+- **Preferências de moda:** tamanhos por tipo de peça (camiseta M, calça 40, calçado 37), cores/estilos preferidos.
+- **Visão 360°:** histórico de compras, ticket médio, frequência, última compra, produtos mais comprados, **saldo de vale-troca**, **crediário** (limite, em aberto, atrasado), **condicionais abertas**.
+- **WhatsApp em 1 clique:** link com mensagem pronta (modelos configuráveis: aniversário, novidade no seu tamanho, lembrete de condicional, cobrança de parcela).
+- **Lista de aniversariantes** do dia/semana/mês.
+- **LGPD:** consentimento explícito para mensagens de marketing (opt-in com data), opção de anonimizar o cliente mantendo o histórico de vendas.
+
+#### 4.7.6 Troca e vale-troca
+
+- **Troca** vinculada à venda original (busca por cliente, data ou código da etiqueta); permite troca sem venda localizada conforme política da loja (configurável).
+- **Prazo de troca configurável** (ex.: 30 dias) e motivo obrigatório (tamanho, cor, defeito, desistência). *Troca por gosto/tamanho em loja física é política da loja; troca por **defeito** segue o CDC — validar regras com o contador/jurídico.*
+- **Destino do item devolvido:** volta ao estoque disponível ou vai para "avariado" (defeito), sem voltar à venda.
+- **Diferença de valor:** se a peça nova é mais cara, o cliente paga a diferença; se é mais barata (ou não leva nada), gera **vale-troca**.
+- **Vale-troca:** código único (impresso em PDF/cupom), valor, **validade configurável**, uso parcial com saldo, vinculado ao cliente ou ao portador. É aceito como forma de pagamento.
+- **Financeiro:** vale-troca é um **crédito do cliente** (obrigação da loja), não receita, até ser usado; vales vencidos aparecem em relatório.
+- **Comissão:** o item devolvido estorna a comissão do vendedor original.
+
+#### 4.7.7 Condicional (malinha)
+
+- Exige **cliente cadastrado** e respeita um **limite por cliente** (valor e/ou nº de peças).
+- As peças saem do estoque disponível para o local virtual **"em condicional"** (continuam sendo da loja, mas não podem ser vendidas para outro cliente).
+- **Prazo de devolução** configurável (ex.: 2 dias) e **termo de responsabilidade** em PDF (itens, valores, prazo) para assinatura.
+- **Retorno:** peças devolvidas voltam ao estoque; as que o cliente ficou viram **venda** (com vendedor e forma de pagamento, inclusive crediário).
+- **Alertas:** condicional vencendo/atrasada no sininho e no resumo diário, com lembrete via WhatsApp em 1 clique.
+- **Bloqueio:** cliente com condicional atrasada não abre outra (liberação com permissão de gerente).
+- **Relatórios:** condicionais abertas, **valor em mercadoria "na rua"**, taxa de conversão (quanto da condicional vira venda) por vendedor.
+
+#### 4.7.8 Crediário próprio (fiado)
+
+- **Limite de crédito por cliente**, aprovado manualmente (perfil Gerente/Dono). O limite disponível considera parcelas em aberto.
+- Venda no crediário: entrada opcional + N parcelas com vencimentos; gera **contas a receber vinculadas ao cliente**.
+- **Carnê em PDF** para imprimir/enviar; **recibo** em PDF a cada pagamento.
+- **Recebimento de parcela:** total ou parcial, com **multa e juros por atraso configuráveis**. *No CDC, a multa por atraso é limitada a 2%; os juros de mora usuais são 1% a.m. — validar com o contador.*
+- **Bloqueio automático** de novas compras no crediário com parcela atrasada há mais de N dias (configurável).
+- **Relatórios:** carteira a receber, **inadimplência por faixa de atraso** (aging: 1–30, 31–60, 61–90, 90+ dias), clientes bloqueados.
+- **Cobrança** via WhatsApp em 1 clique. *Futuro:* boleto/PIX automático via gateway, renegociação de dívida e consulta a birôs de crédito.
+
+#### 4.7.9 Vendedores e comissão
+
+- **Vendedor** pode ser um usuário do sistema ou um cadastro simples sem login.
+- **Regras de comissão:** % por vendedor (padrão), opcionalmente % diferente por categoria de produto.
+- **Base de cálculo configurável:** valor líquido (após descontos), sobre **vendas faturadas** ou **vendas recebidas** (importante no crediário: comissão só quando o cliente paga).
+- **Estornos automáticos** em troca, devolução e cancelamento.
+- **Metas mensais** por vendedor com faixas progressivas (ex.: até 100% da meta → 3%; acima de 120% → 4%).
+- **Fechamento de comissão** por período: relatório por vendedor (PDF/Excel) e, opcionalmente, geração de conta a pagar.
+- **Ranking** de vendedores no dashboard (vendas, ticket médio, conversão de condicional).
+
 ---
 
 ## 5. Fundação da aplicação (dia 1)
@@ -327,7 +423,7 @@ Itens transversais que existem **antes** de qualquer módulo de negócio. Todos 
 - Clique leva ao item relacionado (ex.: produto com estoque baixo, título vencendo).
 - **Tempo real via SignalR** (WebSocket) — o contador atualiza sem recarregar a página. Mesmo canal será reaproveitado pelo dashboard.
 - **Modelo:** tabela `notificacoes` (tenant, empresa, usuário destinatário ou perfil, tipo, título, mensagem, link, lida_em, criada_em). Qualquer módulo cria notificações via um serviço comum.
-- **Tipos iniciais:** estoque baixo / quebra de grade, contas a pagar vencendo hoje, contas vencidas, **exportação de relatório pronta** (5.6), **licença vencendo** (5.8).
+- **Tipos iniciais:** estoque baixo / quebra de grade, contas a pagar vencendo hoje, contas vencidas, **exportação de relatório pronta** (5.6), **licença vencendo** (5.8), **condicional atrasada** (4.7.7), **parcela de crediário vencida** (4.7.8), **importação concluída** (4.7.4) e **resumo diário** (4.7.3).
 - **Depois:** preferências por tipo (o que recebe e por qual canal), e-mail e push no mobile.
 
 ### 5.6 Exportação de relatórios (PDF e Excel)
@@ -487,7 +583,8 @@ flowchart LR
 | `web-ci` | PR / push (paths `src/web/**`) | install, lint, typecheck, testes, build |
 | `admin-ci` | PR / push (paths `src/admin/**`) | install, lint, typecheck, testes, build |
 | `mobile-ci` | PR / push (paths `src/mobile/**`) | lint, typecheck, testes |
-| `release` | push em `main` / tag | build das imagens Docker → push no GHCR |
+| `release` | push em `main` | release-please mantém o PR de release (changelog + versão); ao mergear: tag `vX.Y.Z`, GitHub Release e imagens Docker no GHCR — ver [docs/RELEASES.md](docs/RELEASES.md) |
+| `pr-title` | PR aberto/editado | valida o título no padrão Conventional Commits |
 | `deploy` | manual ou tag | SSH na VPS → `docker compose pull && up -d` → migrations |
 
 ---
@@ -546,14 +643,15 @@ kamusErp/
 | Fase | Entrega |
 |---|---|
 | **0a — Infra** ✅ | Repositório, solução .NET, Docker Compose, CI, multi-tenancy (`tenant_id` + RLS), primeiro teste verde |
-| **0b — Fundação da aplicação** | Login + seed de teste, shell (sidebar/topbar), seletor de empresa, pesquisa global (estrutura), notificações + SignalR, tema claro/escuro, infraestrutura de exportação PDF/Excel, licenciamento + Painel Admin, dashboard (estrutura) |
-| **1 — Cadastros** | Tenant/empresas (multi-CNPJ)/lojas, usuários e perfis, clientes/fornecedores, **produtos com grade** (tamanho × cor), geração de SKUs, códigos de barras internos |
-| **2 — Estoque** | Movimentações, saldo, custo médio, entrada de mercadoria em matriz, ajustes, transferência entre lojas, inventário, kardex, etiquetas, alertas |
+| **0b — Fundação da aplicação** | Login + seed de teste, shell (sidebar/topbar), seletor de empresa, pesquisa global (estrutura), notificações + SignalR, tema claro/escuro, infraestrutura de exportação PDF/Excel, **histórico de alterações (auditoria)**, licenciamento + Painel Admin, dashboard (estrutura), **releases versionadas** ✅ |
+| **1 — Cadastros** | Tenant/empresas (multi-CNPJ)/lojas, usuários e perfis, **ficha do cliente**, fornecedores, **vendedores**, **produtos com grade** (tamanho × cor), geração de SKUs, códigos de barras internos, **importação por planilha** |
+| **2 — Estoque** | Movimentações, saldo, custo médio, entrada de mercadoria em matriz, **importação de XML da NF-e de entrada**, ajustes, transferência entre lojas, inventário, kardex, etiquetas, alertas |
 | **3 — Financeiro** | Contas a pagar/receber, parcelas, baixas, contas financeiras, plano de contas, formas de pagamento com taxa, recorrência, fluxo de caixa, DRE simplificado |
-| **4 — Registro de vendas** | Forma de dar saída de estoque e gerar receita sem PDV (depende da pergunta 1 abaixo) |
-| **5 — Dashboard + Mobile** | Read models, KPIs na web, app mobile somente leitura, push de alertas |
-| **6 — Produção** | Deploy na VPS, backups, monitoramento, primeira loja piloto |
-| *Futuro* | *PDV + Fiscal (após o estudo), importação de XML de NF-e de entrada, condicional, trocas/vale-troca, conciliação bancária* |
+| **4 — Vendas** | **Registro de venda simples**, **troca e vale-troca**, **comissão** e metas de vendedores |
+| **5 — Crédito ao cliente** | **Crediário próprio** (limite, carnê, juros/multa, inadimplência) e **condicional** |
+| **6 — Dashboard + Mobile** | Read models, KPIs na web, app mobile somente leitura, push de alertas, **resumo diário configurável** |
+| **7 — Produção** | Deploy na VPS, backups, monitoramento, primeira loja piloto |
+| *Futuro* | *PDV + Fiscal (após o estudo), importação de NFC-e como vendas, catálogo por link, sugestão de grade de compra, % vendido por coleção, integração com e-commerce, cobrança automática por boleto/PIX, conciliação bancária* |
 
 ---
 
@@ -565,17 +663,21 @@ kamusErp/
    - **C)** Piloto só com estoque + financeiro, e vendas lançadas como baixa de estoque + receita manual.
 
    Sugestão: **A**, desenhada como o "núcleo" de venda que o futuro PDV vai reaproveitar (o PDV vira só uma interface mais rápida + fiscal por cima).
+   **Atualização:** as features escolhidas (troca, crediário, condicional, comissão) pressupõem a opção **A** — ver 4.7.1. *Confirmar.*
 2. **Tamanho do cliente piloto:** loja única ou várias lojas? (define a prioridade de transferência entre lojas)
 3. **Já existe uma loja piloto?** Que sistema/planilha ela usa hoje? (ajuda a entender a migração de dados e o que mais dói)
 4. **Compras:** precisa de pedido de compra ao fornecedor, ou só a entrada de mercadoria?
-5. **Vendedores e comissão:** entram no piloto? (comum em loja de roupas)
-6. **Crediário próprio / "fiado":** a loja vende a prazo direto ao cliente? (impacta contas a receber e cadastro de cliente)
+5. ~~Vendedores e comissão~~ → **sim**, ver 4.7.9. Comissão sobre venda **faturada** ou **recebida** como padrão?
+6. ~~Crediário próprio~~ → **sim**, ver 4.7.8. Valores padrão de multa/juros e dias de atraso para bloqueio?
 7. **Modelo de cobrança do SaaS:** por loja, por usuário, por plano/módulos?
 8. **Idioma/moeda:** só Brasil (pt-BR, BRL) ou pensar em internacionalização?
 9. **Licença — carência:** quantos dias após o vencimento até suspender? Durante a carência, uso normal ou **somente leitura**?
 10. **Licença — suspensão:** cliente suspenso pode ao menos **exportar os próprios dados**? (boa prática e argumento de confiança na venda)
 11. **Planos:** haverá planos diferentes (ex.: por nº de CNPJs/lojas/usuários) ou preço único no piloto?
 12. **Painel Admin:** só você vai usar, ou haverá outras pessoas (suporte, financeiro)?
+13. **Troca:** prazo padrão (30 dias?) e validade padrão do vale-troca (90 dias? sem validade?).
+14. **Condicional:** prazo padrão de devolução e limite padrão por cliente.
+15. **Resumo diário:** quais blocos vêm ligados por padrão?
 
 ---
 
@@ -589,6 +691,13 @@ kamusErp/
 | **Carência** | Dias após o vencimento da mensalidade em que o cliente ainda usa o sistema normalmente |
 | **SignalR** | Biblioteca .NET para comunicação em tempo real (WebSocket) com o navegador/app |
 | **Command palette** | Caixa de pesquisa/ações aberta por atalho (Ctrl+K) |
+| **Vale-troca** | Crédito do cliente gerado numa troca, usado como forma de pagamento |
+| **Condicional (malinha)** | Peças que o cliente leva para provar em casa, com prazo de devolução |
+| **Crediário** | Venda parcelada concedida pela própria loja, sem banco ou cartão |
+| **Aging** | Classificação das contas em atraso por faixa de dias |
+| **Chave de acesso** | Identificador único de 44 dígitos de uma NF-e/NFC-e |
+| **De-para** | Vínculo entre o código do produto do fornecedor e o SKU da loja |
+| **Release** | Versão publicada do sistema (ex.: v0.2.0), com changelog e imagens Docker |
 | **Markup** | Multiplicador aplicado ao custo para formar o preço de venda |
 | **Condicional** | Cliente leva peças para provar em casa e devolve o que não quiser |
 | **Kardex** | Extrato de movimentações de um produto |
@@ -640,3 +749,6 @@ kamusErp/
 | 2026-10-13 | Banco em `snake_case` (EFCore.NamingConventions) | Aceita (Fase 0a) |
 | 2026-10-13 | Aplicação conecta com papel `kamus_app` (sem superusuário) para o RLS valer; superusuário só para migrations | Aceita (Fase 0a) |
 | 2026-10-13 | Um DbContext por módulo, todos herdando de `KamusDbContext` (isolamento por tenant embutido) | Aceita (Fase 0a) |
+| 2026-10-13 | Piloto inclui: histórico de alterações, resumo diário configurável, importação por planilha e XML de NF-e, ficha do cliente, troca e vale-troca, condicional, crediário, vendedores e comissão | Aceita |
+| 2026-10-13 | Registro de venda simples no backoffice (sem fiscal) como núcleo de vendas | Proposta (confirmar) |
+| 2026-10-13 | Releases versionadas com SemVer + Conventional Commits + release-please; imagens Docker no GHCR | Aceita |
