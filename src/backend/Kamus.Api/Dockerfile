@@ -7,9 +7,10 @@ COPY src/backend/Shared/Kamus.SharedKernel/Kamus.SharedKernel.csproj src/backend
 COPY src/backend/Shared/Kamus.Infrastructure/Kamus.Infrastructure.csproj src/backend/Shared/Kamus.Infrastructure/
 RUN dotnet restore src/backend/Kamus.Api/Kamus.Api.csproj
 COPY src/backend/ src/backend/
-# Commit embutido na versão informada por /api/versao (o .git não entra no contexto do build)
+# Versão e commit informados pelo workflow de release (expostos em /api/versao)
+ARG APP_VERSION=0.0.0
 ARG SOURCE_REVISION=
-RUN dotnet publish src/backend/Kamus.Api/Kamus.Api.csproj -c Release -o /app --no-restore -p:SourceRevisionId=$SOURCE_REVISION
+RUN dotnet publish src/backend/Kamus.Api/Kamus.Api.csproj -c Release -o /app --no-restore -p:Version=$APP_VERSION -p:SourceRevisionId=$SOURCE_REVISION
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app

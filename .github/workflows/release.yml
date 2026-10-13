@@ -1,39 +1,80 @@
 name: release
 
-# Fluxo: commits convencionais na main → release-please mantém um PR "chore: release x.y.z"
-# com o CHANGELOG. Ao mergear esse PR: tag vX.Y.Z + GitHub Release + imagens Docker no GHCR.
+# Botão "Run workflow" na aba Actions (só na main). Calcula a versão pelos Conventional Commits
+# desde a última tag, cria a tag vX.Y.Z + GitHub Release com notas e publica as imagens no GHCR.
+# Não abre PR nem faz commit: só precisa de permissão de escrita no conteúdo, pedida abaixo.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      incremento:
+        description: "Incremento da versão (automático = pelos commits)"
+        type: choice
+        options: [automatico, patch, minor, major]
+        default: automatico
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
-  release-please:
+  preparar:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
-      version: ${{ steps.release.outputs.version }}
+      lancar: ${{ steps.versao.outputs.lancar }}
+      versao: ${{ steps.versao.outputs.versao }}
+      tag: ${{ steps.versao.outputs.tag }}
     steps:
-      - uses: googleapis/release-please-action@v4
-        id: release
+      - uses: actions/checkout@v4
         with:
-          # Opcional: um PAT em RELEASE_PLEASE_TOKEN faz o CI rodar também no PR de release
-          # (PRs abertos com o GITHUB_TOKEN padrão não disparam outros workflows).
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
+          fetch-depth: 0 # histórico e tags completos para calcular a versão
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Testes do script de versão
+        run: node --test .github/scripts/release/*.test.mjs
+
+      - name: CI verde neste commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Jobs "build-test" do backend-ci e do web-ci (os que rodaram para este commit)
+          checks=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs" \
+            --jq '[.check_runs[] | select(.name == "build-test")]')
+          echo "$checks" | jq -r '.[] | "\(.name): \(.status) / \(.conclusion)"'
+          pendentes=$(echo "$checks" | jq '[.[] | select(.status != "completed")] | length')
+          falhas=$(echo "$checks" | jq '[.[] | select(.status == "completed" and .conclusion != "success" and .conclusion != "skipped")] | length')
+          if [ "$pendentes" -gt 0 ]; then echo "::error::CI ainda rodando neste commit. Aguarde e tente de novo."; exit 1; fi
+          if [ "$falhas" -gt 0 ]; then echo "::error::CI falhou neste commit. Corrija antes de lançar."; exit 1; fi
+
+      - name: Calcular versão e notas
+        id: versao
+        env:
+          INCREMENTO: ${{ inputs.incremento }}
+        run: node .github/scripts/release/cli.mjs
+
+      - name: Criar tag e GitHub Release
+        if: steps.versao.outputs.lancar == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.versao.outputs.tag }}
+        run: |
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes-file release-notes.md
+          echo "### Release $TAG criada" >> "$GITHUB_STEP_SUMMARY"
+          cat release-notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Nada a lançar
+        if: steps.versao.outputs.lancar != 'true'
+        run: echo "Sem commits feat/fix/perf desde a última release. Use um incremento forçado para lançar mesmo assim." >> "$GITHUB_STEP_SUMMARY"
 
   docker:
-    needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
+    needs: preparar
+    if: needs.preparar.outputs.lancar == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -51,7 +92,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.release-please.outputs.tag_name }}
+          ref: ${{ needs.preparar.outputs.tag }}
 
       - name: Nome da imagem (minúsculas)
         id: nome
@@ -70,8 +111,8 @@ jobs:
         with:
           images: ${{ steps.nome.outputs.image }}
           tags: |
-            type=semver,pattern={{version}},value=${{ needs.release-please.outputs.tag_name }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ needs.release-please.outputs.tag_name }}
+            type=semver,pattern={{version}},value=${{ needs.preparar.outputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.preparar.outputs.tag }}
             type=raw,value=latest
 
       - uses: docker/build-push-action@v6
@@ -82,6 +123,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
+            APP_VERSION=${{ needs.preparar.outputs.versao }}
             SOURCE_REVISION=${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}

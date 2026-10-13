@@ -1,0 +1,19 @@
+name: scripts-ci
+
+on:
+  pull_request:
+    paths: [".github/scripts/**", ".github/workflows/scripts-ci.yml"]
+  push:
+    branches: [main]
+    paths: [".github/scripts/**", ".github/workflows/scripts-ci.yml"]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test .github/scripts/release/*.test.mjs

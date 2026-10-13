@@ -583,9 +583,10 @@ flowchart LR
 | `web-ci` | PR / push (paths `src/web/**`) | install, lint, typecheck, testes, build |
 | `admin-ci` | PR / push (paths `src/admin/**`) | install, lint, typecheck, testes, build |
 | `mobile-ci` | PR / push (paths `src/mobile/**`) | lint, typecheck, testes |
-| `release` | push em `main` | release-please mantém o PR de release (changelog + versão); ao mergear: tag `vX.Y.Z`, GitHub Release e imagens Docker no GHCR — ver [docs/RELEASES.md](docs/RELEASES.md) |
+| `release` | botão manual (Actions) | valida CI verde, calcula a versão pelos commits, cria tag `vX.Y.Z` + GitHub Release e publica imagens no GHCR — ver [docs/RELEASES.md](docs/RELEASES.md) |
+| `scripts-ci` | PR / push (paths `.github/scripts/**`) | testes do script de versão |
 | `pr-title` | PR aberto/editado | valida o título no padrão Conventional Commits |
-| `deploy` | manual ou tag | SSH na VPS → `docker compose pull && up -d` → migrations |
+| `deploy` | *aguardando servidor* | SSH na VPS → `docker compose pull && up -d` → migrations. **Adiado:** ambiente atual é só localhost |
 
 ---
 
@@ -697,7 +698,7 @@ kamusErp/
 | **Aging** | Classificação das contas em atraso por faixa de dias |
 | **Chave de acesso** | Identificador único de 44 dígitos de uma NF-e/NFC-e |
 | **De-para** | Vínculo entre o código do produto do fornecedor e o SKU da loja |
-| **Release** | Versão publicada do sistema (ex.: v0.2.0), com changelog e imagens Docker |
+| **Release** | Versão publicada do sistema (ex.: v0.2.0), com notas e imagens Docker |
 | **Markup** | Multiplicador aplicado ao custo para formar o preço de venda |
 | **Condicional** | Cliente leva peças para provar em casa e devolve o que não quiser |
 | **Kardex** | Extrato de movimentações de um produto |
@@ -751,4 +752,5 @@ kamusErp/
 | 2026-10-13 | Um DbContext por módulo, todos herdando de `KamusDbContext` (isolamento por tenant embutido) | Aceita (Fase 0a) |
 | 2026-10-13 | Piloto inclui: histórico de alterações, resumo diário configurável, importação por planilha e XML de NF-e, ficha do cliente, troca e vale-troca, condicional, crediário, vendedores e comissão | Aceita |
 | 2026-10-13 | Registro de venda simples no backoffice (sem fiscal) como núcleo de vendas | Proposta (confirmar) |
-| 2026-10-13 | Releases versionadas com SemVer + Conventional Commits + release-please; imagens Docker no GHCR | Aceita |
+| 2026-10-13 | Releases versionadas com SemVer + Conventional Commits, por botão no Actions (script próprio, sem PR de release); notas na GitHub Release; imagens Docker no GHCR | Aceita |
+| 2026-10-13 | CD (deploy automático) adiado até existir servidor; por ora ambiente só localhost | Aceita |

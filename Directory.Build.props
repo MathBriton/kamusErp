@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
-    <!-- Atualizado automaticamente pelo release-please a cada release -->
-    <Version>0.0.0</Version> <!-- x-release-please-version -->
+    <!-- Versão de desenvolvimento. A versão real vem da tag no build de release (-p:Version) -->
+    <Version>0.0.0</Version>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
