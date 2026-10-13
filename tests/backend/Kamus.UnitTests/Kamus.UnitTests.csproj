@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\backend\Shared\Kamus.SharedKernel\Kamus.SharedKernel.csproj" />
+  </ItemGroup>
+</Project>
