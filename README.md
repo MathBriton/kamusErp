@@ -100,6 +100,43 @@ tests/backend/                           Testes unitários, de integração e de
 docker/                                  Scripts de inicialização dos containers
 ```
 
+## Dúvidas em aberto e débitos técnicos
+
+Lista viva: cada sessão de desenvolvimento acrescenta aqui o que ficou para decidir ou para melhorar depois.
+O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md) (seção 12).
+
+### Dúvidas de negócio (aguardando o dono do projeto)
+
+| # | Dúvida | Situação |
+|---|---|---|
+| 1 | Vendas sem PDV: registro de venda simples no sistema web (opção A)? | Assumido **A**, falta confirmar |
+| 2 | Loja piloto: loja única ou várias lojas? Que sistema usa hoje? | Em aberto |
+| 3 | Compras: precisa de pedido de compra ou só a entrada de mercadoria? | Em aberto |
+| 4 | Comissão sobre venda **faturada** ou **recebida** como padrão? | Em aberto |
+| 5 | Crediário: multa/juros padrão e dias de atraso para bloquear novas compras | Em aberto |
+| 6 | Modelo de cobrança do SaaS (por loja, usuário ou plano) | Provisório: **plano único "Piloto"** com limites por cliente |
+| 7 | Licença: dias de carência e uso durante a carência | Provisório: **5 dias, uso normal com aviso** |
+| 8 | Licença: cliente suspenso pode exportar os próprios dados? | Provisório: **sim** |
+| 9 | Período de teste (trial) de cliente novo | Provisório: **14 dias** |
+| 10 | Painel Admin: só o dono usa ou haverá equipe (suporte, financeiro)? | Provisório: **só SuperAdmin** |
+| 11 | Troca: prazo padrão e validade do vale-troca | Em aberto |
+| 12 | Condicional: prazo de devolução e limite por cliente | Em aberto |
+| 13 | Resumo diário: blocos ligados por padrão | Em aberto |
+| 14 | Idioma/moeda: só Brasil? | Assumido **só Brasil** (pt-BR, R$) |
+
+### Débitos técnicos
+
+| Débito | Impacto | Quando resolver |
+|---|---|---|
+| Histórico de alterações é gravado logo **após** o `SaveChanges`, não na mesma transação | Se a gravação do histórico falhar, a alteração fica sem registro | Quando houver PostgreSQL em produção |
+| Arquivos de relatório gerados em segundo plano ficam **em memória** | Somem se a API reiniciar | Quando houver servidor (disco ou armazenamento de objetos) |
+| Link de download do relatório usa o id aleatório como "segredo" (sem login) | Quem tiver o link baixa por até 60 min | Avaliar link assinado de uso único |
+| Pesquisa global compara texto sem acento **em memória** | Lento com milhares de registros | Ao entrar produtos/clientes: `unaccent` + `pg_trgm` no PostgreSQL |
+| Desenvolvimento sem persistência (EF Core InMemory) | Dados somem ao reiniciar; RLS só é testado no CI | Quando houver banco local ou servidor |
+| SignalR com um único servidor | Com mais de uma instância da API, notificações não chegam a todos | Ao escalar: backplane (Redis) |
+| Sem CD (deploy automático) | Releases geram imagens, mas ninguém as publica | Quando houver servidor |
+| Imagem web do Docker não é testada localmente (limite do Docker Hub no ambiente) | Só validada no CI de release | — |
+
 ## Multi-tenancy em uma frase
 
 Toda entidade de negócio implementa `ITenantOwned`; o `KamusDbContext` filtra consultas e valida gravações pelo tenant atual, e o PostgreSQL reforça o isolamento com Row Level Security (`EnableTenantRowLevelSecurity` na migration de cada tabela). A aplicação conecta com o papel `kamus_app`, que não é superusuário — senão o RLS seria ignorado.

@@ -135,6 +135,8 @@ na tela — PDF, Excel, CSV, histórico e segundo plano vêm de graça. **Lembre
 - **Release:** GitHub → Actions → `release` → Run workflow (incremento `automatico`). Só lança com CI verde no
   commit. Gera tag `vX.Y.Z`, GitHub Release com notas e imagens `ghcr.io/mathbriton/kamus-api|kamus-web`.
 - Ao mudar uma decisão, registre na seção "Registro de decisões" do `LEVANTAMENTO.md`.
+- **Dúvidas em aberto e débitos técnicos** ficam no `README.md` (seção própria): acrescente lá o que surgir em cada
+  tarefa e risque/remova o que for resolvido.
 - Respostas ao dono do projeto em **português**.
 
 ## 9. Armadilhas já conhecidas
