@@ -4,6 +4,7 @@ SaaS de gestão para lojas de roupas: estoque em grade (cor × tamanho), finance
 
 - **Levantamento e decisões:** [LEVANTAMENTO.md](LEVANTAMENTO.md)
 - **Mockups das telas:** [docs/mockups](docs/mockups/README.md)
+- **Guia para agentes de código (Codex / Claude Code):** [AGENTS.md](AGENTS.md)
 
 ## Stack
 
