@@ -14,6 +14,8 @@ public static class MultiTenancyExtensions
     {
         services.AddScoped<TenantContext>();
         services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<TenantContext>());
+        services.AddScoped<EmpresaAtiva>();
+        services.AddScoped<IEmpresaAtiva>(sp => sp.GetRequiredService<EmpresaAtiva>());
         return services;
     }
 

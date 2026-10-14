@@ -15,6 +15,7 @@ var app = builder.Build();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseKamusMultiTenancy();
+app.UseModuloIdentidade();
 app.UseAuthorization();
 
 app.MapKamusDocumentacaoApi();

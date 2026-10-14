@@ -1,0 +1,14 @@
+namespace Kamus.SharedKernel.MultiTenancy;
+
+/// <summary>
+/// Empresa (CNPJ) escolhida pelo usuário para a requisição, já validada contra os acessos dele.
+/// Na visão consolidada ("todas as empresas", só leitura) <see cref="EmpresaId"/> é nulo e
+/// <see cref="EmpresaIds"/> traz todas as empresas consideradas.
+/// </summary>
+public interface IEmpresaAtiva
+{
+    bool Definida { get; }
+    bool Consolidado { get; }
+    Guid? EmpresaId { get; }
+    IReadOnlyList<Guid> EmpresaIds { get; }
+}

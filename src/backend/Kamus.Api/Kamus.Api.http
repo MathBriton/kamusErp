@@ -33,3 +33,8 @@ POST {{api}}/api/auth/refresh
 
 ### Sair
 POST {{api}}/api/auth/logout
+
+### Empresa ativa (troque pelo id de uma das empresas do login, ou use "todas")
+GET {{api}}/api/empresas/ativa
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: todas

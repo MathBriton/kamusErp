@@ -61,7 +61,10 @@ public static class ModuloIdentidade
         return services;
     }
 
-    public static IEndpointRouteBuilder MapModuloIdentidade(this IEndpointRouteBuilder app) => app.MapAutenticacao();
+    public static IEndpointRouteBuilder MapModuloIdentidade(this IEndpointRouteBuilder app) => app.MapAutenticacao().MapEmpresas();
+
+    /// <summary>Valida a empresa ativa (header X-Empresa-Id). Use depois de <c>UseKamusMultiTenancy</c>.</summary>
+    public static IApplicationBuilder UseModuloIdentidade(this IApplicationBuilder app) => app.UseEmpresaAtiva();
 
     /// <summary>Aplica migrations (se houver conexão de migração) e cria os dados de demonstração em Development.</summary>
     public static async Task InicializarModuloIdentidadeAsync(this WebApplication app)
