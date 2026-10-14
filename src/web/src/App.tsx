@@ -11,6 +11,8 @@ import { EmConstrucaoPage } from './pages/EmConstrucaoPage'
 import { TrocarSenhaPage } from './configuracoes/TrocarSenhaPage'
 import { EmpresasPage } from './configuracoes/EmpresasPage'
 import { UsuariosPage } from './configuracoes/UsuariosPage'
+import { PessoasPage } from './cadastros/PessoasPage'
+import { VendedoresPage } from './cadastros/VendedoresPage'
 import { HistoricoPage } from './pages/HistoricoPage'
 import { LoginPage } from './pages/LoginPage'
 import { NaoEncontradaPage } from './pages/NaoEncontradaPage'
@@ -21,6 +23,9 @@ const PAGINAS_IMPLEMENTADAS: Record<string, ReactNode> = {
   '/configuracoes/licenca': <LicencaPage />,
   '/configuracoes/empresas': <EmpresasPage />,
   '/configuracoes/usuarios': <UsuariosPage />,
+  '/cadastros/clientes': <PessoasPage key="cliente" papel="cliente" />,
+  '/cadastros/fornecedores': <PessoasPage key="fornecedor" papel="fornecedor" />,
+  '/cadastros/vendedores': <VendedoresPage />,
 }
 
 const ROTAS_DO_MENU = todasAsRotas(MENU).filter((item) => item.rota !== '/')

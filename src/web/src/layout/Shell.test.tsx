@@ -33,7 +33,7 @@ describe('Shell', () => {
     await userEvent.click(within(menuLateral()).getByRole('link', { name: 'Produtos' }))
 
     expect(await screen.findByRole('heading', { name: 'Produtos' })).toBeInTheDocument()
-    expect(screen.getByText(/Previsto para a v0\.7\.0/)).toBeInTheDocument()
+    expect(screen.getByText(/Previsto para a v0\.9\.0/)).toBeInTheDocument()
   })
 
   it('recolher o menu guarda a preferência', async () => {
