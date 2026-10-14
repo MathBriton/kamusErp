@@ -12,8 +12,11 @@ interface Props {
 /** Saldo (ou digitação de quantidades) em matriz cor × tamanho, com totais por cor e por tamanho. */
 export function MatrizDeEstoque({ matriz, onCelula, digitacao }: Props) {
   const celula = (corId: string, tamanho: string) => matriz.celulas.find((c) => c.corId === corId && c.tamanho === tamanho)
-  const totalDaCor = (corId: string) => matriz.celulas.filter((c) => c.corId === corId).reduce((s, c) => s + c.quantidade, 0)
-  const totalDoTamanho = (t: string) => matriz.celulas.filter((c) => c.tamanho === t).reduce((s, c) => s + c.quantidade, 0)
+  // Na digitação, os totais somam o que foi digitado; na leitura, o saldo.
+  const valor = (c: Celula) => (digitacao ? Number.parseInt(digitacao.valores[c.skuId] ?? '', 10) || 0 : c.quantidade)
+  const somar = (celulas: Celula[]) => celulas.reduce((s, c) => s + valor(c), 0)
+  const totalDaCor = (corId: string) => somar(matriz.celulas.filter((c) => c.corId === corId))
+  const totalDoTamanho = (t: string) => somar(matriz.celulas.filter((c) => c.tamanho === t))
 
   return (
     <div className="overflow-x-auto">
@@ -81,7 +84,7 @@ export function MatrizDeEstoque({ matriz, onCelula, digitacao }: Props) {
             {matriz.tamanhos.map((t) => (
               <td key={t} className="text-center font-semibold tabular-nums">{totalDoTamanho(t)}</td>
             ))}
-            <td className="px-2 text-right font-bold tabular-nums">{matriz.total}</td>
+            <td aria-label="Total da grade" className="px-2 text-right font-bold tabular-nums">{somar(matriz.celulas)}</td>
           </tr>
         </tbody>
       </table>

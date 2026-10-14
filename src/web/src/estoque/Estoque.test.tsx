@@ -111,6 +111,7 @@ describe('Estoque → Entrada, ajuste e transferência', () => {
     expect(screen.getByLabelText('Preto P')).toBeDisabled() // SKU desativado não recebe entrada
     await userEvent.type(screen.getByLabelText('Azul M'), '5')
     await userEvent.type(screen.getByLabelText('Preto G'), '2')
+    expect(screen.getByLabelText('Total da grade')).toHaveTextContent('7')
     const custo = screen.getByLabelText('Custo unitário (R$)')
     expect(custo).toHaveValue('24')
     await userEvent.clear(custo)
