@@ -11,6 +11,7 @@ public sealed class KamusApiFactory(
     IReadOnlyDictionary<string, string>? configuracoes = null) : WebApplicationFactory<Program>
 {
     public const string ChaveJwtDeTeste = "chave-de-teste-com-pelo-menos-32-caracteres!!";
+    public const string SenhaSuperAdminDeTeste = "SuperAdmin@Teste123";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -18,6 +19,8 @@ public sealed class KamusApiFactory(
         // Sempre sobrescreve: em Development o appsettings traz valores locais.
         builder.UseSetting("ConnectionStrings:Kamus", connectionString ?? "");
         builder.UseSetting("Jwt:Chave", ChaveJwtDeTeste);
+        // Fixa a senha do SuperAdmin de demonstração (no PostgreSQL compartilhado, quem cria primeiro decide).
+        builder.UseSetting("Seed:SenhaSuperAdmin", SenhaSuperAdminDeTeste);
         foreach (var (chave, valor) in configuracoes ?? new Dictionary<string, string>())
             builder.UseSetting(chave, valor);
     }

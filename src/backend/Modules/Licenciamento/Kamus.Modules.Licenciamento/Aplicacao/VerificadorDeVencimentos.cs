@@ -1,10 +1,6 @@
-using Kamus.Infrastructure.MultiTenancy;
 using Kamus.Modules.Licenciamento.Dominio;
 using Kamus.Modules.Licenciamento.Persistencia;
-using Kamus.SharedKernel.Clientes;
-using Kamus.SharedKernel.Notificacoes;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Kamus.Modules.Licenciamento.Aplicacao;
@@ -14,10 +10,9 @@ namespace Kamus.Modules.Licenciamento.Aplicacao;
 /// suspensão. Cada aviso sai uma única vez (fica marcado na licença), então pode rodar quantas vezes quiser.
 /// O estado em si não depende desta rotina: é calculado pelas datas.
 /// </summary>
-public sealed class VerificadorDeVencimentos(LicenciamentoDbContext db, IServiceScopeFactory escopos, ILogger<VerificadorDeVencimentos> log)
+public sealed class VerificadorDeVencimentos(LicenciamentoDbContext db, AvisoAosDonos avisos, ILogger<VerificadorDeVencimentos> log)
 {
     private static readonly int[] DiasDeAviso = [7, 3, 1, 0];
-    internal const string Link = "/configuracoes/licenca";
 
     public async Task ExecutarAsync(DateOnly hoje, CancellationToken ct = default)
     {
@@ -28,7 +23,7 @@ public sealed class VerificadorDeVencimentos(LicenciamentoDbContext db, IService
 
             try
             {
-                await NotificarDonosAsync(licenca.TenantId, aviso, ct);
+                await avisos.EnviarAsync(licenca.TenantId, aviso.Tipo, aviso.Titulo, aviso.Mensagem, ct);
                 await db.SaveChangesAsync(ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -63,16 +58,5 @@ public sealed class VerificadorDeVencimentos(LicenciamentoDbContext db, IService
             default:
                 return null;
         }
-    }
-
-    private async Task NotificarDonosAsync(Guid tenantId, Aviso aviso, CancellationToken ct)
-    {
-        await using var escopo = escopos.CreateAsyncScope();
-        var sp = escopo.ServiceProvider;
-        sp.GetRequiredService<TenantContext>().Definir(tenantId);
-
-        var notificador = sp.GetRequiredService<INotificador>();
-        foreach (var dono in await sp.GetRequiredService<IDiretorioDeClientes>().DonosDoTenantAtualAsync(ct))
-            await notificador.NotificarAsync(new NovaNotificacao(dono, aviso.Tipo, aviso.Titulo, aviso.Mensagem, Link), ct);
     }
 }

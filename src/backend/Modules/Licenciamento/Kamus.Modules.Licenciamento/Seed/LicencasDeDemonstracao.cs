@@ -15,6 +15,7 @@ namespace Kamus.Modules.Licenciamento.Seed;
 internal static class LicencasDeDemonstracao
 {
     public const decimal ValorMensal = 199.90m;
+    public const string EmailSuperAdmin = "superadmin@kamus.local";
 
     public static async Task CriarAsync(IServiceProvider services, CancellationToken ct = default)
     {

@@ -18,6 +18,8 @@ public sealed class LicenciamentoDbContext(DbContextOptions<LicenciamentoDbConte
 
     public DbSet<Licenca> Licencas => Set<Licenca>();
     public DbSet<Pagamento> Pagamentos => Set<Pagamento>();
+    public DbSet<Administrador> Administradores => Set<Administrador>();
+    public DbSet<AcaoAdministrativa> AcoesAdministrativas => Set<AcaoAdministrativa>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +46,26 @@ public sealed class LicenciamentoDbContext(DbContextOptions<LicenciamentoDbConte
             e.Property(p => p.RegistradoPor).HasMaxLength(254);
             e.HasIndex(p => new { p.TenantId, p.PagoEm });
             e.HasOne<Licenca>().WithMany().HasForeignKey(p => p.TenantId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Administrador>(e =>
+        {
+            e.ToTable("administradores");
+            e.Property(a => a.Nome).HasMaxLength(150);
+            e.Property(a => a.Email).HasMaxLength(254);
+            e.Property(a => a.SenhaHash).HasMaxLength(500);
+            e.HasIndex(a => a.Email).IsUnique();
+        });
+
+        modelBuilder.Entity<AcaoAdministrativa>(e =>
+        {
+            e.ToTable("acoes_administrativas");
+            e.Property(a => a.AdministradorEmail).HasMaxLength(254);
+            e.Property(a => a.Acao).HasMaxLength(50);
+            e.Property(a => a.Descricao).HasMaxLength(1000);
+            e.Property(a => a.Ip).HasMaxLength(64);
+            e.HasIndex(a => a.OcorridoEm);
+            e.HasIndex(a => new { a.TenantId, a.OcorridoEm });
         });
 
         base.OnModelCreating(modelBuilder);

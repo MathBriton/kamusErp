@@ -23,6 +23,115 @@ namespace Kamus.Modules.Licenciamento.Persistencia.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Kamus.Modules.Licenciamento.Dominio.AcaoAdministrativa", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Acao")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("acao");
+
+                    b.Property<string>("AdministradorEmail")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("administrador_email");
+
+                    b.Property<Guid?>("AdministradorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("administrador_id");
+
+                    b.Property<string>("Descricao")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("descricao");
+
+                    b.Property<string>("Ip")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("ip");
+
+                    b.Property<DateTimeOffset>("OcorridoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ocorrido_em");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_acoes_administrativas");
+
+                    b.HasIndex("OcorridoEm")
+                        .HasDatabaseName("ix_acoes_administrativas_ocorrido_em");
+
+                    b.HasIndex("TenantId", "OcorridoEm")
+                        .HasDatabaseName("ix_acoes_administrativas_tenant_id_ocorrido_em");
+
+                    b.ToTable("acoes_administrativas", "licenciamento");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Licenciamento.Dominio.Administrador", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ativo");
+
+                    b.Property<DateTimeOffset?>("BloqueadoAte")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("bloqueado_ate");
+
+                    b.Property<DateTimeOffset>("CriadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email");
+
+                    b.Property<int>("FalhasDeLogin")
+                        .HasColumnType("integer")
+                        .HasColumnName("falhas_de_login");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("nome");
+
+                    b.Property<string>("SenhaHash")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("senha_hash");
+
+                    b.Property<DateTimeOffset?>("UltimoLoginEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ultimo_login_em");
+
+                    b.HasKey("Id")
+                        .HasName("pk_administradores");
+
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasDatabaseName("ix_administradores_email");
+
+                    b.ToTable("administradores", "licenciamento");
+                });
+
             modelBuilder.Entity("Kamus.Modules.Licenciamento.Dominio.Licenca", b =>
                 {
                     b.Property<Guid>("TenantId")

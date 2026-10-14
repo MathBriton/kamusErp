@@ -90,6 +90,13 @@ public sealed class Licenca
         (LimiteDeCnpjs, LimiteDeLojas, LimiteDeUsuarios) = (cnpjs, lojas, usuarios);
     }
 
+    public void DefinirCarencia(int dias)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(dias);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(dias, 60);
+        DiasDeCarencia = dias;
+    }
+
     public void DefinirValorMensal(decimal valor)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(valor);

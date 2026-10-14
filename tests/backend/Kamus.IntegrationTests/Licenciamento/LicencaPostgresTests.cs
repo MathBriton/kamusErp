@@ -20,16 +20,54 @@ public sealed class LicencaPostgresTests(PostgresFixture db)
     private sealed record LicencaDto(string Estado);
     private sealed record NotificacaoDto(string Tipo);
     private sealed record ListaDto(List<NotificacaoDto> Itens);
+    private sealed record TokenDto(string Token);
+    private sealed record NovoClienteDto(Guid TenantId, string SenhaProvisoria);
+
+    private KamusApiFactory CriarApi() => new(db.AppConnectionString, "Development", new Dictionary<string, string>
+    {
+        ["ConnectionStrings:KamusMigrations"] = db.AdminConnectionString,
+        ["Seed:SenhaAdmin"] = Senha,
+        ["Admin:Chave"] = "chave-do-painel-administrativo-de-teste-32+",
+    });
+
+    [Fact]
+    public async Task Painel_NoPostgres_CriaClienteQueConsegueEntrarERegistraPagamento()
+    {
+        db.ExigirBanco();
+        await using var api = CriarApi();
+        using var admin = api.CreateClient();
+        var login = await admin.PostAsJsonAsync(new Uri("/admin-api/login", UriKind.Relative), new { email = "superadmin@kamus.local", senha = KamusApiFactory.SenhaSuperAdminDeTeste }, Ct);
+        login.EnsureSuccessStatusCode();
+        admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", (await login.Content.ReadFromJsonAsync<TokenDto>(Ct))!.Token);
+
+        var criado = await admin.PostAsJsonAsync(new Uri("/admin-api/clientes", UriKind.Relative), new
+        {
+            nome = "Bella Moda",
+            razaoSocial = "Bella Moda LTDA",
+            nomeFantasia = "Bella Moda",
+            cnpj = "11.222.333/0001-81",
+            nomeDoDono = "Bella",
+            emailDoDono = "bella@bellamoda.com.br",
+            valorMensal = 149.90m,
+        }, Ct);
+        criado.EnsureSuccessStatusCode();
+        var novo = (await criado.Content.ReadFromJsonAsync<NovoClienteDto>(Ct))!;
+        (await admin.PostAsJsonAsync(new Uri($"/admin-api/clientes/{novo.TenantId}/pagamentos", UriKind.Relative), new { valor = 149.90m, meses = 1 }, Ct))
+            .EnsureSuccessStatusCode();
+
+        using var cliente = api.CreateClient();
+        var entrar = await cliente.PostAsJsonAsync(new Uri("/api/auth/login", UriKind.Relative), new { email = "bella@bellamoda.com.br", senha = novo.SenhaProvisoria }, Ct);
+        entrar.EnsureSuccessStatusCode();
+        cliente.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", (await entrar.Content.ReadFromJsonAsync<SessaoDto>(Ct))!.AccessToken);
+        (await cliente.GetFromJsonAsync<LicencaDto>(new Uri("/api/licenca", UriKind.Relative), Ct))!.Estado.ShouldBe("Ativa");
+        (await cliente.GetFromJsonAsync<ListaDto>(new Uri("/api/notificacoes", UriKind.Relative), Ct))!.Itens.ShouldContain(n => n.Tipo == "licenca_paga");
+    }
 
     [Fact]
     public async Task Licenca_NoPostgres_SituacaoEAvisoAosDonos()
     {
         db.ExigirBanco();
-        await using var api = new KamusApiFactory(db.AppConnectionString, "Development", new Dictionary<string, string>
-        {
-            ["ConnectionStrings:KamusMigrations"] = db.AdminConnectionString,
-            ["Seed:SenhaAdmin"] = Senha,
-        });
+        await using var api = CriarApi();
         using var client = api.CreateClient();
         var login = await client.PostAsJsonAsync(new Uri("/api/auth/login", UriKind.Relative), new { email = "admin@kamus.local", senha = Senha }, Ct);
         login.EnsureSuccessStatusCode();

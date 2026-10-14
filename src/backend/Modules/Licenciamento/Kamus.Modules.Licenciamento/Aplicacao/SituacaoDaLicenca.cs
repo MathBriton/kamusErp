@@ -21,6 +21,8 @@ public sealed record SituacaoDaLicenca(
             MensagemPara(l, estado), l.LimiteDeCnpjs, l.LimiteDeLojas, l.LimiteDeUsuarios);
     }
 
+    internal static string Moeda(decimal valor) => valor.ToString("C", PtBr);
+
     internal static string Data(DateOnly? data) => data?.ToString("dd/MM/yyyy", PtBr) ?? "—";
 
     private static string MensagemPara(Licenca l, EstadoLicenca estado) => estado switch

@@ -35,6 +35,7 @@ public static class ModuloIdentidade
         services.AddScoped<AutenticacaoService>();
         services.AddScoped<Kamus.SharedKernel.Busca.IProvedorDeBusca, ProvedorDeBuscaIdentidade>();
         services.AddScoped<Kamus.SharedKernel.Clientes.IDiretorioDeClientes, DiretorioDeClientes>();
+        services.AddScoped<Kamus.SharedKernel.Clientes.ICadastroDeClientes, CadastroDeClientes>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(o =>
