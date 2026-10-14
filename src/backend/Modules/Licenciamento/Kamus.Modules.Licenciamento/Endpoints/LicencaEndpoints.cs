@@ -1,6 +1,7 @@
 using Kamus.Modules.Licenciamento.Aplicacao;
 using Kamus.Modules.Licenciamento.Persistencia;
 using Kamus.SharedKernel.MultiTenancy;
+using Kamus.SharedKernel.Tempo;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;

@@ -5,6 +5,7 @@ using System.Text.Json;
 using Kamus.IntegrationTests.Infra;
 using Kamus.Modules.Licenciamento.Aplicacao;
 using Kamus.Modules.Licenciamento.Persistencia;
+using Kamus.SharedKernel.Tempo;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 

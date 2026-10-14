@@ -1,4 +1,4 @@
-namespace Kamus.Modules.Licenciamento.Aplicacao;
+namespace Kamus.SharedKernel.Tempo;
 
 /// <summary>
 /// "Hoje" para vencimentos é o dia em Brasília (UTC−3, sem horário de verão desde 2019) — não o dia em UTC,

@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Kamus.Modules.Identidade.Aplicacao;
 
-internal sealed class DiretorioDeClientes(IdentidadeDbContext db, IServiceScopeFactory escopos) : IDiretorioDeClientes
+internal sealed class DiretorioDeClientes(IdentidadeDbContext db, IServiceScopeFactory escopos, TenantContext tenant) : IDiretorioDeClientes
 {
     public async Task<IReadOnlyList<ClienteDoSaas>> ListarAsync(CancellationToken ct = default)
     {
@@ -32,6 +32,14 @@ internal sealed class DiretorioDeClientes(IdentidadeDbContext db, IServiceScopeF
         return await db.AcessosEmpresa.AsNoTracking()
             .Where(a => a.Perfil == Perfil.Dono && ativos.Contains(a.UsuarioId))
             .Select(a => a.UsuarioId).Distinct().ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<UsuarioDoCliente>> UsuariosDoTenantAtualAsync(CancellationToken ct = default)
+    {
+        var tenantId = tenant.TenantId ?? throw new InvalidOperationException("Tenant não definido.");
+        return await db.Usuarios.AsNoTracking().Where(u => u.TenantId == tenantId)
+            .OrderBy(u => u.Nome)
+            .Select(u => new UsuarioDoCliente(u.Id, u.Nome, u.Email, u.Ativo)).ToListAsync(ct);
     }
 
     private async Task<IReadOnlyList<Guid>> DonosAsync(Guid tenantId, CancellationToken ct)
