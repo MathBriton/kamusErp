@@ -661,18 +661,17 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | Versão | Fase | Conteúdo | Status |
 |---|---|---|---|
 | v0.1.0 | 0a | Solução .NET, multi-tenancy (filtro + RLS), CNPJ alfanumérico, Docker, CI, web base com tema | ✅ lançada |
-| v0.2.0 | 0a+ | API em localhost sem banco, tela de testes (Scalar), testes sem Docker | ✅ pronta |
-| v0.3.0 | 0b | Login (JWT + refresh em cookie), bloqueio por tentativas, usuário de teste, dados em memória no desenvolvimento | ✅ pronta |
-| v0.4.0 | 0b | Shell (sidebar/topbar), seletor de CNPJ, dashboard (estrutura) | ⏳ |
-| v0.5.0 | 0b | Notificações em tempo real, pesquisa global, histórico de alterações | ⏳ |
-| v0.6.0 | 0b | Exportação PDF/Excel | ⏳ |
-| v0.7.0 | 0b | Licenciamento + Painel Administrativo | ⏳ |
-| v0.8.0 | 1 | Cadastros (empresas, ficha do cliente, fornecedores, vendedores, produtos com grade, importação por planilha) | ⏳ |
-| v0.9.0 | 2 | Estoque (+ importação de XML da NF-e) | ⏳ |
-| v0.10.0 | 3 | Financeiro | ⏳ |
-| v0.11.0 | 4 | Vendas (registro, troca e vale-troca, comissão) | ⏳ |
-| v0.12.0 | 5 | Crediário e condicional | ⏳ |
-| v0.13.0 | 6 | Dashboard real, app mobile, resumo diário | ⏳ |
+| v0.2.0 | 0a+/0b | API em localhost sem banco, tela de testes (Scalar), login (JWT + refresh em cookie), bloqueio por tentativas, usuário de teste, dados em memória | ✅ lançada |
+| v0.3.0 | 0b | Shell (sidebar/topbar), seletor de CNPJ validado no backend, dashboard (estrutura), páginas previstas | ✅ pronta |
+| v0.4.0 | 0b | Notificações em tempo real, pesquisa global, histórico de alterações | ⏳ |
+| v0.5.0 | 0b | Exportação PDF/Excel | ⏳ |
+| v0.6.0 | 0b | Licenciamento + Painel Administrativo | ⏳ |
+| v0.7.0 | 1 | Cadastros (empresas, ficha do cliente, fornecedores, vendedores, produtos com grade, importação por planilha) | ⏳ |
+| v0.8.0 | 2 | Estoque (+ importação de XML da NF-e) | ⏳ |
+| v0.9.0 | 3 | Financeiro | ⏳ |
+| v0.10.0 | 4 | Vendas (registro, troca e vale-troca, comissão) | ⏳ |
+| v0.11.0 | 5 | Crediário e condicional | ⏳ |
+| v0.12.0 | 6 | Dashboard real, app mobile, resumo diário | ⏳ |
 | v1.0.0 | 7 | Produção e primeira loja piloto | ⏳ depende de servidor |
 
 ---
@@ -782,3 +781,6 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | 2026-10-14 | Autenticação com o `PasswordHasher` do ASP.NET Core Identity e entidades próprias (sem as tabelas completas do Identity); JWT de 15 min + refresh token rotativo em cookie HttpOnly; bloqueio após 5 falhas por 15 min; limite de 10 logins/min por IP | Aceita |
 | 2026-10-14 | Tabelas `usuarios`, `tenants` e `refresh_tokens` sem RLS (lidas no login, antes de o tenant ser conhecido); `empresas` e `acessos_empresa` com RLS | Aceita |
 | 2026-10-14 | Migrations aplicadas na subida com uma conexão de dono do banco (`ConnectionStrings:KamusMigrations`); a aplicação usa o `kamus_app` | Aceita |
+| 2026-10-14 | Menu definido em um único arquivo (`src/web/src/navegacao/menu.ts`), com visibilidade por perfil apenas como conforto visual — a API sempre valida | Aceita |
+| 2026-10-14 | Empresa ativa no header `X-Empresa-Id` (id ou `todas`), validada no backend contra os acessos: 403 sem acesso; `todas` só para Dono e só em leitura (escrita = 400); rotas `/api/auth` ignoram o header | Aceita |
+| 2026-10-14 | Dados de demonstração incluem `vendedor@kamus.local` (perfil Vendedor só no CNPJ Centro) para testar perfis | Aceita |

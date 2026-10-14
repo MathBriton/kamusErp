@@ -32,7 +32,9 @@ dotnet run --project src/backend/Kamus.Api   # API em http://localhost:5249 (abr
 cd src/web && npm install && npm run dev     # web em http://localhost:5173 (proxy para a API)
 ```
 
-**Login de teste:** `admin@kamus.local` / `Kamus@Dev123` (cliente "Loja Demo" com 2 CNPJs).
+**Logins de teste** (senha `Kamus@Dev123`, cliente "Loja Demo" com 2 CNPJs):
+- `admin@kamus.local` — perfil Dono nas duas empresas (vê tudo, inclusive a visão consolidada)
+- `vendedor@kamus.local` — perfil Vendedor só no CNPJ Centro (menu reduzido)
 Sem banco, os dados ficam **em memória**: são recriados a cada vez que a API sobe e somem quando ela para.
 
 | O quê | Onde |

@@ -139,21 +139,30 @@ próprio herdando de `KamusDbContext`, schema próprio, `AddModulo<Nome>()` / `M
 
 **Última atualização:** 2026-10-14
 
-**Pronto e na `main`:**
-- v0.1.0 lançada (fundação). Em seguida: API sem banco + Scalar; **login completo** (JWT 15 min + refresh token
-  rotativo em cookie HttpOnly, bloqueio após 5 falhas, limite de 10 logins/min por IP, seed `admin@kamus.local`),
-  tela de login e página inicial provisória no web. Release seguinte disparada como **v0.2.0**.
+**Releases:** v0.1.0 (fundação) e **v0.2.0** (localhost sem banco + login) lançadas. Na `main`, pronto para a
+próxima release (**v0.3.0**): shell, seletor de CNPJ e dashboard (estrutura).
 
-**Próximo passo — layout (shell), troca de CNPJ e dashboard (estrutura):**
-1. Web: `react-router`; **sidebar** (menu definido num único arquivo de configuração, recolhível com preferência
-   salva, drawer no mobile, itens conforme o mockup `docs/mockups/02-dashboard-claro.png`); **topbar** (pesquisa
-   global como placeholder até a v0.5.0, sininho placeholder, tema, menu do usuário com Sair).
-2. **Seletor de empresa (CNPJ)** na topbar: empresas da sessão, opção "Todas as empresas" (somente leitura, só
-   perfil Dono), escolha salva por usuário; requisições enviam o header `X-Empresa-Id` (guid ou `todas`).
-3. Backend: validar `X-Empresa-Id` contra os acessos do usuário (403 se não tiver acesso; `todas` só para Dono;
-   `todas` proibido em métodos de escrita) e endpoint `GET /api/empresas/ativa`.
-4. **Dashboard (estrutura):** cards de indicadores com estado vazio e "Primeiros passos" guiando o usuário;
-   páginas placeholder para cada item do menu ("previsto para a vX").
+**O que existe hoje:**
+- Login (JWT 15 min + refresh rotativo em cookie HttpOnly `kamus_refresh`, bloqueio após 5 falhas, 10 logins/min
+  por IP). Seeds (só Development): `admin@kamus.local` (Dono nos 2 CNPJs) e `vendedor@kamus.local` (Vendedor no
+  CNPJ Centro), senha `Kamus@Dev123`.
+- Empresa ativa: header `X-Empresa-Id` validado em `EmpresaAtivaMiddleware` (módulo Identidade); disponível para
+  os módulos via `IEmpresaAtiva` (SharedKernel). `GET /api/empresas/ativa`.
+- Web: `react-router`; menu em `src/web/src/navegacao/menu.ts` (fonte única: sidebar, rotas e páginas
+  "Previsto para a vX"); `src/web/src/layout/` (Shell, Sidebar, Topbar, SeletorEmpresa, MenuUsuario);
+  `EmpresaProvider` (escolha salva por usuário em `kamus.empresa.<usuarioId>`); `useApi()` envia token e
+  `X-Empresa-Id`; dashboard com indicadores em estado vazio e "Primeiros passos".
+- Testes: 72 backend, 41 web.
+
+**Próximo passo — v0.4.0: notificações, pesquisa global e histórico de alterações** (ver `LEVANTAMENTO.md` 5.3,
+5.5 e 4.7.2):
+1. **Histórico de alterações (auditoria):** gravar no `SaveChanges` do `KamusDbContext` inclusão/alteração/exclusão
+   de entidades de negócio com valores antes/depois, usuário, data, IP, empresa; tabela append-only; campos
+   sensíveis nunca gravados; eventos sensíveis (login, exportação). Precisa funcionar em memória e no PostgreSQL.
+2. **Notificações:** tabela por usuário, endpoints listar/marcar como lida, SignalR para tempo real; sininho da
+   topbar (`src/web/src/layout/Topbar.tsx`, hoje placeholder).
+3. **Pesquisa global (Ctrl+K):** `GET /api/search?q=` com provedores por módulo (respeitando tenant, empresa e
+   perfil); command palette no web (hoje o campo é placeholder desabilitado). No PostgreSQL: `unaccent` + `pg_trgm`.
 
 **Pendências conhecidas:**
 - Branch órfã `release-please--branches--main--components--kamus` no GitHub (pode ser apagada pela interface).
