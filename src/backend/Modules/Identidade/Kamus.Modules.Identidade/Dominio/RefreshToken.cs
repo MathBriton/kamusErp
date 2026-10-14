@@ -1,9 +1,12 @@
+using Kamus.SharedKernel.Auditoria;
+
 namespace Kamus.Modules.Identidade.Dominio;
 
 /// <summary>
 /// Sessão renovável. Só o hash do token é guardado. A cada renovação o token é trocado (rotação);
 /// reapresentar um token já trocado indica roubo e revoga todas as sessões do usuário.
 /// </summary>
+[NaoAuditar]
 public sealed class RefreshToken
 {
     public Guid Id { get; private set; }

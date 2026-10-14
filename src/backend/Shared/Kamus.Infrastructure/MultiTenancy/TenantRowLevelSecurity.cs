@@ -42,6 +42,20 @@ public static class TenantRowLevelSecurity
     public static void GrantKamusAppRole(this MigrationBuilder migrationBuilder, string schema) =>
         migrationBuilder.Sql(GrantAppRoleSql(schema));
 
+    /// <summary>Tabela somente-inclusão para o <see cref="AppRole"/> (ex.: histórico de alterações).</summary>
+    public static string SomenteInclusaoSql(string schema, string table) => $$"""
+        DO $$
+        BEGIN
+            IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{{AppRole}}') THEN
+                REVOKE UPDATE, DELETE, TRUNCATE ON {{schema}}.{{table}} FROM {{AppRole}};
+            END IF;
+        END
+        $$;
+        """;
+
+    public static void SomenteInclusaoParaKamusApp(this MigrationBuilder migrationBuilder, string schema, string table) =>
+        migrationBuilder.Sql(SomenteInclusaoSql(schema, table));
+
     /// <summary>Use nas migrations logo após criar cada tabela de negócio.</summary>
     public static void EnableTenantRowLevelSecurity(this MigrationBuilder migrationBuilder, string schema, string table) =>
         migrationBuilder.Sql(EnableSql(schema, table));

@@ -1,6 +1,7 @@
 using Kamus.Infrastructure.MultiTenancy;
 using Kamus.Modules.Identidade.Dominio;
 using Kamus.Modules.Identidade.Persistencia;
+using Kamus.SharedKernel.Auditoria;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,7 +12,8 @@ internal sealed class AutenticacaoService(
     IPasswordHasher<Usuario> hasher,
     TokenService tokens,
     TenantContext tenant,
-    TimeProvider relogio)
+    TimeProvider relogio,
+    IRegistradorDeEventos eventos)
 {
     // Hash fixo usado quando o e-mail não existe: o tempo de resposta fica igual ao de uma senha errada.
     private static readonly Lazy<string> HashFicticio = new(() =>
@@ -37,16 +39,24 @@ internal sealed class AutenticacaoService(
         {
             usuario.RegistrarFalhaDeLogin(agora);
             await db.SaveChangesAsync(ct);
-            return usuario.EstaBloqueado(agora)
-                ? new ResultadoLogin.Bloqueado(usuario.BloqueadoAte!.Value)
-                : new ResultadoLogin.CredenciaisInvalidas();
+
+            // Usuário conhecido: o evento vai para o histórico do tenant dele.
+            tenant.Definir(usuario.TenantId);
+            await eventos.RegistrarAsync("login_falhou", $"Senha incorreta no login de {usuario.Email}", usuario.Id, usuario.Nome, ct);
+            if (!usuario.EstaBloqueado(agora)) return new ResultadoLogin.CredenciaisInvalidas();
+
+            await eventos.RegistrarAsync("usuario_bloqueado",
+                $"{usuario.Email} bloqueado por {Usuario.TempoDeBloqueio.TotalMinutes:0} minutos após {Usuario.MaximoDeFalhas} senhas incorretas", usuario.Id, usuario.Nome, ct);
+            return new ResultadoLogin.Bloqueado(usuario.BloqueadoAte!.Value);
         }
 
         if (verificacao == PasswordVerificationResult.SuccessRehashNeeded)
             usuario.DefinirSenhaHash(hasher.HashPassword(usuario, request.Senha!));
 
         usuario.RegistrarLoginComSucesso(agora);
-        return new ResultadoLogin.Sucesso(await EmitirSessaoAsync(usuario, request.ManterConectado, agora, substituindo: null, ct));
+        var sessao = await EmitirSessaoAsync(usuario, request.ManterConectado, agora, substituindo: null, ct);
+        await eventos.RegistrarAsync("login", $"Login de {usuario.Email}", usuario.Id, usuario.Nome, ct);
+        return new ResultadoLogin.Sucesso(sessao);
     }
 
     /// <summary>Troca o token de sessão por um novo (rotação). Reuso de token já trocado revoga todas as sessões.</summary>
@@ -62,6 +72,8 @@ internal sealed class AutenticacaoService(
         if (atual.Revogado)
         {
             await RevogarTodasAsync(atual.UsuarioId, agora, ct);
+            await RegistrarEventoDoUsuarioAsync(atual.UsuarioId, "sessao_revogada",
+                "Reuso de token de sessão detectado: todas as sessões do usuário foram encerradas", ct);
             return null;
         }
 
@@ -83,6 +95,15 @@ internal sealed class AutenticacaoService(
 
         atual.Revogar(relogio.GetUtcNow());
         await db.SaveChangesAsync(ct);
+        await RegistrarEventoDoUsuarioAsync(atual.UsuarioId, "logout", "Saiu do sistema", ct);
+    }
+
+    private async Task RegistrarEventoDoUsuarioAsync(Guid usuarioId, string evento, string descricao, CancellationToken ct)
+    {
+        var usuario = await db.Usuarios.AsNoTracking().SingleOrDefaultAsync(u => u.Id == usuarioId, ct);
+        if (usuario is null) return;
+        if (tenant.TenantId is null) tenant.Definir(usuario.TenantId);
+        await eventos.RegistrarAsync(evento, descricao, usuario.Id, usuario.Nome, ct);
     }
 
     public async Task<MeResponse?> ObterUsuarioAtualAsync(Guid usuarioId, CancellationToken ct)

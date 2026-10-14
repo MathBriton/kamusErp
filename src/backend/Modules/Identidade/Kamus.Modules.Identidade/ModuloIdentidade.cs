@@ -66,36 +66,18 @@ public static class ModuloIdentidade
     /// <summary>Valida a empresa ativa (header X-Empresa-Id). Use depois de <c>UseKamusMultiTenancy</c>.</summary>
     public static IApplicationBuilder UseModuloIdentidade(this IApplicationBuilder app) => app.UseEmpresaAtiva();
 
-    /// <summary>Aplica migrations (se houver conexão de migração) e cria os dados de demonstração em Development.</summary>
+    /// <summary>Cria os dados de demonstração em Development (rode depois de <c>AplicarMigracoesKamusAsync</c>).</summary>
     public static async Task InicializarModuloIdentidadeAsync(this WebApplication app)
     {
         var log = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Kamus.Identidade");
 
         if (app.Configuration.UsaBancoEmMemoria())
-        {
             log.BancoEmMemoria();
-        }
-        else if (app.Configuration.GetConnectionString("KamusMigrations") is { Length: > 0 } conexaoDeMigracao)
-        {
-            await MigrarAsync(conexaoDeMigracao);
-            log.MigrationsAplicadas();
-        }
 
         if (app.Environment.IsDevelopment())
         {
             await DadosDeDemonstracao.CriarAsync(app.Services);
             log.DemonstracaoPronta(DadosDeDemonstracao.EmailAdmin);
         }
-    }
-
-    /// <summary>Migrations rodam com um usuário dono do schema (não com o kamus_app, que só lê/grava dados).</summary>
-    private static async Task MigrarAsync(string connectionString)
-    {
-        var tenant = new Infrastructure.MultiTenancy.TenantContext();
-        var options = new DbContextOptionsBuilder<IdentidadeDbContext>()
-            .UseKamusPostgres(connectionString, tenant, IdentidadeDbContext.Schema)
-            .Options;
-        await using var db = new IdentidadeDbContext(options, tenant);
-        await db.Database.MigrateAsync();
     }
 }

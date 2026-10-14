@@ -8,17 +8,18 @@ public sealed class EmpresaAtiva : IEmpresaAtiva
     public bool Consolidado { get; private set; }
     public Guid? EmpresaId { get; private set; }
     public IReadOnlyList<Guid> EmpresaIds { get; private set; } = [];
+    public string? Perfil { get; private set; }
 
-    public void Definir(Guid empresaId)
+    public void Definir(Guid empresaId, string perfil)
     {
         GarantirNaoDefinida();
-        (Definida, Consolidado, EmpresaId, EmpresaIds) = (true, false, empresaId, [empresaId]);
+        (Definida, Consolidado, EmpresaId, EmpresaIds, Perfil) = (true, false, empresaId, [empresaId], perfil);
     }
 
     public void DefinirConsolidado(IReadOnlyList<Guid> empresaIds)
     {
         GarantirNaoDefinida();
-        (Definida, Consolidado, EmpresaId, EmpresaIds) = (true, true, null, empresaIds);
+        (Definida, Consolidado, EmpresaId, EmpresaIds, Perfil) = (true, true, null, empresaIds, "Dono");
     }
 
     private void GarantirNaoDefinida()

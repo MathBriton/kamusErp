@@ -11,4 +11,7 @@ public interface IEmpresaAtiva
     bool Consolidado { get; }
     Guid? EmpresaId { get; }
     IReadOnlyList<Guid> EmpresaIds { get; }
+
+    /// <summary>Perfil do usuário na empresa ativa ("Dono" na visão consolidada).</summary>
+    string? Perfil { get; }
 }

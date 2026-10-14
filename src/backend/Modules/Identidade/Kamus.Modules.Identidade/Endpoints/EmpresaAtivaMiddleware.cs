@@ -65,11 +65,11 @@ internal static class EmpresaAtivaMiddleware
         if (!Guid.TryParse(valor, out var empresaId))
             return Problema(StatusCodes.Status400BadRequest, $"Valor inválido no header {Header}: use o id da empresa ou '{Consolidado}'.");
 
-        var temAcesso = await db.AcessosEmpresa.AsNoTracking().AnyAsync(a => a.UsuarioId == usuarioId && a.EmpresaId == empresaId, ct);
-        if (!temAcesso)
+        var acesso = await db.AcessosEmpresa.AsNoTracking().SingleOrDefaultAsync(a => a.UsuarioId == usuarioId && a.EmpresaId == empresaId, ct);
+        if (acesso is null)
             return Problema(StatusCodes.Status403Forbidden, "Você não tem acesso a esta empresa.");
 
-        empresaAtiva.Definir(empresaId);
+        empresaAtiva.Definir(empresaId, acesso.Perfil.ToString());
         return null;
     }
 

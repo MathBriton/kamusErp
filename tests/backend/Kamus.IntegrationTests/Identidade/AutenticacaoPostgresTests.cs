@@ -59,6 +59,28 @@ public sealed class AutenticacaoPostgresTests(PostgresFixture db)
         (await ContarEmpresasAsync(conn)).ShouldBe(2);
     }
 
+    [Fact]
+    public async Task HistoricoNoPostgres_EhGravadoEProtegidoContraAlteracao()
+    {
+        db.ExigirBanco();
+        await using (var api = CriarApi())
+        using (var client = api.CreateClient())
+            (await client.PostAsJsonAsync(new Uri("/api/auth/login", UriKind.Relative), new { email = "admin@kamus.local", senha = SenhaDemo }, Ct))
+                .StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        await using var conn = new NpgsqlConnection(db.AppConnectionString);
+        await conn.OpenAsync(Ct);
+        await using (var cmd = new NpgsqlCommand($"SELECT set_config('app.tenant_id', '{TenantDemo}', false)", conn))
+            await cmd.ExecuteNonQueryAsync(Ct);
+
+        await using (var contar = new NpgsqlCommand("SELECT count(*) FROM auditoria.registros WHERE evento = 'login'", conn))
+            ((long)(await contar.ExecuteScalarAsync(Ct))!).ShouldBeGreaterThan(0);
+
+        await using var apagar = new NpgsqlCommand("DELETE FROM auditoria.registros", conn);
+        var erro = await Should.ThrowAsync<PostgresException>(() => apagar.ExecuteNonQueryAsync(Ct));
+        erro.SqlState.ShouldBe(PostgresErrorCodes.InsufficientPrivilege);
+    }
+
     private static async Task<long> ContarEmpresasAsync(NpgsqlConnection conn)
     {
         await using var cmd = new NpgsqlCommand("SELECT count(*) FROM identidade.empresas", conn);

@@ -1,4 +1,5 @@
 using System.Net.Mail;
+using Kamus.SharedKernel.Auditoria;
 
 namespace Kamus.Modules.Identidade.Dominio;
 
@@ -7,6 +8,7 @@ namespace Kamus.Modules.Identidade.Dominio;
 /// não é conhecido, então a busca por e-mail precisa enxergar todos. O <see cref="TenantId"/> é
 /// gravado e define o tenant da sessão após a senha ser validada. E-mail é único no sistema.
 /// </summary>
+[Auditavel]
 public sealed class Usuario
 {
     public const int MaximoDeFalhas = 5;
@@ -16,11 +18,12 @@ public sealed class Usuario
     public Guid TenantId { get; private set; }
     public string Nome { get; private set; } = "";
     public string Email { get; private set; } = "";
-    public string SenhaHash { get; private set; } = "";
+    [NaoAuditar] public string SenhaHash { get; private set; } = "";
     public bool Ativo { get; private set; }
-    public int FalhasDeLogin { get; private set; }
-    public DateTimeOffset? BloqueadoAte { get; private set; }
-    public DateTimeOffset? UltimoLoginEm { get; private set; }
+    // Contadores técnicos do login: viram eventos no histórico (login, falha, bloqueio), não alterações.
+    [NaoAuditar] public int FalhasDeLogin { get; private set; }
+    [NaoAuditar] public DateTimeOffset? BloqueadoAte { get; private set; }
+    [NaoAuditar] public DateTimeOffset? UltimoLoginEm { get; private set; }
 
     private Usuario() { }
 
