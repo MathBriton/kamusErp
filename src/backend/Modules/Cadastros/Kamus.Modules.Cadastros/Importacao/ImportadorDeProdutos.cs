@@ -133,9 +133,9 @@ internal sealed class ImportadorDeProdutos(CadastrosDbContext db, TimeProvider r
         return new Avaliacao(linhas.OrderBy(l => l.Numero).ToList(), grupos);
     }
 
-    public async Task<IReadOnlyList<LinhaValidada>> ValidarAsync(TabelaLida tabela, CancellationToken ct) => (await AvaliarAsync(tabela, ct)).Linhas;
+    public async Task<IReadOnlyList<LinhaValidada>> ValidarAsync(TabelaLida tabela, ContextoDaImportacao contexto, CancellationToken ct) => (await AvaliarAsync(tabela, ct)).Linhas;
 
-    public async Task<ResultadoDaImportacao> ImportarAsync(TabelaLida tabela, CancellationToken ct)
+    public async Task<ResultadoDaImportacao> ImportarAsync(TabelaLida tabela, ContextoDaImportacao contexto, CancellationToken ct)
     {
         var avaliacao = await AvaliarAsync(tabela, ct);
         var cores = await db.Cores.ToListAsync(ct);

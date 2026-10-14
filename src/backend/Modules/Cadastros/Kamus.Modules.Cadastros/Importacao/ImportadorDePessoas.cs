@@ -131,10 +131,10 @@ internal abstract class ImportadorDePessoas(CadastrosDbContext db, TimeProvider 
         return resultado;
     }
 
-    public async Task<IReadOnlyList<LinhaValidada>> ValidarAsync(TabelaLida tabela, CancellationToken ct) =>
+    public async Task<IReadOnlyList<LinhaValidada>> ValidarAsync(TabelaLida tabela, ContextoDaImportacao contexto, CancellationToken ct) =>
         (await AvaliarAsync(tabela, ct)).Select(a => a.Linha).ToList();
 
-    public async Task<ResultadoDaImportacao> ImportarAsync(TabelaLida tabela, CancellationToken ct)
+    public async Task<ResultadoDaImportacao> ImportarAsync(TabelaLida tabela, ContextoDaImportacao contexto, CancellationToken ct)
     {
         var avaliadas = await AvaliarAsync(tabela, ct);
         var agora = relogio.GetUtcNow();

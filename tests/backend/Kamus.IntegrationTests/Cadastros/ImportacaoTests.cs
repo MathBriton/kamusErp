@@ -234,6 +234,22 @@ public sealed class ImportacaoTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Confirmar_EmOutraEmpresa_409SemGravar()
+    {
+        var client = await Entrar();
+        var validacao = await Validar(client, "clientes", Planilha(ColunasClientes, ["Cliente Da Matriz", null, null, null, null, null, null]));
+        var login = await _factory.CreateClient().PostAsJsonAsync(U("/api/auth/login"), new { email = "admin@kamus.local", senha = Senha }, Ct);
+        var empresas = (await login.Content.ReadFromJsonAsync<SessaoDto>(Ct))!.Empresas;
+        client.DefaultRequestHeaders.Remove("X-Empresa-Id");
+        client.DefaultRequestHeaders.Add("X-Empresa-Id", empresas[1].Id.ToString());
+
+        var resposta = await client.PostAsync(U($"/api/importacoes/{validacao.Id}/confirmar"), null, Ct);
+
+        resposta.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await client.GetFromJsonAsync<PaginaDto>(U("/api/pessoas?papel=cliente&busca=Matriz"), Ct))!.Total.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task ArquivoInvalido_400()
     {
         var client = await Entrar();

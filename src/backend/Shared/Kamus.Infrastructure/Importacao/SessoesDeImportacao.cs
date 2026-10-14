@@ -8,15 +8,18 @@ internal sealed class SessoesDeImportacao(TimeProvider relogio)
 {
     private static readonly TimeSpan Validade = TimeSpan.FromMinutes(30);
 
-    public sealed record Sessao(Guid Id, string Tipo, Guid TenantId, Guid UsuarioId, string NomeDoArquivo, TabelaLida Tabela, DateTimeOffset ExpiraEm);
+    public sealed record Sessao(Guid Id, string Tipo, Guid TenantId, ContextoDaImportacao Contexto, string NomeDoArquivo, TabelaLida Tabela, DateTimeOffset ExpiraEm)
+    {
+        public Guid UsuarioId => Contexto.UsuarioId;
+    }
 
     private readonly ConcurrentDictionary<Guid, Sessao> _sessoes = new();
 
-    public Sessao Guardar(string tipo, Guid tenantId, Guid usuarioId, string nomeDoArquivo, TabelaLida tabela)
+    public Sessao Guardar(string tipo, Guid tenantId, ContextoDaImportacao contexto, string nomeDoArquivo, TabelaLida tabela)
     {
         var agora = relogio.GetUtcNow();
         foreach (var vencida in _sessoes.Values.Where(s => s.ExpiraEm <= agora)) _sessoes.TryRemove(vencida.Id, out _);
-        var sessao = new Sessao(Guid.NewGuid(), tipo, tenantId, usuarioId, nomeDoArquivo, tabela, agora + Validade);
+        var sessao = new Sessao(Guid.NewGuid(), tipo, tenantId, contexto, nomeDoArquivo, tabela, agora + Validade);
         _sessoes[sessao.Id] = sessao;
         return sessao;
     }

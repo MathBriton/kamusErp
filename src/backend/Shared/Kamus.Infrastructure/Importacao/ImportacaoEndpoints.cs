@@ -84,8 +84,9 @@ public static partial class ImportacaoEndpoints
             return Problema(StatusCodes.Status400BadRequest, ex.Message);
         }
 
-        var linhas = await importador!.ValidarAsync(tabela, ct);
-        var sessao = sessoes.Guardar(importador.Tipo, tenant.TenantId!.Value, UsuarioId(user), arquivo.FileName, tabela);
+        var contexto = new ContextoDaImportacao(UsuarioId(user), user.FindFirstValue("name"), empresa.EmpresaId, empresa.Nome);
+        var linhas = await importador!.ValidarAsync(tabela, contexto, ct);
+        var sessao = sessoes.Guardar(importador.Tipo, tenant.TenantId!.Value, contexto, arquivo.FileName, tabela);
         return Results.Ok(new ValidacaoDto(sessao.Id, importador.Tipo, arquivo.FileName, linhas.Count,
             linhas.Count(l => l.Acao != AcaoDaLinha.Erro), linhas.Count(l => l.Acao == AcaoDaLinha.Erro),
             linhas.Count(l => l.Acao == AcaoDaLinha.Criar), linhas.Count(l => l.Acao == AcaoDaLinha.Atualizar), linhas));
@@ -99,18 +100,21 @@ public static partial class ImportacaoEndpoints
         if (sessao is null) return Problema(StatusCodes.Status404NotFound, "Importação não encontrada ou vencida (30 minutos). Envie a planilha de novo.");
         var importador = Importador(importadores, sessao.Tipo);
         if (Barrar(importador, empresa) is { } barrado) return barrado;
+        if (sessao.Contexto.EmpresaId != empresa.EmpresaId)
+            return Problema(StatusCodes.Status409Conflict, $"A planilha foi validada na empresa {sessao.Contexto.EmpresaNome}. Volte para ela ou envie a planilha de novo.");
 
         var validas = sessao.Tabela.Linhas.Count;
         if (validas <= configuracao.GetValue("Importacao:LimiteSincrono", LimiteSincronoPadrao))
-            return Results.Ok(await importador!.ImportarAsync(sessao.Tabela, ct));
+            return Results.Ok(await importador!.ImportarAsync(sessao.Tabela, sessao.Contexto, ct));
 
-        _ = Task.Run(() => ImportarEmSegundoPlanoAsync(escopos, sessao, usuarioId, empresa.EmpresaId), CancellationToken.None);
+        _ = Task.Run(() => ImportarEmSegundoPlanoAsync(escopos, sessao), CancellationToken.None);
         return Results.Accepted(value: new EmSegundoPlanoDto(
             $"A planilha tem {validas} linhas: a importação continua em segundo plano e você será avisado no sininho."));
     }
 
-    private static async Task ImportarEmSegundoPlanoAsync(IServiceScopeFactory escopos, SessoesDeImportacao.Sessao sessao, Guid usuarioId, Guid? empresaId)
+    private static async Task ImportarEmSegundoPlanoAsync(IServiceScopeFactory escopos, SessoesDeImportacao.Sessao sessao)
     {
+        var (usuarioId, empresaId) = (sessao.Contexto.UsuarioId, sessao.Contexto.EmpresaId);
         await using var escopo = escopos.CreateAsyncScope();
         var sp = escopo.ServiceProvider;
         sp.GetRequiredService<TenantContext>().Definir(sessao.TenantId);
@@ -118,7 +122,7 @@ public static partial class ImportacaoEndpoints
         var importador = sp.GetServices<IImportador>().Single(i => i.Tipo == sessao.Tipo);
         try
         {
-            var r = await importador.ImportarAsync(sessao.Tabela, CancellationToken.None);
+            var r = await importador.ImportarAsync(sessao.Tabela, sessao.Contexto, CancellationToken.None);
             await notificador.NotificarAsync(new NovaNotificacao(usuarioId, "importacao_concluida",
                 $"Importação de {importador.Titulo.ToLowerInvariant()} concluída: {r.Criados} criados, {r.Atualizados} atualizados",
                 $"{sessao.NomeDoArquivo}: {r.Ignorados} linhas com erro foram ignoradas.", importador.Link, empresaId));
