@@ -69,8 +69,11 @@ dotnet ef migrations add <Nome> --project src/backend/Modules/<Modulo>/Kamus.Mod
 src/backend/Kamus.Api                         Ponto de entrada (Program.cs, health, versão, OpenAPI/Scalar)
 src/backend/Shared/Kamus.SharedKernel         Tipos de domínio sem dependências de framework (Cnpj, ITenantOwned...)
 src/backend/Shared/Kamus.Infrastructure       KamusDbContext (isolamento por tenant), RLS, persistência, middleware de tenant
-src/backend/Modules/Identidade/...            Módulo Identidade: Dominio/, Aplicacao/, Persistencia/, Endpoints/, Seed/
-src/web/src                                   auth/, components/, pages/, theme/, test/
+src/backend/Shared/Kamus.Infrastructure/Auditoria  Histórico de alterações (interceptor, schema auditoria, /api/auditoria)
+src/backend/Shared/Kamus.Infrastructure/Busca      Pesquisa global (/api/busca) — junta os IProvedorDeBusca dos módulos
+src/backend/Modules/Identidade/...            Módulo Identidade: Dominio/, Aplicacao/, Persistencia/, Endpoints/, Busca/, Seed/
+src/backend/Modules/Notificacoes/...          Módulo Notificacoes: notificações por usuário + SignalR (/hubs/notificacoes)
+src/web/src                                   auth/, api/, busca/, empresa/, layout/, navegacao/, notificacoes/, pages/, theme/, test/
 tests/backend/Kamus.UnitTests                 Unitários (domínio puro)
 tests/backend/Kamus.IntegrationTests          API via WebApplicationFactory; InMemory e PostgreSQL (Testcontainers)
 tests/backend/Kamus.ArchitectureTests         Regras de dependência entre camadas
@@ -79,8 +82,14 @@ docs/                                         mockups, RELEASES.md
 ```
 
 Novo módulo = `src/backend/Modules/<Nome>/Kamus.Modules.<Nome>` com as mesmas pastas, um `DbContext`
-próprio herdando de `KamusDbContext`, schema próprio, `AddModulo<Nome>()` / `MapModulo<Nome>()`.
-**Lembre de adicionar o `.csproj` novo no `src/backend/Kamus.Api/Dockerfile`** (o restore copia os projetos um a um).
+próprio herdando de `KamusDbContext` registrado com `AddKamusDbContext<T>(config, schema)` (isso já liga
+auditoria, RLS e registra as migrations para `AplicarMigracoesKamusAsync`), schema próprio,
+`AddModulo<Nome>()` / `MapModulo<Nome>()` chamados no `Program.cs`. Para aparecer na pesquisa global,
+registre um `IProvedorDeBusca`. **Lembre de adicionar o `.csproj` novo no `src/backend/Kamus.Api/Dockerfile`**
+(o restore copia os projetos um a um) e de incluir o assembly nos testes de arquitetura.
+
+**Módulos conversam só pelo SharedKernel** (há teste de arquitetura): `INotificador` (notificar usuários),
+`IRegistradorDeEventos` (eventos no histórico), `IProvedorDeBusca`, `IEmpresaAtiva`, `IUsuarioAtual`.
 
 ## 6. Regras inegociáveis
 
@@ -91,12 +100,15 @@ próprio herdando de `KamusDbContext`, schema próprio, `AddModulo<Nome>()` / `M
    `refresh_tokens` (lidas no login antes de o tenant ser conhecido).
 3. **A aplicação conecta como `kamus_app`** (sem superusuário, senão o RLS é ignorado). Migrations usam
    `ConnectionStrings:KamusMigrations` (dono do banco).
-4. **Frontend só usa tokens de cor** (`bg-surface`, `text-muted`, `bg-primary`...), nunca cores fixas — dark mode
+4. **Histórico de alterações é automático** para entidades `ITenantOwned` e `[Auditavel]`. Campos sensíveis
+   (senhas, tokens, contadores técnicos) recebem `[NaoAuditar]`; entidades volumosas sem valor de negócio
+   também (`[NaoAuditar]` na classe). Use `[DisplayName("...")]` na classe para o nome amigável.
+5. **Frontend só usa tokens de cor** (`bg-surface`, `text-muted`, `bg-primary`...), nunca cores fixas — dark mode
    precisa funcionar em toda tela nova. Tokens em `src/web/src/index.css`.
-5. **Segredos nunca no repositório.** Valores de `appsettings.Development.json` são só para dev local.
-6. **Nunca pule/desabilite teste para deixar o CI verde.** Testes de PostgreSQL usam `db.ExigirBanco()`: pulam
+6. **Segredos nunca no repositório.** Valores de `appsettings.Development.json` são só para dev local.
+7. **Nunca pule/desabilite teste para deixar o CI verde.** Testes de PostgreSQL usam `db.ExigirBanco()`: pulam
    sem Docker local, mas no CI (`CI=true`) a falta de Docker é erro.
-7. **Conventional Commits** (`feat:`, `fix:`, `docs:`, `ci:`, `build:`, `refactor:`, `test:`, `chore:`), com escopo
+8. **Conventional Commits** (`feat:`, `fix:`, `docs:`, `ci:`, `build:`, `refactor:`, `test:`, `chore:`), com escopo
    quando fizer sentido (`feat(identidade): ...`). Eles calculam a versão da release.
 
 ## 7. Convenções
@@ -132,6 +144,12 @@ próprio herdando de `KamusDbContext`, schema próprio, `AddModulo<Nome>()` / `M
 - Cookie de sessão `kamus_refresh` é `Secure` fora de Development; em Development (http://localhost) não é.
 - Release workflow precisa de `checks: read` para conferir o CI do commit.
 - Os mockups ficam em `docs/mockups/src/mockups.html` e viram PNG com `node docs/mockups/src/render.mjs`.
+- Testes web: `@microsoft/signalr` é substituído por um falso em `src/web/src/test/signalrFake.ts` (via `setup.ts`);
+  dispare eventos do servidor com `emitirDoServidor('notificacao', ...)`. O `mockApi` casa a URL exata
+  (inclusive query string).
+- Testes de SignalR no backend usam `LongPolling` com `Server.CreateHandler()` (o TestServer não faz WebSocket).
+- No frontend, telas implementadas entram em `PAGINAS_IMPLEMENTADAS` (`src/web/src/App.tsx`); item do menu sem
+  `previstoPara` precisa ter tela lá.
 
 ---
 
@@ -139,31 +157,38 @@ próprio herdando de `KamusDbContext`, schema próprio, `AddModulo<Nome>()` / `M
 
 **Última atualização:** 2026-10-14
 
-**Releases:** v0.1.0 (fundação) e **v0.2.0** (localhost sem banco + login) lançadas. Na `main`, pronto para a
-próxima release (**v0.3.0**): shell, seletor de CNPJ e dashboard (estrutura).
+**Releases:** v0.1.0, v0.2.0 (localhost + login) e v0.3.0 (shell, CNPJ, dashboard) lançadas. Na `main`, pronto
+para a próxima release (**v0.4.0**): histórico de alterações, notificações em tempo real e pesquisa global.
 
 **O que existe hoje:**
 - Login (JWT 15 min + refresh rotativo em cookie HttpOnly `kamus_refresh`, bloqueio após 5 falhas, 10 logins/min
   por IP). Seeds (só Development): `admin@kamus.local` (Dono nos 2 CNPJs) e `vendedor@kamus.local` (Vendedor no
-  CNPJ Centro), senha `Kamus@Dev123`.
-- Empresa ativa: header `X-Empresa-Id` validado em `EmpresaAtivaMiddleware` (módulo Identidade); disponível para
-  os módulos via `IEmpresaAtiva` (SharedKernel). `GET /api/empresas/ativa`.
-- Web: `react-router`; menu em `src/web/src/navegacao/menu.ts` (fonte única: sidebar, rotas e páginas
-  "Previsto para a vX"); `src/web/src/layout/` (Shell, Sidebar, Topbar, SeletorEmpresa, MenuUsuario);
-  `EmpresaProvider` (escolha salva por usuário em `kamus.empresa.<usuarioId>`); `useApi()` envia token e
-  `X-Empresa-Id`; dashboard com indicadores em estado vazio e "Primeiros passos".
-- Testes: 72 backend, 41 web.
+  CNPJ Centro), senha `Kamus@Dev123`, com notificações de boas-vindas.
+- Empresa ativa: header `X-Empresa-Id` validado em `EmpresaAtivaMiddleware`; `IEmpresaAtiva` traz também o
+  `Perfil` do usuário na empresa. `GET /api/empresas/ativa`.
+- **Histórico de alterações:** `AuditoriaInterceptor` em todo DbContext de módulo; eventos `login`,
+  `login_falhou`, `usuario_bloqueado`, `logout`, `sessao_revogada`; tabela `auditoria.registros` com RLS e
+  somente-inclusão; `GET /api/auditoria` (Dono/Gerente); tela em Configurações → Histórico de alterações.
+- **Notificações:** módulo Notificacoes, `INotificador`, hub `/hubs/notificacoes` (JWT por query string em
+  `/hubs`), `GET /api/notificacoes`, marcar como lida/todas; `POST /api/notificacoes/teste` só em Development;
+  bloqueio de usuário avisa os Donos. Sininho no web (`src/web/src/notificacoes/Sino.tsx`).
+- **Pesquisa global:** `GET /api/busca?q=` (mín. 2 letras, sem acento) com `ProvedorDeBuscaIdentidade`
+  (empresas que o usuário acessa; usuários só para Dono/Gerente). Ctrl+K no web
+  (`src/web/src/busca/PesquisaGlobal.tsx`) também encontra telas do menu; escolher empresa troca o CNPJ ativo.
+- Migrations centralizadas: `app.AplicarMigracoesKamusAsync()` aplica as de todos os DbContexts registrados.
+- Testes: 110 backend, 58 web.
 
-**Próximo passo — v0.4.0: notificações, pesquisa global e histórico de alterações** (ver `LEVANTAMENTO.md` 5.3,
-5.5 e 4.7.2):
-1. **Histórico de alterações (auditoria):** gravar no `SaveChanges` do `KamusDbContext` inclusão/alteração/exclusão
-   de entidades de negócio com valores antes/depois, usuário, data, IP, empresa; tabela append-only; campos
-   sensíveis nunca gravados; eventos sensíveis (login, exportação). Precisa funcionar em memória e no PostgreSQL.
-2. **Notificações:** tabela por usuário, endpoints listar/marcar como lida, SignalR para tempo real; sininho da
-   topbar (`src/web/src/layout/Topbar.tsx`, hoje placeholder).
-3. **Pesquisa global (Ctrl+K):** `GET /api/search?q=` com provedores por módulo (respeitando tenant, empresa e
-   perfil); command palette no web (hoje o campo é placeholder desabilitado). No PostgreSQL: `unaccent` + `pg_trgm`.
+**Próximo passo — v0.5.0: exportação de relatórios em PDF e Excel** (ver `LEVANTAMENTO.md` 5.6):
+1. Infraestrutura de relatórios: uma definição (`ReportData`: colunas, tipos, linhas, totais, filtros) renderizada
+   por `PdfExporter` (QuestPDF — conferir licença Community) e `ExcelExporter` (ClosedXML), + CSV.
+2. Cabeçalho padrão (empresa ativa, CNPJ, filtros, data/hora, usuário), PDF sempre claro, Excel com tipos reais.
+3. Exportação grande em segundo plano com notificação "relatório pronto" (usar `INotificador`) e evento
+   `exportacao` no histórico (`IRegistradorDeEventos`).
+4. Primeiro relatório real: o próprio histórico de alterações (botão "Exportar ▾" na tela).
+5. Componente web padrão "Exportar ▾ (PDF / Excel / CSV)" enviando os filtros da tela.
 
 **Pendências conhecidas:**
 - Branch órfã `release-please--branches--main--components--kamus` no GitHub (pode ser apagada pela interface).
 - Perguntas em aberto para o dono: seção 12 do `LEVANTAMENTO.md` (prazos de troca, comissão, crediário etc.).
+- Gravação do histórico acontece logo após o `SaveChanges` (não na mesma transação); revisar quando houver
+  PostgreSQL em produção.

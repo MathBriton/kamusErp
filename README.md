@@ -44,6 +44,9 @@ Sem banco, os dados ficam **em memória**: são recriados a cada vez que a API s
 | Documento OpenAPI | http://localhost:5249/openapi/v1.json |
 | Saúde | http://localhost:5249/health → `Degraded` sem banco (normal neste modo) |
 | Autenticação | `POST /api/auth/login`, `/refresh`, `/logout` e `GET /api/auth/me` |
+| Histórico de alterações | `GET /api/auditoria` · tela em Configurações → Histórico de alterações |
+| Notificações | `GET /api/notificacoes` · tempo real em `/hubs/notificacoes` · `POST /api/notificacoes/teste` dispara uma de teste |
+| Pesquisa global | `GET /api/busca?q=...` · **Ctrl+K** na aplicação web |
 | Versão | http://localhost:5249/api/versao |
 | Requisições prontas | [`src/backend/Kamus.Api/Kamus.Api.http`](src/backend/Kamus.Api/Kamus.Api.http) (VS Code com REST Client, Visual Studio, Rider) |
 

@@ -662,8 +662,8 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 |---|---|---|---|
 | v0.1.0 | 0a | Solução .NET, multi-tenancy (filtro + RLS), CNPJ alfanumérico, Docker, CI, web base com tema | ✅ lançada |
 | v0.2.0 | 0a+/0b | API em localhost sem banco, tela de testes (Scalar), login (JWT + refresh em cookie), bloqueio por tentativas, usuário de teste, dados em memória | ✅ lançada |
-| v0.3.0 | 0b | Shell (sidebar/topbar), seletor de CNPJ validado no backend, dashboard (estrutura), páginas previstas | ✅ pronta |
-| v0.4.0 | 0b | Notificações em tempo real, pesquisa global, histórico de alterações | ⏳ |
+| v0.3.0 | 0b | Shell (sidebar/topbar), seletor de CNPJ validado no backend, dashboard (estrutura), páginas previstas | ✅ lançada |
+| v0.4.0 | 0b | Notificações em tempo real, pesquisa global, histórico de alterações | ✅ pronta |
 | v0.5.0 | 0b | Exportação PDF/Excel | ⏳ |
 | v0.6.0 | 0b | Licenciamento + Painel Administrativo | ⏳ |
 | v0.7.0 | 1 | Cadastros (empresas, ficha do cliente, fornecedores, vendedores, produtos com grade, importação por planilha) | ⏳ |
@@ -784,3 +784,8 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | 2026-10-14 | Menu definido em um único arquivo (`src/web/src/navegacao/menu.ts`), com visibilidade por perfil apenas como conforto visual — a API sempre valida | Aceita |
 | 2026-10-14 | Empresa ativa no header `X-Empresa-Id` (id ou `todas`), validada no backend contra os acessos: 403 sem acesso; `todas` só para Dono e só em leitura (escrita = 400); rotas `/api/auth` ignoram o header | Aceita |
 | 2026-10-14 | Dados de demonstração incluem `vendedor@kamus.local` (perfil Vendedor só no CNPJ Centro) para testar perfis | Aceita |
+| 2026-10-14 | Histórico de alterações por interceptor no `SaveChanges` (automático para `ITenantOwned`/`[Auditavel]`, `[NaoAuditar]` para campos sensíveis), gravado logo após a gravação de negócio; tabela somente-inclusão no banco | Aceita |
+| 2026-10-14 | Histórico visível para Dono e Gerente; mostra registros da empresa ativa e eventos gerais do cliente | Aceita |
+| 2026-10-14 | Notificações em módulo próprio, entregues por SignalR; módulos notificam via `INotificador` (sem depender uns dos outros) | Aceita |
+| 2026-10-14 | Bloqueio de usuário por tentativas gera alerta para todos os Donos | Aceita |
+| 2026-10-14 | Pesquisa global por provedores de busca de cada módulo; comparação sem acento em memória enquanto os volumes são pequenos (produtos usarão `unaccent` + `pg_trgm`) | Aceita |
