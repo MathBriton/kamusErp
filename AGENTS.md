@@ -183,7 +183,7 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 
 **Última atualização:** 2026-10-14
 
-**Releases:** v0.1.0 → **v0.9.0** lançadas. Na `main`, pronto para a **v0.10.0** (importação por planilha) — encerra a fase 1 (cadastros).
+**Releases:** v0.1.0 → **v0.10.0** lançadas (a v0.10.0 trouxe a importação por planilha e encerrou a fase 1, cadastros). Próxima: **v0.11.0** (estoque).
 Plano de releases em `LEVANTAMENTO.md` → Plano de releases.
 
 **O que existe hoje:**
