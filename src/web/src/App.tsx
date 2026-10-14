@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Route, Routes } from 'react-router'
 import { useAuth } from './auth/AuthContext'
 import { EmpresaProvider } from './empresa/EmpresaProvider'
@@ -5,10 +6,16 @@ import { Shell } from './layout/Shell'
 import { MENU, todasAsRotas } from './navegacao/menu'
 import { DashboardPage } from './pages/DashboardPage'
 import { EmConstrucaoPage } from './pages/EmConstrucaoPage'
+import { HistoricoPage } from './pages/HistoricoPage'
 import { LoginPage } from './pages/LoginPage'
 import { NaoEncontradaPage } from './pages/NaoEncontradaPage'
 
-const PAGINAS_PREVISTAS = todasAsRotas(MENU).filter((item) => item.rota !== '/')
+/** Telas já implementadas; as demais rotas do menu mostram "Previsto para a vX". */
+const PAGINAS_IMPLEMENTADAS: Record<string, ReactNode> = {
+  '/configuracoes/historico': <HistoricoPage />,
+}
+
+const ROTAS_DO_MENU = todasAsRotas(MENU).filter((item) => item.rota !== '/')
 
 export function App() {
   const { estado } = useAuth()
@@ -24,8 +31,8 @@ export function App() {
       <Routes>
         <Route element={<Shell sessao={estado.sessao} />}>
           <Route index element={<DashboardPage />} />
-          {PAGINAS_PREVISTAS.map((item) => (
-            <Route key={item.rota} path={item.rota} element={<EmConstrucaoPage item={item} />} />
+          {ROTAS_DO_MENU.map((item) => (
+            <Route key={item.rota} path={item.rota} element={PAGINAS_IMPLEMENTADAS[item.rota] ?? <EmConstrucaoPage item={item} />} />
           ))}
           <Route path="*" element={<NaoEncontradaPage />} />
         </Route>

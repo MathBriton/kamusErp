@@ -16,6 +16,11 @@ describe('menu', () => {
     expect(visiveis).toContain('Vendas')
   })
 
+  it('Gerente vê o histórico de alterações, mas não usuários e licença', () => {
+    const config = filtrarMenu(MENU, 'Gerente').find((g) => g.titulo === 'Configurações')
+    expect(config?.itens?.map((i) => i.titulo)).toEqual(['Histórico de alterações'])
+  })
+
   it('grupo sem nenhum item visível some do menu', () => {
     const cadastros = filtrarMenu(MENU, 'Vendedor').find((g) => g.titulo === 'Cadastros')
     expect(cadastros?.itens?.map((i) => i.titulo)).toEqual(['Clientes'])
