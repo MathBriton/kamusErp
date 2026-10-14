@@ -670,7 +670,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.8.0 | 1 | Ficha do cliente, fornecedores e vendedores | ✅ lançada |
 | v0.9.0 | 1 | Produtos com grade (cor × tamanho), SKUs, códigos de barras internos | ✅ lançada |
 | v0.10.0 | 1 | Importação por planilha | ✅ lançada |
-| v0.11.0 | 2 | Estoque: lojas, saldo por SKU, entrada/ajuste/transferência, custo médio, kardex, posição em matriz, estoque inicial por planilha | ✅ pronta |
+| v0.11.0 | 2 | Estoque: lojas, saldo por SKU, entrada/ajuste/transferência, custo médio, kardex, posição em matriz, estoque inicial por planilha | ✅ lançada |
 | v0.12.0 | 2 | Estoque: importação de XML da NF-e, inventário, etiquetas | ⏳ |
 | v0.13.0 | 3 | Financeiro | ⏳ |
 | v0.14.0 | 4 | Vendas (registro, troca e vale-troca, comissão) | ⏳ |
