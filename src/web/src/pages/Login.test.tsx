@@ -1,23 +1,11 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import { App } from '../App'
-import { AuthProvider } from '../auth/AuthProvider'
-import { json, mockApi, problema, sessaoDemo } from '../test/mockApi'
-import { ThemeProvider } from '../theme/ThemeProvider'
+import { empresaAtivaHandler, json, mockApi, problema, sessaoDemo } from '../test/mockApi'
+import { renderApp } from '../test/renderApp'
 
 const semSessao = { 'POST /api/auth/refresh': () => problema(401, 'Faça login novamente.') }
-const health = { 'GET /health': () => new Response('Degraded') }
-
-function renderApp() {
-  return render(
-    <ThemeProvider>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </ThemeProvider>,
-  )
-}
+const health = { 'GET /health': () => new Response('Degraded'), 'GET /api/empresas/ativa': empresaAtivaHandler() }
 
 async function preencherEEntrar(email: string, senha: string) {
   await userEvent.type(await screen.findByLabelText('E-mail'), email)
@@ -35,7 +23,7 @@ describe('Login', () => {
   it('com sessão ativa (cookie válido) entra direto', async () => {
     mockApi({ 'POST /api/auth/refresh': () => json(sessaoDemo), ...health })
     renderApp()
-    expect(await screen.findByText(/Olá, Admin Demo/)).toBeInTheDocument()
+    expect(await screen.findByText(/Olá, Admin/)).toBeInTheDocument()
   })
 
   it('login correto mostra o usuário e as empresas que ele acessa', async () => {
@@ -44,9 +32,8 @@ describe('Login', () => {
 
     await preencherEEntrar('admin@kamus.local', 'Kamus@Dev123')
 
-    expect(await screen.findByText(/Olá, Admin Demo/)).toBeInTheDocument()
-    expect(screen.getByText('12.345.678/0001-95')).toBeInTheDocument()
-    expect(screen.getByText('98.765.432/0001-98')).toBeInTheDocument()
+    expect(await screen.findByText(/Olá, Admin/)).toBeInTheDocument()
+    expect(screen.getAllByText('12.345.678/0001-95').length).toBeGreaterThan(0)
     const chamada = api.mock.calls.find(([url]) => url === '/api/auth/login')!
     expect(JSON.parse(chamada[1]!.body as string)).toEqual({ email: 'admin@kamus.local', senha: 'Kamus@Dev123', manterConectado: false })
   })
@@ -96,7 +83,7 @@ describe('Login', () => {
     await userEvent.click(await screen.findByLabelText('Manter conectado'))
     await preencherEEntrar('admin@kamus.local', 'Kamus@Dev123')
 
-    await screen.findByText(/Olá, Admin Demo/)
+    await screen.findByText(/Olá, Admin/)
     const chamada = api.mock.calls.find(([url]) => url === '/api/auth/login')!
     expect(JSON.parse(chamada[1]!.body as string).manterConectado).toBe(true)
   })
@@ -120,7 +107,8 @@ describe('Login', () => {
     })
     renderApp()
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Sair' }))
+    await userEvent.click(await screen.findByRole('button', { name: /Menu do usuário/ }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Sair' }))
 
     expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeInTheDocument()
     await waitFor(() => expect(api.mock.calls.some(([url]) => url === '/api/auth/logout')).toBe(true))

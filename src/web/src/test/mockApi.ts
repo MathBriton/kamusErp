@@ -28,3 +28,20 @@ export const sessaoDemo = {
     { id: 'e2', nomeFantasia: 'Kamus Moda Shopping', razaoSocial: 'Kamus Moda Shopping LTDA', cnpj: '98.765.432/0001-98', perfil: 'Dono' },
   ],
 }
+
+export const sessaoVendedor = {
+  ...sessaoDemo,
+  usuario: { id: 'u2', nome: 'Vendedora Demo', email: 'vendedor@kamus.local' },
+  empresas: [{ ...sessaoDemo.empresas[0]!, perfil: 'Vendedor' }],
+}
+
+/** Responde GET /api/empresas/ativa conforme o header X-Empresa-Id enviado. */
+export function empresaAtivaHandler(sessao = sessaoDemo) {
+  return (init: RequestInit | undefined) => {
+    const valor = new Headers(init?.headers).get('X-Empresa-Id')
+    const resumo = (e: (typeof sessaoDemo.empresas)[number]) => ({ id: e.id, nomeFantasia: e.nomeFantasia, razaoSocial: e.razaoSocial, cnpj: e.cnpj })
+    if (valor === 'todas') return json({ consolidado: true, empresas: sessao.empresas.map(resumo) })
+    const empresa = sessao.empresas.find((e) => e.id === valor)
+    return empresa ? json({ consolidado: false, empresas: [resumo(empresa)] }) : problema(403, 'Você não tem acesso a esta empresa.')
+  }
+}

@@ -31,7 +31,7 @@ export class ErroDeApi extends Error {
 
 const SEM_CONEXAO = 'Não foi possível conectar à API. Verifique se ela está rodando em http://localhost:5249.'
 
-async function chamar(caminho: string, init: RequestInit = {}): Promise<Response> {
+export async function chamar(caminho: string, init: RequestInit = {}): Promise<Response> {
   let resposta: Response
   try {
     // credentials: o cookie de sessão (HttpOnly) vai junto, mas o JavaScript nunca o lê.
