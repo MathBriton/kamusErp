@@ -10,6 +10,8 @@ export interface AuthContextValue {
   estado: EstadoAuth
   entrar: (email: string, senha: string, manterConectado: boolean) => Promise<void>
   sair: () => Promise<void>
+  /** Busca a sessão de novo (ex.: depois de trocar a senha ou cadastrar uma empresa). */
+  recarregar: () => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)

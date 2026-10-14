@@ -8,6 +8,9 @@ import { LicencaProvider } from './licenca/LicencaProvider'
 import { MENU, todasAsRotas } from './navegacao/menu'
 import { DashboardPage } from './pages/DashboardPage'
 import { EmConstrucaoPage } from './pages/EmConstrucaoPage'
+import { TrocarSenhaPage } from './configuracoes/TrocarSenhaPage'
+import { EmpresasPage } from './configuracoes/EmpresasPage'
+import { UsuariosPage } from './configuracoes/UsuariosPage'
 import { HistoricoPage } from './pages/HistoricoPage'
 import { LoginPage } from './pages/LoginPage'
 import { NaoEncontradaPage } from './pages/NaoEncontradaPage'
@@ -16,6 +19,8 @@ import { NaoEncontradaPage } from './pages/NaoEncontradaPage'
 const PAGINAS_IMPLEMENTADAS: Record<string, ReactNode> = {
   '/configuracoes/historico': <HistoricoPage />,
   '/configuracoes/licenca': <LicencaPage />,
+  '/configuracoes/empresas': <EmpresasPage />,
+  '/configuracoes/usuarios': <UsuariosPage />,
 }
 
 const ROTAS_DO_MENU = todasAsRotas(MENU).filter((item) => item.rota !== '/')
@@ -27,6 +32,8 @@ export function App() {
     return <main className="grid min-h-dvh place-items-center text-muted">Carregando...</main>
 
   if (estado.status === 'anonimo') return <LoginPage />
+
+  if (estado.sessao.usuario.deveTrocarSenha) return <TrocarSenhaPage nome={estado.sessao.usuario.nome} />
 
   return (
     // key: trocar de usuário recria o contexto de empresa do zero

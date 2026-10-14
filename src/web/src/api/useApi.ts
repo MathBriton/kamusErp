@@ -40,6 +40,23 @@ export function useApi() {
     [token, selecao],
   )
 
+  /** POST/PUT com corpo JSON; devolve o JSON da resposta (ou null em 204). */
+  const enviar = useCallback(
+    async <T,>(metodo: 'POST' | 'PUT', caminho: string, corpo?: unknown): Promise<T> => {
+      const resposta = await chamar(caminho, {
+        method: metodo,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'X-Empresa-Id': selecao,
+          ...(corpo === undefined ? {} : { 'Content-Type': 'application/json' }),
+        },
+        body: corpo === undefined ? undefined : JSON.stringify(corpo),
+      })
+      return (resposta.status === 204 ? null : await resposta.json()) as T
+    },
+    [token, selecao],
+  )
+
   /** Exportações: 200 = arquivo para baixar; 202 = gerado em segundo plano (aviso no sininho). */
   const baixar = useCallback(
     async (caminho: string): Promise<ResultadoDownload> => {
@@ -54,5 +71,5 @@ export function useApi() {
     [token, selecao],
   )
 
-  return { getJson, post, baixar }
+  return { getJson, post, enviar, baixar }
 }

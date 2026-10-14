@@ -54,3 +54,6 @@ export const notificacoesDemo = {
     { id: 'n3', tipo: 'historico', titulo: 'Notificação antiga já lida', mensagem: 'Lida ontem', link: null, empresaId: null, criadaEm: new Date(Date.now() - 86_400_000).toISOString(), lidaEm: new Date().toISOString() },
   ],
 }
+
+/** Corpo JSON enviado numa chamada mapeada. */
+export const corpo = (init: RequestInit | undefined) => JSON.parse(String(init?.body)) as Record<string, unknown>

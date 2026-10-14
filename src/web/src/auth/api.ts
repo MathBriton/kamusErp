@@ -2,6 +2,8 @@ export interface Usuario {
   id: string
   nome: string
   email: string
+  /** Senha provisória: o sistema só libera depois de trocar. */
+  deveTrocarSenha?: boolean
 }
 
 export interface Empresa {
@@ -85,4 +87,12 @@ export async function renovar(): Promise<Sessao | null> {
 
 export async function sair(): Promise<void> {
   await postJson('/api/auth/logout')
+}
+
+export async function trocarSenha(token: string, senhaAtual: string, novaSenha: string): Promise<void> {
+  await chamar('/api/auth/trocar-senha', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ senhaAtual, novaSenha }),
+  })
 }

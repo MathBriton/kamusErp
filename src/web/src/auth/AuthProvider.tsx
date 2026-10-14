@@ -52,6 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [aplicar])
 
-  const value = useMemo(() => ({ estado, entrar, sair }), [estado, entrar, sair])
+  const recarregar = useCallback(async () => {
+    aplicar(await api.renovar())
+  }, [aplicar])
+
+  const value = useMemo(() => ({ estado, entrar, sair, recarregar }), [estado, entrar, sair, recarregar])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import { FormularioDeSenha } from '../configuracoes/FormularioDeSenha'
+import { Dialogo } from '../components/Dialogo'
 import { Icone } from '../components/Icone'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { useFecharAoClicarFora } from '../components/useFecharAoClicarFora'
@@ -17,6 +19,8 @@ export function MenuUsuario({ nome, email }: { nome: string; email: string }) {
   const { sair } = useAuth()
   const { perfilAtual } = useEmpresa()
   const [aberto, setAberto] = useState(false)
+  const [trocandoSenha, setTrocandoSenha] = useState(false)
+  const [senhaTrocada, setSenhaTrocada] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   useFecharAoClicarFora(ref, aberto, () => setAberto(false))
 
@@ -52,6 +56,19 @@ export function MenuUsuario({ nome, email }: { nome: string; email: string }) {
           <button
             type="button"
             role="menuitem"
+            onClick={() => {
+              setAberto(false)
+              setSenhaTrocada(false)
+              setTrocandoSenha(true)
+            }}
+            className="flex w-full items-center gap-2.5 rounded-lg border-t border-border px-2.5 py-2 text-left text-sm hover:bg-surface-2"
+          >
+            <Icone nome="lock" />
+            Trocar senha
+          </button>
+          <button
+            type="button"
+            role="menuitem"
             onClick={() => void sair()}
             className="flex w-full items-center gap-2.5 rounded-lg border-t border-border px-2.5 py-2 text-left text-sm text-danger hover:bg-danger-soft"
           >
@@ -59,6 +76,18 @@ export function MenuUsuario({ nome, email }: { nome: string; email: string }) {
             Sair
           </button>
         </div>
+      )}
+
+      {trocandoSenha && (
+        <Dialogo titulo="Trocar senha" onFechar={() => setTrocandoSenha(false)}>
+          {senhaTrocada ? (
+            <p role="status" className="rounded-lg bg-success-soft px-3 py-2.5 text-sm text-success">
+              Senha alterada. Use a nova senha no próximo login.
+            </p>
+          ) : (
+            <FormularioDeSenha rotuloAtual="Senha atual" onTrocada={() => setSenhaTrocada(true)} />
+          )}
+        </Dialogo>
       )}
     </div>
   )
