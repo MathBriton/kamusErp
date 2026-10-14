@@ -2,7 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Kamus.Infrastructure.MultiTenancy;
 using Kamus.IntegrationTests.Infra;
+using Kamus.SharedKernel.Catalogo;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Kamus.IntegrationTests.Cadastros;
 
@@ -12,6 +15,7 @@ public sealed class ProdutosTests : IAsyncDisposable
     private const string Senha = "Senha@Teste123";
     private static readonly string[] PpAoGg = ["PP", "P", "M", "G", "GG"];
     private static readonly string[] SoPeM = ["P", "M"];
+    private static readonly Guid TenantDemo = Guid.Parse("d0000000-0000-0000-0000-000000000001");
 
     private readonly KamusApiFactory _factory = new(ambiente: "Development",
         configuracoes: new Dictionary<string, string> { ["Seed:SenhaAdmin"] = Senha });
@@ -246,5 +250,41 @@ public sealed class ProdutosTests : IAsyncDisposable
         var csv = await client.GetStringAsync(U("/api/relatorios/produtos.csv"), Ct);
         csv.ShouldContain("CAM-001");
         csv.ShouldContain(camiseta.Skus[0].CodigoDeBarras);
+    }
+
+    [Fact]
+    public async Task CatalogoDeProdutos_ExpoeProdutoESkusParaOutrosModulos()
+    {
+        var client = await Entrar();
+        var camiseta = await CriarCamiseta(client);
+        var azulM = camiseta.Skus.Single(s => s.CorId == camiseta.Cores.Single(c => c.Nome == "Azul").Id && s.Tamanho == "M");
+
+        await using var escopo = _factory.Services.CreateAsyncScope();
+        escopo.ServiceProvider.GetRequiredService<TenantContext>().Definir(TenantDemo);
+        var catalogo = escopo.ServiceProvider.GetRequiredService<ICatalogoDeProdutos>();
+
+        var produto = (await catalogo.ProdutoAsync(camiseta.Id, Ct))!;
+        produto.Tamanhos.ShouldBe(PpAoGg);
+        produto.Cores.Select(c => c.Nome).ShouldBe(["Azul", "Preto"], ignoreOrder: true);
+        produto.Skus.Count.ShouldBe(10);
+        produto.PrecoCusto.ShouldBe(24m);
+
+        var sku = (await catalogo.SkusAsync([azulM.Id], Ct)).Single();
+        sku.ShouldBe(sku with { ProdutoId = camiseta.Id, Referencia = "CAM-001", Descricao = "Camiseta Básica Gola V", Cor = "Azul", Tamanho = "M", CodigoDeBarras = azulM.CodigoDeBarras, PrecoCusto = 24m, Ativo = true });
+
+        (await catalogo.TodosOsSkusAsync(Ct)).ShouldContain(s => s.Id == azulM.Id);
+        (await catalogo.ProdutoAsync(Guid.NewGuid(), Ct)).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task CatalogoDeProdutos_SemTenant_NaoEnxergaNada()
+    {
+        var client = await Entrar();
+        var camiseta = await CriarCamiseta(client);
+
+        await using var escopo = _factory.Services.CreateAsyncScope();
+        var catalogo = escopo.ServiceProvider.GetRequiredService<ICatalogoDeProdutos>();
+
+        (await catalogo.ProdutoAsync(camiseta.Id, Ct)).ShouldBeNull();
     }
 }

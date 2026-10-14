@@ -1,11 +1,13 @@
 using Kamus.Infrastructure.Importacao;
 using Kamus.Infrastructure.Persistence;
+using Kamus.Modules.Cadastros.Aplicacao;
 using Kamus.Modules.Cadastros.Busca;
 using Kamus.Modules.Cadastros.Endpoints;
 using Kamus.Modules.Cadastros.Importacao;
 using Kamus.Modules.Cadastros.Persistencia;
 using Kamus.Modules.Cadastros.Relatorios;
 using Kamus.SharedKernel.Busca;
+using Kamus.SharedKernel.Catalogo;
 using Kamus.SharedKernel.Relatorios;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
@@ -21,6 +23,7 @@ public static class ModuloCadastros
     {
         services.AddKamusDbContext<CadastrosDbContext>(configuration, CadastrosDbContext.Schema);
         services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<ICatalogoDeProdutos, CatalogoDeProdutos>();
         services.AddScoped<IProvedorDeBusca, ProvedorDeBuscaCadastros>();
         services.AddScoped<IRelatorio, RelatorioDeClientes>();
         services.AddScoped<IRelatorio, RelatorioDeFornecedores>();
