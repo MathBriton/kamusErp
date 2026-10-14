@@ -104,7 +104,10 @@ export function Sino() {
   const abrir = (n: Notificacao) => {
     marcarComoLida(n)
     setAberto(false)
-    if (n.link) navigate(n.link)
+    if (!n.link) return
+    // Links da API (ex.: arquivo de relatório pronto) abrem no navegador; os demais são telas do app.
+    if (n.link.startsWith('/api/')) window.open(n.link, '_self')
+    else navigate(n.link)
   }
 
   const marcarTodas = () => {

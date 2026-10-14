@@ -1,4 +1,13 @@
 import { useCallback } from 'react'
+
+export type ResultadoDownload = { tipo: 'arquivo'; nome: string; blob: Blob } | { tipo: 'agendado'; mensagem: string }
+
+/** Nome do arquivo no Content-Disposition (prefere o filename* em UTF-8). */
+function nomeDoArquivo(disposicao: string | null, padrao: string) {
+  const utf8 = disposicao?.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+  if (utf8) return decodeURIComponent(utf8)
+  return disposicao?.match(/filename="?([^";]+)"?/i)?.[1] ?? padrao
+}
 import { chamar } from '../auth/api'
 import { useAuth } from '../auth/AuthContext'
 import { useEmpresa } from '../empresa/EmpresaContext'
@@ -31,5 +40,19 @@ export function useApi() {
     [token, selecao],
   )
 
-  return { getJson, post }
+  /** Exportações: 200 = arquivo para baixar; 202 = gerado em segundo plano (aviso no sininho). */
+  const baixar = useCallback(
+    async (caminho: string): Promise<ResultadoDownload> => {
+      const resposta = await chamar(caminho, { headers: { Authorization: `Bearer ${token}`, 'X-Empresa-Id': selecao } })
+      if (resposta.status === 202) {
+        const corpo = (await resposta.json()) as { mensagem: string }
+        return { tipo: 'agendado', mensagem: corpo.mensagem }
+      }
+      const padrao = caminho.split('?')[0]!.split('/').at(-1)!
+      return { tipo: 'arquivo', nome: nomeDoArquivo(resposta.headers.get('Content-Disposition'), padrao), blob: await resposta.blob() }
+    },
+    [token, selecao],
+  )
+
+  return { getJson, post, baixar }
 }

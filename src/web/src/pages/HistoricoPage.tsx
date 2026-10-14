@@ -3,6 +3,7 @@ import { useApi } from '../api/useApi'
 import { ErroDeApi } from '../auth/api'
 import { Icone } from '../components/Icone'
 import { useEmpresa } from '../empresa/EmpresaContext'
+import { BotaoExportar } from '../relatorios/BotaoExportar'
 
 interface Alteracao {
   campo: string
@@ -101,6 +102,7 @@ export function HistoricoPage() {
             {pagina.total} {pagina.total === 1 ? 'registro' : 'registros'}
           </span>
         )}
+        <BotaoExportar relatorio="historico-de-alteracoes" parametros={{ tipo }} />
       </div>
 
       {erro && (
