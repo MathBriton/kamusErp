@@ -1,10 +1,14 @@
-using Kamus.Modules.Identidade.Aplicacao;
+using System.Security.Claims;
+using Kamus.Modules.Identidade.Dominio;
 using Kamus.Modules.Identidade.Persistencia;
+using Kamus.SharedKernel.Clientes;
+using Kamus.SharedKernel.Documentos;
 using Kamus.SharedKernel.MultiTenancy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace Kamus.Modules.Identidade.Endpoints;
 
@@ -12,16 +16,24 @@ internal static class EmpresasEndpoints
 {
     public sealed record EmpresaAtivaResponse(bool Consolidado, IReadOnlyList<EmpresaResumoDto> Empresas);
     public sealed record EmpresaResumoDto(Guid Id, string NomeFantasia, string RazaoSocial, string Cnpj);
+    public sealed record EmpresaDoClienteDto(Guid Id, string RazaoSocial, string NomeFantasia, string Cnpj);
+    public sealed record NovaEmpresaRequest(string? RazaoSocial, string? NomeFantasia, string? Cnpj);
+    public sealed record EmpresaRequest(string? RazaoSocial, string? NomeFantasia);
 
     public static IEndpointRouteBuilder MapEmpresas(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/empresas/ativa", EmpresaAtiva)
-            .RequireAuthorization()
-            .WithTags("Empresas")
+        var grupo = app.MapGroup("/api/empresas").RequireAuthorization().WithTags("Empresas");
+
+        grupo.MapGet("/ativa", EmpresaAtiva)
             .WithSummary($"Empresa(s) do contexto atual, conforme o header {EmpresaAtivaMiddleware.Header}")
             .Produces<EmpresaAtivaResponse>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden);
+        grupo.MapGet("", Listar).WithSummary("Empresas (CNPJs) do cliente — perfil Dono").Produces<IReadOnlyList<EmpresaDoClienteDto>>();
+        grupo.MapPost("", Criar).WithSummary("Cadastrar empresa (CNPJ); quem cadastra vira Dono dela. Respeita o limite do plano")
+            .Produces<EmpresaDoClienteDto>(StatusCodes.Status201Created).ProducesProblem(StatusCodes.Status409Conflict);
+        grupo.MapPut("/{id:guid}", Editar).WithSummary("Alterar razão social e nome fantasia (o CNPJ não muda)")
+            .Produces(StatusCodes.Status204NoContent).ProducesProblem(StatusCodes.Status404NotFound);
         return app;
     }
 
@@ -38,5 +50,49 @@ internal static class EmpresasEndpoints
             .Select(e => new EmpresaResumoDto(e.Id, e.NomeFantasia, e.RazaoSocial, e.Cnpj.Formatado))
             .ToList();
         return Results.Ok(new EmpresaAtivaResponse(empresaAtiva.Consolidado, resposta));
+    }
+
+    private static EmpresaDoClienteDto ParaDto(Empresa e) => new(e.Id, e.RazaoSocial, e.NomeFantasia, e.Cnpj.Formatado);
+
+    private static async Task<IResult> Listar(IEmpresaAtiva empresaAtiva, IdentidadeDbContext db, CancellationToken ct)
+    {
+        if (Gestao.ExigirDono(empresaAtiva) is { } negado) return negado;
+        var empresas = await db.Empresas.AsNoTracking().ToListAsync(ct);
+        return Results.Ok(empresas.OrderBy(e => e.NomeFantasia, StringComparer.CurrentCulture).Select(ParaDto).ToList());
+    }
+
+    private static async Task<IResult> Criar(
+        NovaEmpresaRequest r, IEmpresaAtiva empresaAtiva, ITenantContext tenant, ILimitesDoCliente limites,
+        IdentidadeDbContext db, ClaimsPrincipal user, CancellationToken ct)
+    {
+        if (Gestao.ExigirDono(empresaAtiva) is { } negado) return negado;
+        if (string.IsNullOrWhiteSpace(r.RazaoSocial) || string.IsNullOrWhiteSpace(r.NomeFantasia))
+            return Gestao.Problema(StatusCodes.Status400BadRequest, "Dados incompletos", "Informe razão social e nome fantasia.");
+        if (!Cnpj.TryParse(r.Cnpj, out var cnpj))
+            return Gestao.Problema(StatusCodes.Status400BadRequest, "CNPJ inválido", "CNPJ inválido.");
+        if (await db.Empresas.AnyAsync(e => e.Cnpj == cnpj, ct))
+            return Gestao.Problema(StatusCodes.Status409Conflict, "CNPJ já cadastrado", $"O CNPJ {cnpj.Formatado} já está cadastrado.");
+
+        var limite = (await limites.ObterAsync(tenant.TenantId!.Value, ct)).Cnpjs;
+        if (limite is { } max && await db.Empresas.CountAsync(ct) >= max) return Gestao.Limite("CNPJs", max);
+
+        var empresa = Empresa.Criar(r.RazaoSocial, r.NomeFantasia, cnpj);
+        db.Empresas.Add(empresa);
+        db.AcessosEmpresa.Add(AcessoEmpresa.Criar(Guid.Parse(user.FindFirstValue(JwtRegisteredClaimNames.Sub)!), empresa.Id, Perfil.Dono));
+        await db.SaveChangesAsync(ct);
+        return Results.Created($"/api/empresas/{empresa.Id}", ParaDto(empresa));
+    }
+
+    private static async Task<IResult> Editar(Guid id, EmpresaRequest r, IEmpresaAtiva empresaAtiva, IdentidadeDbContext db, CancellationToken ct)
+    {
+        if (Gestao.ExigirDono(empresaAtiva) is { } negado) return negado;
+        var empresa = await db.Empresas.SingleOrDefaultAsync(e => e.Id == id, ct);
+        if (empresa is null) return Gestao.Problema(StatusCodes.Status404NotFound, "Não encontrada", "Empresa não encontrada.");
+        if (string.IsNullOrWhiteSpace(r.RazaoSocial) || string.IsNullOrWhiteSpace(r.NomeFantasia))
+            return Gestao.Problema(StatusCodes.Status400BadRequest, "Dados incompletos", "Informe razão social e nome fantasia.");
+
+        empresa.Atualizar(r.RazaoSocial, r.NomeFantasia);
+        await db.SaveChangesAsync(ct);
+        return Results.NoContent();
     }
 }

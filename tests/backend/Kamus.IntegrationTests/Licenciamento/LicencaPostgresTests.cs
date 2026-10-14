@@ -59,6 +59,11 @@ public sealed class LicencaPostgresTests(PostgresFixture db)
         var entrar = await cliente.PostAsJsonAsync(new Uri("/api/auth/login", UriKind.Relative), new { email = "bella@bellamoda.com.br", senha = novo.SenhaProvisoria }, Ct);
         entrar.EnsureSuccessStatusCode();
         cliente.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", (await entrar.Content.ReadFromJsonAsync<SessaoDto>(Ct))!.AccessToken);
+        (await cliente.PostAsJsonAsync(new Uri("/api/auth/trocar-senha", UriKind.Relative), new { senhaAtual = novo.SenhaProvisoria, novaSenha = "BellaModa2026" }, Ct))
+            .EnsureSuccessStatusCode();
+        entrar = await cliente.PostAsJsonAsync(new Uri("/api/auth/login", UriKind.Relative), new { email = "bella@bellamoda.com.br", senha = "BellaModa2026" }, Ct);
+        entrar.EnsureSuccessStatusCode();
+        cliente.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", (await entrar.Content.ReadFromJsonAsync<SessaoDto>(Ct))!.AccessToken);
         (await cliente.GetFromJsonAsync<LicencaDto>(new Uri("/api/licenca", UriKind.Relative), Ct))!.Estado.ShouldBe("Ativa");
         (await cliente.GetFromJsonAsync<ListaDto>(new Uri("/api/notificacoes", UriKind.Relative), Ct))!.Itens.ShouldContain(n => n.Tipo == "licenca_paga");
     }

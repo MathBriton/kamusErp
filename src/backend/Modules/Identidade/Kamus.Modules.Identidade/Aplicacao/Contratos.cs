@@ -2,7 +2,10 @@ namespace Kamus.Modules.Identidade.Aplicacao;
 
 public sealed record LoginRequest(string? Email, string? Senha, bool ManterConectado = false);
 
-public sealed record UsuarioDto(Guid Id, string Nome, string Email);
+/// <param name="DeveTrocarSenha">Senha provisória: o sistema só libera depois de <c>POST /api/auth/trocar-senha</c>.</param>
+public sealed record UsuarioDto(Guid Id, string Nome, string Email, bool DeveTrocarSenha);
+
+public sealed record TrocarSenhaRequest(string? SenhaAtual, string? NovaSenha);
 
 public sealed record EmpresaDto(Guid Id, string NomeFantasia, string RazaoSocial, string Cnpj, string Perfil);
 

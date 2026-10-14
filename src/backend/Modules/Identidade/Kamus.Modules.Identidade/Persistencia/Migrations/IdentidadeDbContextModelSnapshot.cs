@@ -194,6 +194,10 @@ namespace Kamus.Modules.Identidade.Persistencia.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("bloqueado_ate");
 
+                    b.Property<bool>("DeveTrocarSenha")
+                        .HasColumnType("boolean")
+                        .HasColumnName("deve_trocar_senha");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(254)

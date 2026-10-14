@@ -221,7 +221,12 @@ public sealed class PainelAdministrativoTests : IAsyncDisposable
         var criado = (await resposta.Content.ReadFromJsonAsync<NovoClienteDto>(Ct))!;
         criado.SenhaProvisoria.Length.ShouldBeGreaterThanOrEqualTo(10);
 
-        var cliente = await EntrarComoCliente("ana@flordelis.com.br", criado.SenhaProvisoria);
+        // O Dono recebe senha provisória: troca no primeiro acesso antes de usar o sistema.
+        var provisorio = await EntrarComoCliente("ana@flordelis.com.br", criado.SenhaProvisoria);
+        (await provisorio.GetAsync(U("/api/licenca"), Ct)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await provisorio.PostAsJsonAsync(U("/api/auth/trocar-senha"), new { senhaAtual = criado.SenhaProvisoria, novaSenha = "FlorDeLis2026" }, Ct))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        var cliente = await EntrarComoCliente("ana@flordelis.com.br", "FlorDeLis2026");
         (await cliente.GetFromJsonAsync<LicencaDto>(U("/api/licenca"), Ct))!.Estado.ShouldBe("Trial");
         var clientes = await admin.GetFromJsonAsync<List<ClienteDto>>(U("/admin-api/clientes"), Ct);
         clientes.ShouldNotBeNull().ShouldContain(c => c.TenantId == criado.TenantId && c.Estado == "Trial" && c.ValorMensal == 149.90m);

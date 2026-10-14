@@ -28,6 +28,7 @@ public static class ModuloLicenciamento
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<CacheDeLicencas>();
         services.AddScoped<AvisoAosDonos>();
+        services.AddScoped<Kamus.SharedKernel.Clientes.ILimitesDoCliente, LimitesDaLicenca>();
         services.AddScoped<VerificadorDeVencimentos>();
         services.AddHostedService<RotinaDeVencimentos>();
 

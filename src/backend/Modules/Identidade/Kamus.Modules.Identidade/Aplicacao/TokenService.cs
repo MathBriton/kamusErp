@@ -11,6 +11,9 @@ namespace Kamus.Modules.Identidade.Aplicacao;
 
 internal sealed class TokenService(IOptions<JwtOptions> options)
 {
+    /// <summary>Presente no token de quem está com senha provisória: só as rotas de autenticação respondem.</summary>
+    public const string ClaimTrocarSenha = "trocar_senha";
+
     private readonly JwtOptions _opcoes = options.Value;
 
     public SymmetricSecurityKey ChaveDeAssinatura => CriarChave(_opcoes);
@@ -34,6 +37,7 @@ internal sealed class TokenService(IOptions<JwtOptions> options)
                 new Claim(JwtRegisteredClaimNames.Email, usuario.Email),
                 new Claim(JwtRegisteredClaimNames.Name, usuario.Nome),
                 new Claim(MultiTenancyExtensions.TenantClaim, usuario.TenantId.ToString()),
+                .. usuario.DeveTrocarSenha ? [new Claim(ClaimTrocarSenha, "true")] : Array.Empty<Claim>(),
             ]),
         };
         return (new JsonWebTokenHandler().CreateToken(descritor), expiraEm);

@@ -121,6 +121,22 @@ internal sealed class AutenticacaoService(
         await eventos.RegistrarAsync(evento, descricao, usuario.Id, usuario.Nome, ct);
     }
 
+    /// <returns>O motivo da recusa (pronto para exibir) ou <c>null</c> se trocou.</returns>
+    public async Task<string?> TrocarSenhaAsync(Guid usuarioId, TrocarSenhaRequest request, CancellationToken ct)
+    {
+        var usuario = await db.Usuarios.SingleOrDefaultAsync(u => u.Id == usuarioId && u.Ativo, ct);
+        if (usuario is null) return "Usuário não encontrado.";
+        if (hasher.VerifyHashedPassword(usuario, usuario.SenhaHash, request.SenhaAtual ?? "") == PasswordVerificationResult.Failed)
+            return "A senha atual não confere.";
+        if (PoliticaDeSenha.Validar(request.NovaSenha) is { } erro) return erro;
+        if (request.NovaSenha == request.SenhaAtual) return "A nova senha precisa ser diferente da atual.";
+
+        usuario.TrocarSenha(hasher.HashPassword(usuario, request.NovaSenha!));
+        await db.SaveChangesAsync(ct);
+        await eventos.RegistrarAsync("senha_alterada", $"{usuario.Email} trocou a própria senha", usuario.Id, usuario.Nome, ct);
+        return null;
+    }
+
     public async Task<MeResponse?> ObterUsuarioAtualAsync(Guid usuarioId, CancellationToken ct)
     {
         var usuario = await db.Usuarios.AsNoTracking().SingleOrDefaultAsync(u => u.Id == usuarioId && u.Ativo, ct);
@@ -164,5 +180,5 @@ internal sealed class AutenticacaoService(
         await db.SaveChangesAsync(ct);
     }
 
-    private static UsuarioDto ParaDto(Usuario u) => new(u.Id, u.Nome, u.Email);
+    private static UsuarioDto ParaDto(Usuario u) => new(u.Id, u.Nome, u.Email, u.DeveTrocarSenha);
 }

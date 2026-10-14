@@ -39,6 +39,12 @@ internal static class AutenticacaoEndpoints
             .WithSummary("Encerrar a sessão")
             .Produces(StatusCodes.Status204NoContent);
 
+        grupo.MapPost("/trocar-senha", TrocarSenha)
+            .RequireAuthorization()
+            .WithSummary("Trocar a própria senha (obrigatório quando a senha é provisória). Depois, renove a sessão em /refresh")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status400BadRequest);
+
         grupo.MapGet("/me", UsuarioAtual)
             .RequireAuthorization()
             .WithSummary("Usuário logado e empresas que ele acessa")
@@ -62,6 +68,14 @@ internal static class AutenticacaoEndpoints
                 detail: $"Usuário bloqueado temporariamente por excesso de tentativas. Tente novamente em {Math.Max(1, (int)Math.Ceiling((b.Ate - DateTimeOffset.UtcNow).TotalMinutes))} minuto(s)."),
             _ => CredenciaisInvalidas(),
         };
+    }
+
+    private static async Task<IResult> TrocarSenha(TrocarSenhaRequest request, AutenticacaoService auth, ClaimsPrincipal user, CancellationToken ct)
+    {
+        var erro = await auth.TrocarSenhaAsync(Guid.Parse(user.FindFirstValue(JwtRegisteredClaimNames.Sub)!), request, ct);
+        return erro is null
+            ? Results.NoContent()
+            : Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Senha não alterada", detail: erro);
     }
 
     private static async Task<IResult> Renovar(AutenticacaoService auth, HttpContext http, CancellationToken ct)

@@ -27,6 +27,9 @@ public sealed class Usuario
     [NaoAuditar] public DateTimeOffset? BloqueadoAte { get; private set; }
     [NaoAuditar] public DateTimeOffset? UltimoLoginEm { get; private set; }
 
+    /// <summary>Senha provisória (criada por outra pessoa): só pode usar o sistema depois de trocar.</summary>
+    public bool DeveTrocarSenha { get; private set; }
+
     private Usuario() { }
 
     public static Usuario Criar(Guid tenantId, string nome, string email, Guid? id = null)
@@ -56,6 +59,28 @@ public sealed class Usuario
         ArgumentException.ThrowIfNullOrWhiteSpace(hash);
         SenhaHash = hash;
     }
+
+    public void DefinirSenhaProvisoria(string hash)
+    {
+        DefinirSenhaHash(hash);
+        DeveTrocarSenha = true;
+    }
+
+    public void TrocarSenha(string hash)
+    {
+        DefinirSenhaHash(hash);
+        DeveTrocarSenha = false;
+    }
+
+    public void Renomear(string nome)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(nome);
+        Nome = nome.Trim();
+    }
+
+    public void Desativar() => Ativo = false;
+
+    public void Reativar() => Ativo = true;
 
     public bool EstaBloqueado(DateTimeOffset agora) => BloqueadoAte is { } ate && agora < ate;
 

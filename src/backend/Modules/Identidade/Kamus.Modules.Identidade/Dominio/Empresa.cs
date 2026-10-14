@@ -23,4 +23,12 @@ public sealed class Empresa : ITenantOwned
         ArgumentNullException.ThrowIfNull(cnpj);
         return new Empresa { Id = id ?? Guid.NewGuid(), RazaoSocial = razaoSocial.Trim(), NomeFantasia = nomeFantasia.Trim(), Cnpj = cnpj };
     }
+
+    /// <summary>O CNPJ não muda: outro CNPJ é outra empresa.</summary>
+    public void Atualizar(string razaoSocial, string nomeFantasia)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(razaoSocial);
+        ArgumentException.ThrowIfNullOrWhiteSpace(nomeFantasia);
+        (RazaoSocial, NomeFantasia) = (razaoSocial.Trim(), nomeFantasia.Trim());
+    }
 }

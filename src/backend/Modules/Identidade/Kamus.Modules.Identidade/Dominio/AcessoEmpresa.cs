@@ -17,4 +17,6 @@ public sealed class AcessoEmpresa : ITenantOwned
 
     public static AcessoEmpresa Criar(Guid usuarioId, Guid empresaId, Perfil perfil) =>
         new() { Id = Guid.NewGuid(), UsuarioId = usuarioId, EmpresaId = empresaId, Perfil = perfil };
+
+    public void AlterarPerfil(Perfil perfil) => Perfil = perfil;
 }

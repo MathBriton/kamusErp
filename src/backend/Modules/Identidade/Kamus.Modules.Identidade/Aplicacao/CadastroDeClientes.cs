@@ -34,7 +34,7 @@ internal sealed class CadastroDeClientes(IdentidadeDbContext db, IServiceScopeFa
         dbDoTenant.Tenants.Add(tenant);
         var empresa = Empresa.Criar(c.RazaoSocial, c.NomeFantasia, cnpj);
         var dono = Usuario.Criar(tenant.Id, c.NomeDoDono, email);
-        dono.DefinirSenhaHash(hasher.HashPassword(dono, c.Senha));
+        dono.DefinirSenhaProvisoria(hasher.HashPassword(dono, c.Senha));
         dbDoTenant.Empresas.Add(empresa);
         dbDoTenant.Usuarios.Add(dono);
         dbDoTenant.AcessosEmpresa.Add(AcessoEmpresa.Criar(dono.Id, empresa.Id, Perfil.Dono));

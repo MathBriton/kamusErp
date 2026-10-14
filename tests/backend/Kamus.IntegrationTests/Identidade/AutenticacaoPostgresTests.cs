@@ -93,4 +93,35 @@ public sealed class AutenticacaoPostgresTests(PostgresFixture db)
         await using var cmd = new NpgsqlCommand("SELECT count(*) FROM identidade.empresas", conn);
         return (long)(await cmd.ExecuteScalarAsync(Ct))!;
     }
+
+    private sealed record EmpresaComIdDto(Guid Id, string Cnpj);
+    private sealed record SessaoComEmpresasDto(string AccessToken, List<EmpresaComIdDto> Empresas);
+    private sealed record CriadoDto(Guid Id, string SenhaProvisoria);
+
+    [Fact]
+    public async Task Gestao_NoPostgres_CriaEmpresaEUsuarioQueConsegueEntrar()
+    {
+        db.ExigirBanco();
+        await using var api = CriarApi();
+        using var admin = api.CreateClient();
+        var login = await admin.PostAsJsonAsync(new Uri("/api/auth/login", UriKind.Relative), new { email = "admin@kamus.local", senha = SenhaDemo }, Ct);
+        var sessao = (await login.Content.ReadFromJsonAsync<SessaoComEmpresasDto>(Ct))!;
+        admin.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", sessao.AccessToken);
+        admin.DefaultRequestHeaders.Add("X-Empresa-Id", sessao.Empresas[0].Id.ToString());
+
+        var empresa = await admin.PostAsJsonAsync(new Uri("/api/empresas", UriKind.Relative),
+            new { razaoSocial = "Kamus Outlet LTDA", nomeFantasia = "Kamus Outlet", cnpj = "11.444.777/0001-61" }, Ct);
+        empresa.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var novaEmpresa = (await empresa.Content.ReadFromJsonAsync<EmpresaComIdDto>(Ct))!;
+
+        var usuario = await admin.PostAsJsonAsync(new Uri("/api/usuarios", UriKind.Relative),
+            new { nome = "Caixa Outlet", email = "caixa@outlet.com", acessos = new[] { new { empresaId = novaEmpresa.Id, perfil = "Vendedor" } } }, Ct);
+        usuario.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var criado = (await usuario.Content.ReadFromJsonAsync<CriadoDto>(Ct))!;
+
+        using var caixa = api.CreateClient();
+        var entrar = await caixa.PostAsJsonAsync(new Uri("/api/auth/login", UriKind.Relative), new { email = "caixa@outlet.com", senha = criado.SenhaProvisoria }, Ct);
+        entrar.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await entrar.Content.ReadFromJsonAsync<SessaoComEmpresasDto>(Ct))!.Empresas.ShouldHaveSingleItem().Cnpj.ShouldBe("11.444.777/0001-61");
+    }
 }

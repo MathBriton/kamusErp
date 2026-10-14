@@ -76,10 +76,10 @@ public static class ModuloIdentidade
         return services;
     }
 
-    public static IEndpointRouteBuilder MapModuloIdentidade(this IEndpointRouteBuilder app) => app.MapAutenticacao().MapEmpresas();
+    public static IEndpointRouteBuilder MapModuloIdentidade(this IEndpointRouteBuilder app) => app.MapAutenticacao().MapEmpresas().MapUsuarios();
 
-    /// <summary>Valida a empresa ativa (header X-Empresa-Id). Use depois de <c>UseKamusMultiTenancy</c>.</summary>
-    public static IApplicationBuilder UseModuloIdentidade(this IApplicationBuilder app) => app.UseEmpresaAtiva();
+    /// <summary>Bloqueio de senha provisória e empresa ativa (header X-Empresa-Id). Use depois de <c>UseKamusMultiTenancy</c>.</summary>
+    public static IApplicationBuilder UseModuloIdentidade(this IApplicationBuilder app) => app.UseSenhaProvisoria().UseEmpresaAtiva();
 
     /// <summary>Cria os dados de demonstração em Development (rode depois de <c>AplicarMigracoesKamusAsync</c>).</summary>
     public static async Task InicializarModuloIdentidadeAsync(this WebApplication app)
