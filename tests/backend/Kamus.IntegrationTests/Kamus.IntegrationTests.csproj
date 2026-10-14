@@ -3,6 +3,7 @@
     <ProjectReference Include="..\..\..\src\backend\Kamus.Api\Kamus.Api.csproj" />
     <ProjectReference Include="..\..\..\src\backend\Modules\Licenciamento\Kamus.Modules.Licenciamento\Kamus.Modules.Licenciamento.csproj" />
     <ProjectReference Include="..\..\..\src\backend\Modules\Cadastros\Kamus.Modules.Cadastros\Kamus.Modules.Cadastros.csproj" />
+    <ProjectReference Include="..\..\..\src\backend\Modules\Estoque\Kamus.Modules.Estoque\Kamus.Modules.Estoque.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Testcontainers.PostgreSql" />

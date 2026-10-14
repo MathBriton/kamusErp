@@ -6,6 +6,7 @@ using Kamus.Infrastructure.MultiTenancy;
 using Kamus.Infrastructure.Persistence;
 using Kamus.Infrastructure.Relatorios;
 using Kamus.Modules.Cadastros;
+using Kamus.Modules.Estoque;
 using Kamus.Modules.Identidade;
 using Kamus.Modules.Licenciamento;
 using Kamus.Modules.Notificacoes;
@@ -23,6 +24,7 @@ builder.Services.AddModuloIdentidade(builder.Configuration);
 builder.Services.AddModuloNotificacoes(builder.Configuration);
 builder.Services.AddModuloLicenciamento(builder.Configuration);
 builder.Services.AddModuloCadastros(builder.Configuration);
+builder.Services.AddModuloEstoque(builder.Configuration);
 
 var app = builder.Build();
 
@@ -44,6 +46,7 @@ app.MapModuloIdentidade();
 app.MapModuloNotificacoes();
 app.MapModuloLicenciamento();
 app.MapModuloCadastros();
+app.MapModuloEstoque();
 
 await app.AplicarMigracoesKamusAsync();
 await app.InicializarModuloIdentidadeAsync();
