@@ -78,7 +78,7 @@ src/backend/Shared/Kamus.Infrastructure/Relatorios Exportação PDF/Excel/CSV (/
 src/backend/Modules/Identidade/...            Módulo Identidade: Dominio/, Aplicacao/, Persistencia/, Endpoints/, Busca/, Seed/
 src/backend/Modules/Notificacoes/...          Módulo Notificacoes: notificações por usuário + SignalR (/hubs/notificacoes)
 src/backend/Modules/Licenciamento/...         Licença por cliente (/api/licenca, bloqueio 402, avisos) + API do Painel (Administracao/, /admin-api)
-src/backend/Modules/Cadastros/...             Clientes/fornecedores (Pessoa com papéis, /api/pessoas) e vendedores (/api/vendedores)
+src/backend/Modules/Cadastros/...             Clientes/fornecedores (/api/pessoas), vendedores, grades, cores e produtos com SKUs (/api/produtos)
 src/web/src                                   auth/, api/, busca/, cadastros/, configuracoes/, empresa/, layout/, licenca/, navegacao/, notificacoes/, pages/, relatorios/, theme/, test/
 src/admin/src                                 Painel Administrativo (operador do SaaS): login SuperAdmin, clientes, pagamentos
 tests/backend/Kamus.UnitTests                 Unitários (domínio puro)
@@ -182,39 +182,36 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 
 **Última atualização:** 2026-10-14
 
-**Releases:** v0.1.0 → **v0.8.0** lançadas (a v0.8.0 trouxe clientes, fornecedores e vendedores). Próxima: **v0.9.0** (produtos com grade).
+**Releases:** v0.1.0 → **v0.8.0** lançadas. Na `main`, pronto para a **v0.9.0** (produtos com grade).
 Plano de releases da fase 1 dividido (ver `LEVANTAMENTO.md` → Plano de releases).
 
 **O que existe hoje:**
 - Fundação: login (JWT + refresh rotativo; o web compartilha renovações simultâneas), empresa ativa (`X-Empresa-Id`),
   histórico de alterações, notificações (SignalR), pesquisa global, exportação PDF/Excel/CSV.
 - Licenciamento (`/api/licenca`, 402, avisos) e Painel Administrativo (`/admin-api` + `src/admin`).
-- v0.7.0: `/api/empresas` e `/api/usuarios` (Dono), senha provisória com troca obrigatória (403 `TROCAR_SENHA`),
-  limites do plano (`ILimitesDoCliente`, 409 `LIMITE_DA_LICENCA`).
-- **v0.8.0 — módulo Cadastros** (schema `cadastros`, RLS em `pessoas` e `vendedores`):
-  - `Pessoa` = cliente e/ou fornecedor (papéis), do tenant (vale em todos os CNPJs). CPF (`Cpf` no SharedKernel) ou CNPJ
-    opcional e único por tenant (índice parcial). Telefone com DDD (só dígitos; `WhatsApp` = 55+telefone). Endereço e
-    preferências de moda como colunas (`EnderecoCidade`...) porque o InMemory não consulta complex types. Consentimento de
-    marketing com data (opt-in). `Anonimizar` (LGPD) apaga dados e mantém o registro.
-  - `/api/pessoas`: lista por papel com busca sem acento (em memória), situação, paginação; ficha; criar/editar (409 com
-    `existenteId` se o documento já existe); inativar/reativar (Dono/Gerente); anonimizar (Dono); `/aniversariantes`.
-    Permissões em `Endpoints/Permissoes.cs`.
-  - `/api/vendedores` (Dono/Gerente alteram; todos veem), comissão 0–100%, vínculo opcional a um usuário
-    (`IDiretorioDeClientes.UsuariosDoTenantAtualAsync`).
-  - Pesquisa global (grupos Clientes/Fornecedores, link `?id=` abre a ficha) e relatórios `clientes`/`fornecedores`.
-  - `CalendarioBrasilia` agora está em `Kamus.SharedKernel.Tempo`.
-  - Web: `src/web/src/cadastros/` (`PessoasPage` serve clientes e fornecedores, `FichaDaPessoa`, `VendedoresPage`),
-    aniversariantes da semana com parabéns no WhatsApp; `components/Dialogo.tsx` (prop `largo`), `components/estilos.ts`.
-- Testes: 259 backend, 97 web, 10 admin. E2E em localhost com Playwright (cliente, CPF repetido, busca global pelo CPF,
-  edição registrada no histórico, CSV, fornecedor, vendedor vinculado).
+- v0.7.0: `/api/empresas` e `/api/usuarios` (Dono), senha provisória (403 `TROCAR_SENHA`), limites do plano (409 `LIMITE_DA_LICENCA`).
+- v0.8.0 (módulo Cadastros): `Pessoa` cliente/fornecedor (`/api/pessoas`, aniversariantes, LGPD), `/api/vendedores`.
+  Permissões em `Endpoints/Permissoes.cs`. `Cpf` e `CalendarioBrasilia` no SharedKernel.
+- **v0.9.0 — produtos com grade** (mesmo módulo Cadastros, migration `Produtos`, RLS em `grades`, `cores`, `produtos`, `skus`):
+  - `GradeDeTamanhos` (tamanhos em uma coluna "PP|P|M", ordem = exibição; padrões em `GradeDeTamanhos.Padroes`) e `Cor`
+    (hex opcional; `Cor.Padroes`). `POST /api/grades/padrao` e `/api/cores/padrao` criam os que faltam. Grade em uso → 409.
+  - `Produto` (referência única e imutável, maiúscula) gera `Sku` por cor × tamanho (`OrdemTamanho`); `DefinirCores` adiciona
+    e desativa. `Sku`: código de barras (`CodigoDeBarras` no SharedKernel: GTIN válido ou interno EAN-13 prefixo 2 em
+    sequência — `GeradorDeCodigosAsync`), preço próprio opcional, ativo. Ao editar, SKUs novos são adicionados ao `DbSet`
+    explicitamente (chave Guid gerada no domínio).
+  - `/api/produtos` (busca por descrição/referência/marca/código), `/{id}`, `PUT /{id}/skus/{skuId}` (409 se o EAN é de outro
+    produto), `/por-codigo/{ean}`, `/sugestoes`. Catálogo: Dono/Gerente/Estoquista alteram; todos consultam.
+  - Pesquisa global (grupo Produtos) e relatório `produtos` (um SKU por linha).
+  - Web: `cadastros/GradesPage.tsx`, `cadastros/ProdutosPage.tsx` (formulário, detalhe com matriz cor × tamanho, edição de SKU),
+    `cadastros/catalogo.ts` (tipos, `moeda`, `lerNumero` para "59,90"), `Amostra.tsx`.
+- Testes: 298 backend, 106 web, 10 admin. E2E em localhost (padrões, produto com 3 cores, preço próprio, combinação
+  desativada, EAN do fornecedor, EAN inválido, busca global pelo EAN).
 
-**Próximo passo — v0.9.0: produtos com grade** (ver `LEVANTAMENTO.md` 4.1.1):
-1. Grades de tamanho reutilizáveis (PP–GG, 36–48, infantil, Único) com ordem; cores.
-2. Produto (modelo: descrição, marca, categoria, coleção, referência do fornecedor, preço base, custo, markup) e SKUs gerados
-   por grade × cores (desativar combinações), preço opcional por SKU.
-3. Código de barras por SKU: EAN do fornecedor ou interno (EAN-13 com prefixo 2), único por tenant.
-4. Telas Cadastros → Produtos e Grades e cores, matriz cor × tamanho; busca (nome, referência, SKU, EAN) e relatório.
-5. Etiquetas ficam para a entrada de mercadoria (v0.11.0).
+**Próximo passo — v0.10.0: importação por planilha** (ver `LEVANTAMENTO.md` 4.7.4):
+1. Modelos .xlsx para download (clientes, fornecedores, produtos com grade — uma linha por SKU) com instruções.
+2. Upload → pré-visualização com validação linha a linha → confirmação → processamento (segundo plano + sininho se grande).
+3. Modo simulação e reimportação segura (atualiza por CPF/CNPJ e por referência + cor + tamanho; não duplica).
+4. Estoque inicial por SKU fica para a v0.11.0 (estoque).
 
 **Pendências conhecidas:** ver "Dúvidas em aberto e débitos técnicos" no `README.md` (lista viva — acrescente lá).
 Também: branch órfã `release-please--branches--main--components--kamus` no GitHub (pode ser apagada pela interface).

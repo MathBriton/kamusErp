@@ -57,6 +57,7 @@ Sem banco, os dados ficam **em memória**: são recriados a cada vez que a API s
 | Exportação | `GET /api/relatorios/historico-de-alteracoes.pdf` (ou `.xlsx`, `.csv`) · botão **Exportar** no histórico |
 | Licença do cliente | `GET /api/licenca` e `/api/licenca/pagamentos` · tela em Configurações → Licença e assinatura |
 | Empresas e usuários | `/api/empresas`, `/api/usuarios`, `POST /api/auth/trocar-senha` · Configurações → Empresas / Usuários e permissões (perfil Dono) |
+| Produtos | `/api/grades`, `/api/cores` (com `/padrao`), `/api/produtos` (SKUs, `/por-codigo/{ean}`, `/sugestoes`) · Cadastros → Produtos (matriz cor × tamanho) / Grades e cores · relatório `produtos` |
 | Clientes, fornecedores e vendedores | `/api/pessoas` (papel, busca, aniversariantes, anonimizar), `/api/vendedores` · Cadastros → Clientes / Fornecedores / Vendedores · relatórios `clientes` e `fornecedores` |
 | Painel Administrativo | http://localhost:5174 · API em `/admin-api/*` (token próprio) |
 | Versão | http://localhost:5249/api/versao |
@@ -148,6 +149,9 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 23 | Cadastro de cliente: CPF obrigatório? (hoje opcional; ajuda no crediário) | Provisório: **opcional** |
 | 24 | Vendedor pode cadastrar e editar clientes? | Provisório: **sim** (não inativa nem anonimiza) |
 | 25 | Mensagem padrão de aniversário no WhatsApp — texto e se oferece desconto | Provisório: texto fixo ("Preparamos um mimo para você na loja") |
+| 26 | Markup padrão por categoria (sugerir preço a partir do custo)? | Provisório: só exibe o markup; sem sugestão automática |
+| 27 | Produto precisa de NCM/dados fiscais já agora? | Provisório: **não** (fiscal fora do piloto) |
+| 28 | Fotos de produto (por produto e por cor) | Em aberto: precisa de armazenamento de arquivos (servidor) |
 
 ### Débitos técnicos
 
@@ -174,6 +178,9 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Modelos de mensagem do WhatsApp fixos no código | A loja não personaliza o texto | Configurações de mensagens (junto com o resumo diário) |
 | Ficha do cliente ainda sem histórico de compras, vale-troca e crediário | Visão 360° incompleta | Conforme vendas (v0.13.0) e crediário (v0.14.0) |
 | Sem busca de endereço por CEP | Digitação manual | Integração com serviço de CEP (ViaCEP) |
+| Busca de produtos em memória | Lenta com catálogos grandes | `pg_trgm` e índice por código de barras no PostgreSQL |
+| Grade em uso não pode ganhar tamanho novo | Para um tamanho novo é preciso criar outra grade | Permitir acrescentar tamanhos ao produto |
+| Sequência do código interno calculada pelo maior existente | Duas criações simultâneas podem colidir (o índice único recusa uma) | Sequência no banco quando houver PostgreSQL em produção |
 
 ## Multi-tenancy em uma frase
 

@@ -196,3 +196,30 @@ X-Empresa-Id: {{login.response.body.empresas[0].id}}
 GET {{api}}/api/vendedores
 Authorization: Bearer {{login.response.body.accessToken}}
 X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### ---------- Produtos com grade ----------
+
+### Criar grades e cores padrão
+POST {{api}}/api/grades/padrao
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+###
+POST {{api}}/api/cores/padrao
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Grades (use o id no cadastro do produto)
+GET {{api}}/api/grades
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Produtos (busca por descrição, referência, marca ou código de barras)
+GET {{api}}/api/produtos?busca=camiseta
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### SKU pelo código de barras (leitor)
+GET {{api}}/api/produtos/por-codigo/2000000000015
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}

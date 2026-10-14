@@ -668,7 +668,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.6.0 | 0b | Licenciamento + Painel Administrativo | ✅ lançada |
 | v0.7.0 | 1 | Empresas (CNPJs) e usuários: perfis por empresa, senha provisória com troca obrigatória, limites do plano | ✅ lançada |
 | v0.8.0 | 1 | Ficha do cliente, fornecedores e vendedores | ✅ lançada |
-| v0.9.0 | 1 | Produtos com grade (cor × tamanho), SKUs, códigos de barras internos | ⏳ |
+| v0.9.0 | 1 | Produtos com grade (cor × tamanho), SKUs, códigos de barras internos | ✅ pronta |
 | v0.10.0 | 1 | Importação por planilha | ⏳ |
 | v0.11.0 | 2 | Estoque (lojas/locais de estoque + importação de XML da NF-e) | ⏳ |
 | v0.12.0 | 3 | Financeiro | ⏳ |
@@ -809,3 +809,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | 2026-10-14 | Permissões: clientes (Dono, Gerente, Vendedor, Financeiro), fornecedores (Dono, Gerente, Estoquista, Financeiro), inativar (Dono, Gerente), anonimizar LGPD (Dono), vendedores (Dono e Gerente alteram; todos veem) | Aceita |
 | 2026-10-14 | LGPD: consentimento de marketing é opt-in com data registrada; anonimizar apaga dados pessoais e mantém o registro (para o histórico de vendas). Mensagem de aniversário só é oferecida a quem aceitou | Aceita |
 | 2026-10-14 | Endereço e preferências guardados como colunas da pessoa (o EF InMemory, usado em localhost, não consulta tipos complexos); o histórico registra cada campo (ex.: `EnderecoCidade`) | Aceita |
+| 2026-10-14 | Produto = modelo; SKU = cor × tamanho, gerado da grade escolhida. A grade do produto e sua referência não mudam depois de criados; cores podem entrar (novos SKUs) e sair (SKUs desativados, nunca apagados). Grade já usada por produto não pode ser alterada | Aceita |
+| 2026-10-14 | Código de barras por SKU: EAN do fornecedor (dígito verificador conferido) ou interno EAN-13 com prefixo 2, em sequência por cliente; único por cliente do SaaS | Aceita |
+| 2026-10-14 | Catálogo: Dono, Gerente e Estoquista cadastram; todos os perfis consultam (o vendedor precisa ver preço e grade) | Aceita |
+| 2026-10-14 | Markup exibido (preço ÷ custo), sem markup padrão por categoria por enquanto | Aceita (provisória) |
