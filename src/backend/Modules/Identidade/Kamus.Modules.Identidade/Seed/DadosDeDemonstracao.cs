@@ -2,6 +2,7 @@ using Kamus.Infrastructure.MultiTenancy;
 using Kamus.Modules.Identidade.Dominio;
 using Kamus.Modules.Identidade.Persistencia;
 using Kamus.SharedKernel.Documentos;
+using Kamus.SharedKernel.Notificacoes;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -53,5 +54,15 @@ internal static class DadosDeDemonstracao
             AcessoEmpresa.Criar(vendedora.Id, centro.Id, Perfil.Vendedor));
 
         await db.SaveChangesAsync(ct);
+
+        var notificador = sp.GetRequiredService<INotificador>();
+        foreach (var n in new[]
+        {
+            new NovaNotificacao(admin.Id, "boas_vindas", "Bem-vindo ao Kamus", "Este é o ambiente de demonstração, com 2 CNPJs. Use o seletor no topo para trocar de empresa.", "/"),
+            new NovaNotificacao(admin.Id, "primeiros_passos", "Comece cadastrando seus produtos", "Produtos com grade (cor × tamanho) chegam na v0.7.0.", "/cadastros/produtos"),
+            new NovaNotificacao(admin.Id, "historico", "Histórico de alterações disponível", "Veja logins, alterações e eventos de segurança em Configurações.", "/configuracoes/historico"),
+            new NovaNotificacao(vendedora.Id, "boas_vindas", "Bem-vinda ao Kamus", "Você acessa a empresa Kamus Moda Centro com o perfil Vendedor.", "/"),
+        })
+            await notificador.NotificarAsync(n, ct);
     }
 }

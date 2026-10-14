@@ -1,8 +1,10 @@
+using System.ComponentModel;
 using Kamus.SharedKernel.MultiTenancy;
 
 namespace Kamus.Modules.Identidade.Dominio;
 
 /// <summary>Quais empresas o usuário acessa e com qual perfil.</summary>
+[DisplayName("Acesso à empresa")]
 public sealed class AcessoEmpresa : ITenantOwned
 {
     public Guid Id { get; private set; }

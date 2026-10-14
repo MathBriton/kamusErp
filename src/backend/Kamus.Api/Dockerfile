@@ -6,6 +6,7 @@ COPY src/backend/Kamus.Api/Kamus.Api.csproj src/backend/Kamus.Api/
 COPY src/backend/Shared/Kamus.SharedKernel/Kamus.SharedKernel.csproj src/backend/Shared/Kamus.SharedKernel/
 COPY src/backend/Shared/Kamus.Infrastructure/Kamus.Infrastructure.csproj src/backend/Shared/Kamus.Infrastructure/
 COPY src/backend/Modules/Identidade/Kamus.Modules.Identidade/Kamus.Modules.Identidade.csproj src/backend/Modules/Identidade/Kamus.Modules.Identidade/
+COPY src/backend/Modules/Notificacoes/Kamus.Modules.Notificacoes/Kamus.Modules.Notificacoes.csproj src/backend/Modules/Notificacoes/Kamus.Modules.Notificacoes/
 RUN dotnet restore src/backend/Kamus.Api/Kamus.Api.csproj
 COPY src/backend/ src/backend/
 # Versão e commit informados pelo workflow de release (expostos em /api/versao)

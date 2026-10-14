@@ -1,9 +1,11 @@
+using System.ComponentModel;
 using Kamus.SharedKernel.Documentos;
 using Kamus.SharedKernel.MultiTenancy;
 
 namespace Kamus.Modules.Identidade.Dominio;
 
 /// <summary>Empresa (CNPJ) de um tenant. Um tenant pode ter várias.</summary>
+[DisplayName("Empresa")]
 public sealed class Empresa : ITenantOwned
 {
     public Guid Id { get; private set; }

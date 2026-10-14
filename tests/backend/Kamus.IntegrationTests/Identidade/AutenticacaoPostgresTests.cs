@@ -19,6 +19,8 @@ public sealed class AutenticacaoPostgresTests(PostgresFixture db)
 
     private sealed record EmpresaDto(string Cnpj);
     private sealed record LoginResponse(string AccessToken, List<EmpresaDto> Empresas);
+    private sealed record NotificacaoDto(string Titulo);
+    private sealed record ListaNotificacoes(List<NotificacaoDto> Itens, int NaoLidas);
 
     private KamusApiFactory CriarApi() => new(db.AppConnectionString, "Development", new Dictionary<string, string>
     {
@@ -39,6 +41,11 @@ public sealed class AutenticacaoPostgresTests(PostgresFixture db)
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var corpo = await response.Content.ReadFromJsonAsync<LoginResponse>(Ct);
         corpo!.Empresas.Count.ShouldBe(2);
+
+        // Notificações (outro módulo, outro schema) também funcionam no PostgreSQL com RLS
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", corpo.AccessToken);
+        var notificacoes = await client.GetFromJsonAsync<ListaNotificacoes>(new Uri("/api/notificacoes", UriKind.Relative), Ct);
+        notificacoes!.Itens.ShouldContain(n => n.Titulo == "Bem-vindo ao Kamus");
     }
 
     [Fact]

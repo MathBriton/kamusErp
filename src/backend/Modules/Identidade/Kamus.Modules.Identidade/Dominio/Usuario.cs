@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Net.Mail;
 using Kamus.SharedKernel.Auditoria;
 
@@ -9,6 +10,7 @@ namespace Kamus.Modules.Identidade.Dominio;
 /// gravado e define o tenant da sessão após a senha ser validada. E-mail é único no sistema.
 /// </summary>
 [Auditavel]
+[DisplayName("Usuário")]
 public sealed class Usuario
 {
     public const int MaximoDeFalhas = 5;

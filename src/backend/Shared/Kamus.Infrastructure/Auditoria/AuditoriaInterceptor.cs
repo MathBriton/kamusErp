@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Globalization;
 using System.Reflection;
 using Kamus.SharedKernel.Auditoria;
@@ -17,7 +18,7 @@ namespace Kamus.Infrastructure.Auditoria;
 /// </summary>
 internal sealed class AuditoriaInterceptor(IServiceProvider servicos) : SaveChangesInterceptor
 {
-    private sealed record Pendente(TipoRegistroAuditoria Tipo, string Entidade, string EntidadeId, List<AlteracaoDeCampo> Alteracoes);
+    private sealed record Pendente(TipoRegistroAuditoria Tipo, string Entidade, string NomeExibicao, string EntidadeId, List<AlteracaoDeCampo> Alteracoes);
 
     private List<Pendente> _pendentes = [];
 
@@ -76,7 +77,8 @@ internal sealed class AuditoriaInterceptor(IServiceProvider servicos) : SaveChan
             var alteracoes = CamposAlterados(entrada, tipo);
             if (tipo == TipoRegistroAuditoria.Alteracao && alteracoes.Count == 0) continue;
 
-            _pendentes.Add(new Pendente(tipo, tipoClr.Name, Chave(entrada), alteracoes));
+            var nome = tipoClr.GetCustomAttribute<DisplayNameAttribute>()?.DisplayName ?? tipoClr.Name;
+            _pendentes.Add(new Pendente(tipo, tipoClr.Name, nome, Chave(entrada), alteracoes));
         }
     }
 
@@ -90,7 +92,7 @@ internal sealed class AuditoriaInterceptor(IServiceProvider servicos) : SaveChan
         var autoria = servicos.GetRequiredService<FonteDeAutoria>().Atual();
         var db = servicos.GetRequiredService<AuditoriaDbContext>();
         foreach (var p in pendentes)
-            db.Registros.Add(RegistroAuditoria.DeAlteracao(p.Tipo, p.Entidade, p.EntidadeId, p.Alteracoes, autoria));
+            db.Registros.Add(RegistroAuditoria.DeAlteracao(p.Tipo, p.Entidade, p.NomeExibicao, p.EntidadeId, p.Alteracoes, autoria));
         return db;
     }
 

@@ -31,7 +31,8 @@ public sealed class RegistroAuditoria : ITenantOwned
 
     private RegistroAuditoria() { }
 
-    public static RegistroAuditoria DeAlteracao(TipoRegistroAuditoria tipo, string entidade, string entidadeId,
+    /// <param name="nomeExibicao">Nome amigável da entidade (atributo <c>[DisplayName]</c>), usado na descrição.</param>
+    public static RegistroAuditoria DeAlteracao(TipoRegistroAuditoria tipo, string entidade, string nomeExibicao, string entidadeId,
         List<AlteracaoDeCampo> alteracoes, Autoria autoria) =>
         new RegistroAuditoria
         {
@@ -39,7 +40,7 @@ public sealed class RegistroAuditoria : ITenantOwned
             Tipo = tipo,
             Entidade = entidade,
             EntidadeId = entidadeId,
-            Descricao = $"{NomeDoTipo(tipo)} de {entidade}",
+            Descricao = $"{NomeDoTipo(tipo)} de {nomeExibicao}",
             Alteracoes = alteracoes,
         }.Com(autoria);
 

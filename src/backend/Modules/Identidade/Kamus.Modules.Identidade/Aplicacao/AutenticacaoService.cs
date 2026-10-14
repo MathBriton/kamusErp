@@ -2,6 +2,7 @@ using Kamus.Infrastructure.MultiTenancy;
 using Kamus.Modules.Identidade.Dominio;
 using Kamus.Modules.Identidade.Persistencia;
 using Kamus.SharedKernel.Auditoria;
+using Kamus.SharedKernel.Notificacoes;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,7 +14,8 @@ internal sealed class AutenticacaoService(
     TokenService tokens,
     TenantContext tenant,
     TimeProvider relogio,
-    IRegistradorDeEventos eventos)
+    IRegistradorDeEventos eventos,
+    INotificador notificador)
 {
     // Hash fixo usado quando o e-mail não existe: o tempo de resposta fica igual ao de uma senha errada.
     private static readonly Lazy<string> HashFicticio = new(() =>
@@ -45,8 +47,9 @@ internal sealed class AutenticacaoService(
             await eventos.RegistrarAsync("login_falhou", $"Senha incorreta no login de {usuario.Email}", usuario.Id, usuario.Nome, ct);
             if (!usuario.EstaBloqueado(agora)) return new ResultadoLogin.CredenciaisInvalidas();
 
-            await eventos.RegistrarAsync("usuario_bloqueado",
-                $"{usuario.Email} bloqueado por {Usuario.TempoDeBloqueio.TotalMinutes:0} minutos após {Usuario.MaximoDeFalhas} senhas incorretas", usuario.Id, usuario.Nome, ct);
+            var aviso = $"{usuario.Email} bloqueado por {Usuario.TempoDeBloqueio.TotalMinutes:0} minutos após {Usuario.MaximoDeFalhas} senhas incorretas";
+            await eventos.RegistrarAsync("usuario_bloqueado", aviso, usuario.Id, usuario.Nome, ct);
+            await AvisarDonosAsync("usuario_bloqueado", "Usuário bloqueado por tentativas de acesso", aviso, ct);
             return new ResultadoLogin.Bloqueado(usuario.BloqueadoAte!.Value);
         }
 
@@ -96,6 +99,18 @@ internal sealed class AutenticacaoService(
         atual.Revogar(relogio.GetUtcNow());
         await db.SaveChangesAsync(ct);
         await RegistrarEventoDoUsuarioAsync(atual.UsuarioId, "logout", "Saiu do sistema", ct);
+    }
+
+    /// <summary>Alerta de segurança para todos os usuários com perfil Dono no tenant atual.</summary>
+    private async Task AvisarDonosAsync(string tipo, string titulo, string mensagem, CancellationToken ct)
+    {
+        var donos = await db.AcessosEmpresa.AsNoTracking()
+            .Where(a => a.Perfil == Perfil.Dono)
+            .Select(a => a.UsuarioId)
+            .Distinct()
+            .ToListAsync(ct);
+        foreach (var dono in donos)
+            await notificador.NotificarAsync(new NovaNotificacao(dono, tipo, titulo, mensagem, "/configuracoes/historico"), ct);
     }
 
     private async Task RegistrarEventoDoUsuarioAsync(Guid usuarioId, string evento, string descricao, CancellationToken ct)

@@ -20,8 +20,21 @@ public class CamadasTests
     [Fact]
     public void Modulos_NaoDependemDaApi()
     {
-        var resultado = Types.InAssembly(typeof(Kamus.Modules.Identidade.ModuloIdentidade).Assembly)
+        var resultado = Types.InAssemblies([
+                typeof(Kamus.Modules.Identidade.ModuloIdentidade).Assembly,
+                typeof(Kamus.Modules.Notificacoes.ModuloNotificacoes).Assembly])
             .ShouldNot().HaveDependencyOn("Kamus.Api")
+            .GetResult();
+
+        resultado.IsSuccessful.ShouldBeTrue(string.Join(", ", resultado.FailingTypeNames ?? []));
+    }
+
+    [Fact]
+    public void Modulos_NaoDependemUnsDosOutros()
+    {
+        // Comunicação entre módulos só pelo SharedKernel (ex.: INotificador, IRegistradorDeEventos).
+        var resultado = Types.InAssembly(typeof(Kamus.Modules.Identidade.ModuloIdentidade).Assembly)
+            .ShouldNot().HaveDependencyOn("Kamus.Modules.Notificacoes")
             .GetResult();
 
         resultado.IsSuccessful.ShouldBeTrue(string.Join(", ", resultado.FailingTypeNames ?? []));

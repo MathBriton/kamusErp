@@ -3,6 +3,7 @@ using Kamus.Infrastructure.Auditoria;
 using Kamus.Infrastructure.MultiTenancy;
 using Kamus.Infrastructure.Persistence;
 using Kamus.Modules.Identidade;
+using Kamus.Modules.Notificacoes;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +13,7 @@ builder.Services.AddKamusHealthChecks(builder.Configuration);
 builder.Services.AddKamusDocumentacaoApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddModuloIdentidade(builder.Configuration);
+builder.Services.AddModuloNotificacoes(builder.Configuration);
 
 var app = builder.Build();
 
@@ -26,6 +28,7 @@ app.MapHealthChecks("/health");
 app.MapVersao();
 app.MapKamusAuditoria();
 app.MapModuloIdentidade();
+app.MapModuloNotificacoes();
 
 await app.AplicarMigracoesKamusAsync();
 await app.InicializarModuloIdentidadeAsync();

@@ -45,6 +45,17 @@ public static class ModuloIdentidade
                     ClockSkew = TimeSpan.FromSeconds(30),
                     NameClaimType = "name",
                 };
+                // WebSockets não enviam header Authorization: o SignalR manda o token na query string.
+                o.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = ctx =>
+                    {
+                        var token = ctx.Request.Query["access_token"].ToString();
+                        if (!string.IsNullOrEmpty(token) && ctx.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                            ctx.Token = token;
+                        return Task.CompletedTask;
+                    },
+                };
             });
         services.AddAuthorization();
 
