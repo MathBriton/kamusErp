@@ -22,12 +22,18 @@ export interface Sessao {
 /** Erro com mensagem pronta para mostrar ao usuário. */
 export class ErroDeApi extends Error {
   readonly status: number
+  /** Código estável enviado pela API em alguns erros (ex.: LICENCA_SUSPENSA). */
+  readonly codigo: string | null
 
-  constructor(status: number, mensagem: string) {
+  constructor(status: number, mensagem: string, codigo: string | null = null) {
     super(mensagem)
     this.status = status
+    this.codigo = codigo
   }
 }
+
+/** Disparado quando qualquer chamada recebe 402 (licença suspensa/cancelada): a tela de bloqueio aparece na hora. */
+export const EVENTO_LICENCA_BLOQUEADA = 'kamus:licenca-bloqueada'
 
 const SEM_CONEXAO = 'Não foi possível conectar à API. Verifique se ela está rodando em http://localhost:5249.'
 
@@ -42,13 +48,16 @@ export async function chamar(caminho: string, init: RequestInit = {}): Promise<R
 
   if (!resposta.ok) {
     let mensagem = 'Algo deu errado. Tente novamente.'
+    let codigo: string | null = null
     try {
-      const problema = (await resposta.json()) as { detail?: string; title?: string }
+      const problema = (await resposta.json()) as { detail?: string; title?: string; codigo?: string }
       mensagem = problema.detail ?? problema.title ?? mensagem
+      codigo = problema.codigo ?? null
     } catch {
       if (resposta.status === 429) mensagem = 'Muitas tentativas. Aguarde um minuto e tente novamente.'
     }
-    throw new ErroDeApi(resposta.status, mensagem)
+    if (resposta.status === 402) window.dispatchEvent(new Event(EVENTO_LICENCA_BLOQUEADA))
+    throw new ErroDeApi(resposta.status, mensagem, codigo)
   }
   return resposta
 }

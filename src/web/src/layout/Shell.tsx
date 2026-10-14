@@ -2,6 +2,9 @@ import { useMemo, useState } from 'react'
 import { Outlet } from 'react-router'
 import type { Sessao } from '../auth/api'
 import { useEmpresa } from '../empresa/EmpresaContext'
+import { BannerDaLicenca } from '../licenca/BannerDaLicenca'
+import { useLicenca } from '../licenca/LicencaContext'
+import { TelaDeBloqueio } from '../licenca/TelaDeBloqueio'
 import { filtrarMenu, MENU } from '../navegacao/menu'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
@@ -22,6 +25,7 @@ export function Shell({ sessao }: { sessao: Sessao }) {
   const menu = useMemo(() => filtrarMenu(MENU, perfilAtual), [perfilAtual])
   const [recolhido, setRecolhido] = useState(lerRecolhido)
   const [menuMovelAberto, setMenuMovelAberto] = useState(false)
+  const licenca = useLicenca()
 
   const alternarRecolhido = () => {
     setRecolhido((atual) => {
@@ -33,6 +37,8 @@ export function Shell({ sessao }: { sessao: Sessao }) {
       return !atual
     })
   }
+
+  if (licenca.bloqueada && licenca.situacao) return <TelaDeBloqueio situacao={licenca.situacao} email={sessao.usuario.email} />
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -52,6 +58,7 @@ export function Shell({ sessao }: { sessao: Sessao }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar usuario={sessao.usuario} onAbrirMenu={() => setMenuMovelAberto(true)} />
         <main className="flex-1 overflow-y-auto p-4 lg:p-7">
+          <BannerDaLicenca />
           <Outlet />
         </main>
       </div>

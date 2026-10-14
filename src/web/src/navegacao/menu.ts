@@ -87,7 +87,7 @@ export const MENU: GrupoMenu[] = [
     itens: [
       { titulo: 'Histórico de alterações', rota: '/configuracoes/historico', descricao: 'Quem alterou o quê e quando, logins e eventos de segurança.', perfis: GESTAO },
       { titulo: 'Usuários e permissões', rota: '/configuracoes/usuarios', previstoPara: 'v0.6.0', descricao: 'Usuários, perfis por empresa e convites.', perfis: ['Dono'] },
-      { titulo: 'Licença e assinatura', rota: '/configuracoes/licenca', previstoPara: 'v0.6.0', descricao: 'Plano, vencimento e situação da mensalidade.', perfis: ['Dono'] },
+      { titulo: 'Licença e assinatura', rota: '/configuracoes/licenca', descricao: 'Plano, vencimento e situação da mensalidade.', perfis: ['Dono'] },
     ],
   },
 ]
