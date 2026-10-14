@@ -13,6 +13,8 @@ import { EmpresasPage } from './configuracoes/EmpresasPage'
 import { UsuariosPage } from './configuracoes/UsuariosPage'
 import { PessoasPage } from './cadastros/PessoasPage'
 import { VendedoresPage } from './cadastros/VendedoresPage'
+import { GradesPage } from './cadastros/GradesPage'
+import { ProdutosPage } from './cadastros/ProdutosPage'
 import { HistoricoPage } from './pages/HistoricoPage'
 import { LoginPage } from './pages/LoginPage'
 import { NaoEncontradaPage } from './pages/NaoEncontradaPage'
@@ -26,6 +28,8 @@ const PAGINAS_IMPLEMENTADAS: Record<string, ReactNode> = {
   '/cadastros/clientes': <PessoasPage key="cliente" papel="cliente" />,
   '/cadastros/fornecedores': <PessoasPage key="fornecedor" papel="fornecedor" />,
   '/cadastros/vendedores': <VendedoresPage />,
+  '/cadastros/grades': <GradesPage />,
+  '/cadastros/produtos': <ProdutosPage />,
 }
 
 const ROTAS_DO_MENU = todasAsRotas(MENU).filter((item) => item.rota !== '/')
