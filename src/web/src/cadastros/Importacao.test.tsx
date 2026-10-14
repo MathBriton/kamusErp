@@ -101,4 +101,11 @@ describe('Cadastros → Importar planilha', () => {
     expect(await screen.findByText(/Nenhuma linha pode ser importada/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Importar/ })).not.toBeInTheDocument()
   })
+
+  it('estoque inicial: abre já escolhido pelo link da posição de estoque', async () => {
+    api()
+    renderApp('/cadastros/importacao?tipo=estoque-inicial')
+
+    expect(await screen.findByRole('radio', { name: /Estoque inicial/ })).toBeChecked()
+  })
 })

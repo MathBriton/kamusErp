@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router'
 import { useApi } from '../api/useApi'
 import { ErroDeApi } from '../auth/api'
 import { estilos } from '../components/estilos'
@@ -29,6 +30,12 @@ const TIPOS = [
   { tipo: 'clientes', rotulo: 'Clientes', ajuda: 'Casa pelo CPF/CNPJ, telefone ou nome: reimportar atualiza, não duplica.', perfis: ['Dono', 'Gerente'] },
   { tipo: 'fornecedores', rotulo: 'Fornecedores', ajuda: 'Pessoa jurídica identificada pelo CNPJ.', perfis: ['Dono', 'Gerente'] },
   { tipo: 'produtos', rotulo: 'Produtos', ajuda: 'Uma linha por SKU (referência + cor + tamanho). A grade precisa estar cadastrada.', perfis: ['Dono', 'Gerente', 'Estoquista'] },
+  {
+    tipo: 'estoque-inicial',
+    rotulo: 'Estoque inicial',
+    ajuda: 'Quantidade atual de cada SKU por loja. Substitui o saldo (reimportar corrige, não soma). Os produtos precisam estar cadastrados.',
+    perfis: ['Dono', 'Gerente', 'Estoquista'],
+  },
 ]
 
 const ESTILO_ACAO: Record<LinhaValidada['acao'], { rotulo: string; classe: string }> = {
@@ -44,7 +51,9 @@ export function ImportacaoPage() {
   const { baixar, enviarArquivo, postarComStatus } = useApi()
   const { perfilAtual } = useEmpresa()
   const tipos = TIPOS.filter((t) => t.perfis.includes(perfilAtual))
-  const [tipo, setTipo] = useState(tipos[0]?.tipo ?? 'clientes')
+  const [params] = useSearchParams()
+  const pedido = params.get('tipo')
+  const [tipo, setTipo] = useState(tipos.find((t) => t.tipo === pedido)?.tipo ?? tipos[0]?.tipo ?? 'clientes')
   const [arquivo, setArquivo] = useState<File | null>(null)
   const [validacao, setValidacao] = useState<Validacao | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)

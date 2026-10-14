@@ -30,10 +30,10 @@ describe('Shell', () => {
     await screen.findByText(/Olá, Admin/)
 
     await userEvent.click(within(menuLateral()).getByRole('button', { name: /Estoque/ }))
-    await userEvent.click(within(menuLateral()).getByRole('link', { name: 'Posição de estoque' }))
+    await userEvent.click(within(menuLateral()).getByRole('link', { name: 'Inventário' }))
 
-    expect(await screen.findByRole('heading', { name: 'Posição de estoque' })).toBeInTheDocument()
-    expect(screen.getByText(/Previsto para a v0\.11\.0/)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Inventário' })).toBeInTheDocument()
+    expect(screen.getByText(/Previsto para a v0\.12\.0/)).toBeInTheDocument()
   })
 
   it('recolher o menu guarda a preferência', async () => {

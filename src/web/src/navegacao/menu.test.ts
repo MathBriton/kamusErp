@@ -8,12 +8,13 @@ describe('menu', () => {
     expect(titulos('Dono')).toEqual(['Dashboard', 'Cadastros', 'Estoque', 'Financeiro', 'Vendas', 'Relatórios', 'Configurações'])
   })
 
-  it('Vendedor não vê Financeiro, Estoque nem Configurações', () => {
+  it('Vendedor não vê Financeiro nem Configurações; no Estoque, só a posição', () => {
     const visiveis = titulos('Vendedor')
     expect(visiveis).not.toContain('Financeiro')
-    expect(visiveis).not.toContain('Estoque')
     expect(visiveis).not.toContain('Configurações')
     expect(visiveis).toContain('Vendas')
+    const estoque = filtrarMenu(MENU, 'Vendedor').find((g) => g.titulo === 'Estoque')
+    expect(estoque?.itens?.map((i) => i.titulo)).toEqual(['Posição de estoque'])
   })
 
   it('Gerente vê o histórico de alterações, mas não usuários e licença', () => {
