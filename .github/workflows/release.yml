@@ -49,9 +49,14 @@ jobs:
             --jq '[.check_runs[] | select(.name == "build-test")]')
           echo "$checks" | jq -r '.[] | "\(.name): \(.status) / \(.conclusion)"'
           pendentes=$(echo "$checks" | jq '[.[] | select(.status != "completed")] | length')
-          falhas=$(echo "$checks" | jq '[.[] | select(.status == "completed" and .conclusion != "success" and .conclusion != "skipped")] | length')
+          # "cancelled" acontece quando o mesmo workflow dispara duas vezes (concurrency cancela a duplicata):
+          # é ignorado, desde que exista pelo menos uma execução com sucesso.
+          falhas=$(echo "$checks" | jq '[.[] | select(.status == "completed" and (.conclusion | IN("success", "skipped", "cancelled", "neutral") | not))] | length')
+          canceladas=$(echo "$checks" | jq '[.[] | select(.conclusion == "cancelled")] | length')
+          sucessos=$(echo "$checks" | jq '[.[] | select(.conclusion == "success")] | length')
           if [ "$pendentes" -gt 0 ]; then echo "::error::CI ainda rodando neste commit. Aguarde e tente de novo."; exit 1; fi
           if [ "$falhas" -gt 0 ]; then echo "::error::CI falhou neste commit. Corrija antes de lançar."; exit 1; fi
+          if [ "$canceladas" -gt 0 ] && [ "$sucessos" -eq 0 ]; then echo "::error::CI cancelado neste commit. Rode de novo antes de lançar."; exit 1; fi
 
       - name: Calcular versão e notas
         id: versao
