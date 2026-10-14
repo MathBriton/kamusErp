@@ -754,3 +754,6 @@ kamusErp/
 | 2026-10-13 | Registro de venda simples no backoffice (sem fiscal) como núcleo de vendas | Proposta (confirmar) |
 | 2026-10-13 | Releases versionadas com SemVer + Conventional Commits, por botão no Actions (script próprio, sem PR de release); notas na GitHub Release; imagens Docker no GHCR | Aceita |
 | 2026-10-13 | CD (deploy automático) adiado até existir servidor; por ora ambiente só localhost | Aceita |
+| 2026-10-14 | API roda em localhost **sem Docker e sem PostgreSQL** (banco opcional; `/health` = Degraded) | Aceita |
+| 2026-10-14 | Tela de testes da API com OpenAPI + Scalar, só em Development; arquivo `.http` com requisições | Aceita |
+| 2026-10-14 | Testes com PostgreSQL pulados com aviso quando não há Docker local; obrigatórios no CI | Aceita |

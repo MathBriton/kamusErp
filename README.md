@@ -18,39 +18,56 @@ SaaS de gestão para lojas de roupas: estoque em grade (cor × tamanho), finance
 
 - [.NET SDK 10](https://dotnet.microsoft.com/download)
 - [Node.js 22+](https://nodejs.org)
-- [Docker](https://www.docker.com) (necessário também para os testes de integração)
+- [Docker](https://www.docker.com) — **opcional**: só para rodar com banco e para os testes com PostgreSQL
 
 ## Rodando localmente
+
+### Só localhost — sem Docker e sem PostgreSQL (padrão)
+
+Precisa apenas do .NET SDK 10 e do Node.js.
+
+```bash
+dotnet run --project src/backend/Kamus.Api   # API em http://localhost:5249 (abre a tela de testes)
+cd src/web && npm install && npm run dev     # web em http://localhost:5173 (proxy para a API)
+```
+
+| O quê | Onde |
+|---|---|
+| **Tela para testar a API** (Scalar) | http://localhost:5249/scalar |
+| Documento OpenAPI | http://localhost:5249/openapi/v1.json |
+| Saúde | http://localhost:5249/health → `Degraded` sem banco (normal neste modo) |
+| Versão | http://localhost:5249/api/versao |
+| Requisições prontas | [`src/backend/Kamus.Api/Kamus.Api.http`](src/backend/Kamus.Api/Kamus.Api.http) (VS Code com REST Client, Visual Studio, Rider) |
+
+A documentação da API (`/scalar`, `/openapi`) só existe em ambiente de desenvolvimento.
+
+### Com banco (opcional)
 
 **Tudo via Docker:**
 
 ```bash
 cp .env.example .env
-docker compose up -d --build
+docker compose up -d --build   # web :5173, API :8080, PostgreSQL :5432
 ```
 
-| Serviço | URL |
-|---|---|
-| Web | http://localhost:5173 |
-| API | http://localhost:8080/health |
-| PostgreSQL | localhost:5432 (usuário da aplicação: `kamus_app`) |
-
-**Desenvolvimento (hot reload):**
+**API local + PostgreSQL do Docker:**
 
 ```bash
-docker compose up -d db                     # só o banco
-dotnet run --project src/backend/Kamus.Api  # API em http://localhost:5249
-cd src/web && npm install && npm run dev    # web em http://localhost:5173 (proxy para a API)
+docker compose up -d db
+dotnet user-secrets set "ConnectionStrings:Kamus" "Host=localhost;Port=5432;Database=kamus;Username=kamus_app;Password=kamus_app_dev" --project src/backend/Kamus.Api
+dotnet run --project src/backend/Kamus.Api
 ```
 
-Para usar a API do Docker Compose no `npm run dev`: `KAMUS_API_URL=http://localhost:8080 npm run dev`.
+Para o `npm run dev` usar a API do Compose: `KAMUS_API_URL=http://localhost:8080 npm run dev`.
 
 ## Testes
 
 ```bash
-dotnet test --solution Kamus.slnx   # backend (sobe um PostgreSQL real via Testcontainers)
+dotnet test --solution Kamus.slnx   # backend
 cd src/web && npm test              # frontend
 ```
+
+Os testes que precisam de PostgreSQL usam Testcontainers (Docker). **Sem Docker na máquina eles são pulados com aviso** e o restante roda normalmente; no CI (`CI=true`) eles são obrigatórios e a falta de Docker é erro.
 
 TDD first: todo código de produção nasce de um teste que falhou antes.
 
