@@ -88,4 +88,35 @@ public sealed class CadastrosPostgresTests(PostgresFixture db)
         (await client.PutAsJsonAsync(new Uri($"/api/produtos/{calca.Id}/skus/{outro.Id}", UriKind.Relative),
             new { codigoDeBarras = calca.Skus[0].CodigoDeBarras, ativo = true }, Ct)).StatusCode.ShouldBe(HttpStatusCode.Conflict);
     }
+
+    private sealed record ValidacaoDto(Guid Id, int Validas, int ComErro);
+    private sealed record ResultadoDto(int Criados, int Atualizados, int Ignorados);
+
+    [Fact]
+    public async Task Importacao_NoPostgres_ProdutosComCorNova()
+    {
+        db.ExigirBanco();
+        await using var api = new KamusApiFactory(db.AppConnectionString, "Development", new Dictionary<string, string>
+        {
+            ["ConnectionStrings:KamusMigrations"] = db.AdminConnectionString,
+            ["Seed:SenhaAdmin"] = Senha,
+        });
+        using var client = api.CreateClient();
+        var login = await client.PostAsJsonAsync(new Uri("/api/auth/login", UriKind.Relative), new { email = "admin@kamus.local", senha = Senha }, Ct);
+        var sessao = (await login.Content.ReadFromJsonAsync<SessaoDto>(Ct))!;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", sessao.AccessToken);
+        client.DefaultRequestHeaders.Add("X-Empresa-Id", sessao.Empresas[0].Id.ToString());
+        (await client.PostAsync(new Uri("/api/grades/padrao", UriKind.Relative), null, Ct)).EnsureSuccessStatusCode();
+
+        var csv = "Referência;Descrição;Grade;Cor;Tamanho;Preço de venda\nIMP-PG-01;Blusa Importada;PP ao GG;Lilás Importação;M;79,90\nIMP-PG-01;;PP ao GG;Lilás Importação;G;\n";
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(csv)), "arquivo", "produtos.csv");
+        var validacao = (await (await client.PostAsync(new Uri("/api/importacoes/produtos/validar", UriKind.Relative), form, Ct))
+            .Content.ReadFromJsonAsync<ValidacaoDto>(Ct))!;
+        validacao.Validas.ShouldBe(2);
+
+        var resposta = await client.PostAsync(new Uri($"/api/importacoes/{validacao.Id}/confirmar", UriKind.Relative), null, Ct);
+        resposta.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await resposta.Content.ReadFromJsonAsync<ResultadoDto>(Ct))!.Criados.ShouldBe(1);
+    }
 }

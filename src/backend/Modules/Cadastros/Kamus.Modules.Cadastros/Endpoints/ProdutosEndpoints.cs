@@ -65,7 +65,7 @@ internal static class ProdutosEndpoints
     private static SkuDto SkuParaDto(Produto p, Sku s) => new(s.Id, s.CorId, s.Tamanho, s.OrdemTamanho, s.CodigoDeBarras, s.PrecoVenda, p.PrecoDe(s), s.Ativo);
 
     /// <summary>Próximo código interno (EAN-13 prefixo 2): continua a sequência do cliente.</summary>
-    private static async Task<Func<string>> GeradorDeCodigosAsync(CadastrosDbContext db, CancellationToken ct)
+    internal static async Task<Func<string>> GeradorDeCodigosAsync(CadastrosDbContext db, CancellationToken ct)
     {
         var internos = await db.Skus.Where(s => s.CodigoDeBarras.Length == 13).Select(s => s.CodigoDeBarras).ToListAsync(ct);
         var ultimo = internos.Select(CodigoDeBarras.SequencialInterno).Max() ?? 0;
