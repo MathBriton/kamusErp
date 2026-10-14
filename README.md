@@ -47,6 +47,9 @@ Sem banco, os dados ficam **em memória**: são recriados a cada vez que a API s
 | Histórico de alterações | `GET /api/auditoria` · tela em Configurações → Histórico de alterações |
 | Notificações | `GET /api/notificacoes` · tempo real em `/hubs/notificacoes` · `POST /api/notificacoes/teste` dispara uma de teste |
 | Pesquisa global | `GET /api/busca?q=...` · **Ctrl+K** na aplicação web |
+| Exportação | `GET /api/relatorios/historico-de-alteracoes.pdf` (ou `.xlsx`, `.csv`) · botão **Exportar** no histórico |
+
+Para ver a geração em segundo plano (aviso no sininho) com poucos dados: `Relatorios__LimiteSincrono=1 dotnet run --project src/backend/Kamus.Api`.
 | Versão | http://localhost:5249/api/versao |
 | Requisições prontas | [`src/backend/Kamus.Api/Kamus.Api.http`](src/backend/Kamus.Api/Kamus.Api.http) (VS Code com REST Client, Visual Studio, Rider) |
 

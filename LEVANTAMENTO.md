@@ -663,8 +663,8 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.1.0 | 0a | Solução .NET, multi-tenancy (filtro + RLS), CNPJ alfanumérico, Docker, CI, web base com tema | ✅ lançada |
 | v0.2.0 | 0a+/0b | API em localhost sem banco, tela de testes (Scalar), login (JWT + refresh em cookie), bloqueio por tentativas, usuário de teste, dados em memória | ✅ lançada |
 | v0.3.0 | 0b | Shell (sidebar/topbar), seletor de CNPJ validado no backend, dashboard (estrutura), páginas previstas | ✅ lançada |
-| v0.4.0 | 0b | Notificações em tempo real, pesquisa global, histórico de alterações | ✅ pronta |
-| v0.5.0 | 0b | Exportação PDF/Excel | ⏳ |
+| v0.4.0 | 0b | Notificações em tempo real, pesquisa global, histórico de alterações | ✅ lançada |
+| v0.5.0 | 0b | Exportação PDF/Excel/CSV (com geração em segundo plano) | ✅ pronta |
 | v0.6.0 | 0b | Licenciamento + Painel Administrativo | ⏳ |
 | v0.7.0 | 1 | Cadastros (empresas, ficha do cliente, fornecedores, vendedores, produtos com grade, importação por planilha) | ⏳ |
 | v0.8.0 | 2 | Estoque (+ importação de XML da NF-e) | ⏳ |
@@ -788,4 +788,6 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | 2026-10-14 | Histórico visível para Dono e Gerente; mostra registros da empresa ativa e eventos gerais do cliente | Aceita |
 | 2026-10-14 | Notificações em módulo próprio, entregues por SignalR; módulos notificam via `INotificador` (sem depender uns dos outros) | Aceita |
 | 2026-10-14 | Bloqueio de usuário por tentativas gera alerta para todos os Donos | Aceita |
+| 2026-10-14 | Exportação por definição única de relatório (`IRelatorio` → `DadosDoRelatorio`) renderizada em PDF (QuestPDF, licença Community), Excel (ClosedXML) e CSV (`;`, UTF-8 com BOM); endpoint único `/api/relatorios/{codigo}.{formato}` | Aceita |
+| 2026-10-14 | Relatórios acima de 2.000 linhas são gerados em segundo plano e avisados no sininho; o arquivo fica disponível por 60 minutos por um link secreto | Aceita |
 | 2026-10-14 | Pesquisa global por provedores de busca de cada módulo; comparação sem acento em memória enquanto os volumes são pequenos (produtos usarão `unaccent` + `pg_trgm`) | Aceita |
