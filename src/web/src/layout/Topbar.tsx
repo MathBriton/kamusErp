@@ -1,3 +1,4 @@
+import { PesquisaGlobal } from '../busca/PesquisaGlobal'
 import { Icone } from '../components/Icone'
 import { Sino } from '../notificacoes/Sino'
 import { useTheme } from '../theme/ThemeContext'
@@ -25,17 +26,7 @@ export function Topbar({ usuario, onAbrirMenu }: Props) {
         <Icone nome="menu" />
       </button>
 
-      {/* Pesquisa global (Ctrl+K) chega na v0.4.0 — aqui só o lugar dela. */}
-      <button
-        type="button"
-        disabled
-        title="Pesquisa global chega na v0.4.0"
-        className="hidden h-10 w-full max-w-md items-center gap-2.5 rounded-lg border border-border bg-surface-2 px-3 text-sm text-muted md:flex"
-      >
-        <Icone nome="search" />
-        <span className="flex-1 truncate text-left">Pesquisar produtos, SKU, clientes, telas...</span>
-        <kbd className="rounded border border-border bg-surface px-1.5 text-[11px]">Ctrl K</kbd>
-      </button>
+      <PesquisaGlobal />
 
       <div className="ml-auto flex items-center gap-2">
         <SeletorEmpresa />
