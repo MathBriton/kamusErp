@@ -22,7 +22,8 @@ public class CamadasTests
     {
         var resultado = Types.InAssemblies([
                 typeof(Kamus.Modules.Identidade.ModuloIdentidade).Assembly,
-                typeof(Kamus.Modules.Notificacoes.ModuloNotificacoes).Assembly])
+                typeof(Kamus.Modules.Notificacoes.ModuloNotificacoes).Assembly,
+                typeof(Kamus.Modules.Licenciamento.ModuloLicenciamento).Assembly])
             .ShouldNot().HaveDependencyOn("Kamus.Api")
             .GetResult();
 
@@ -33,11 +34,21 @@ public class CamadasTests
     public void Modulos_NaoDependemUnsDosOutros()
     {
         // Comunicação entre módulos só pelo SharedKernel (ex.: INotificador, IRegistradorDeEventos).
-        var resultado = Types.InAssembly(typeof(Kamus.Modules.Identidade.ModuloIdentidade).Assembly)
-            .ShouldNot().HaveDependencyOn("Kamus.Modules.Notificacoes")
-            .GetResult();
+        string[] modulos = ["Kamus.Modules.Identidade", "Kamus.Modules.Notificacoes", "Kamus.Modules.Licenciamento"];
+        System.Reflection.Assembly[] assemblies = [
+            typeof(Kamus.Modules.Identidade.ModuloIdentidade).Assembly,
+            typeof(Kamus.Modules.Notificacoes.ModuloNotificacoes).Assembly,
+            typeof(Kamus.Modules.Licenciamento.ModuloLicenciamento).Assembly];
 
-        resultado.IsSuccessful.ShouldBeTrue(string.Join(", ", resultado.FailingTypeNames ?? []));
+        foreach (var assembly in assemblies)
+        {
+            var proprio = assembly.GetName().Name!;
+            var resultado = Types.InAssembly(assembly)
+                .ShouldNot().HaveDependencyOnAny([.. modulos.Where(m => m != proprio)])
+                .GetResult();
+
+            resultado.IsSuccessful.ShouldBeTrue($"{proprio}: {string.Join(", ", resultado.FailingTypeNames ?? [])}");
+        }
     }
 
     [Fact]

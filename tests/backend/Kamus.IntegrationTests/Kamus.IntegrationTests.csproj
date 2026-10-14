@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\backend\Kamus.Api\Kamus.Api.csproj" />
+    <ProjectReference Include="..\..\..\src\backend\Modules\Licenciamento\Kamus.Modules.Licenciamento\Kamus.Modules.Licenciamento.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Testcontainers.PostgreSql" />

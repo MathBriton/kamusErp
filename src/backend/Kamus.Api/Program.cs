@@ -5,6 +5,7 @@ using Kamus.Infrastructure.MultiTenancy;
 using Kamus.Infrastructure.Persistence;
 using Kamus.Infrastructure.Relatorios;
 using Kamus.Modules.Identidade;
+using Kamus.Modules.Licenciamento;
 using Kamus.Modules.Notificacoes;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,6 +18,7 @@ builder.Services.AddKamusDocumentacaoApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddModuloIdentidade(builder.Configuration);
 builder.Services.AddModuloNotificacoes(builder.Configuration);
+builder.Services.AddModuloLicenciamento(builder.Configuration);
 
 var app = builder.Build();
 
@@ -24,6 +26,7 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseKamusMultiTenancy();
 app.UseModuloIdentidade();
+app.UseModuloLicenciamento();
 app.UseAuthorization();
 
 app.MapKamusDocumentacaoApi();
@@ -34,9 +37,11 @@ app.MapKamusBusca();
 app.MapKamusRelatorios();
 app.MapModuloIdentidade();
 app.MapModuloNotificacoes();
+app.MapModuloLicenciamento();
 
 await app.AplicarMigracoesKamusAsync();
 await app.InicializarModuloIdentidadeAsync();
+await app.InicializarModuloLicenciamentoAsync();
 
 await app.RunAsync();
 

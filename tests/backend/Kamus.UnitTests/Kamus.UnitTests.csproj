@@ -3,6 +3,7 @@
     <ProjectReference Include="..\..\..\src\backend\Shared\Kamus.SharedKernel\Kamus.SharedKernel.csproj" />
     <ProjectReference Include="..\..\..\src\backend\Shared\Kamus.Infrastructure\Kamus.Infrastructure.csproj" />
     <ProjectReference Include="..\..\..\src\backend\Modules\Identidade\Kamus.Modules.Identidade\Kamus.Modules.Identidade.csproj" />
+    <ProjectReference Include="..\..\..\src\backend\Modules\Licenciamento\Kamus.Modules.Licenciamento\Kamus.Modules.Licenciamento.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="PdfPig" />
