@@ -1,6 +1,8 @@
+using Kamus.Infrastructure.Importacao;
 using Kamus.Infrastructure.Persistence;
 using Kamus.Modules.Estoque.Aplicacao;
 using Kamus.Modules.Estoque.Endpoints;
+using Kamus.Modules.Estoque.Importacao;
 using Kamus.Modules.Estoque.Persistencia;
 using Kamus.Modules.Estoque.Relatorios;
 using Kamus.SharedKernel.Relatorios;
@@ -20,6 +22,7 @@ public static class ModuloEstoque
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<Lojas>();
         services.AddScoped<IRelatorio, RelatorioDePosicao>();
+        services.AddScoped<IImportador, ImportadorDeEstoqueInicial>();
         return services;
     }
 
