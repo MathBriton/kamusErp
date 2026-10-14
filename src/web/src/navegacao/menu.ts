@@ -34,6 +34,7 @@ export const MENU: GrupoMenu[] = [
       { titulo: 'Grades e cores', rota: '/cadastros/grades', descricao: 'Grades de tamanho reutilizáveis (PP–GG, 36–48, infantil) e cores.', perfis: [...GESTAO, 'Estoquista'] },
       { titulo: 'Clientes', rota: '/cadastros/clientes', descricao: 'Ficha do cliente: tamanhos preferidos, contato, aniversariantes e WhatsApp em 1 clique.', perfis: [...GESTAO, 'Vendedor', 'Financeiro'] },
       { titulo: 'Fornecedores', rota: '/cadastros/fornecedores', descricao: 'Fornecedores e de-para de produtos para a importação de XML.', perfis: [...GESTAO, 'Estoquista', 'Financeiro'] },
+      { titulo: 'Importar planilha', rota: '/cadastros/importacao', descricao: 'Clientes, fornecedores e produtos a partir do Excel.', perfis: [...GESTAO, 'Estoquista'] },
       { titulo: 'Vendedores', rota: '/cadastros/vendedores', descricao: 'Vendedores e comissão padrão.', perfis: GESTAO },
     ],
   },

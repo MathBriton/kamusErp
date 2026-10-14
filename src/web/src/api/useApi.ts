@@ -57,6 +57,28 @@ export function useApi() {
     [token, selecao],
   )
 
+  /** Envio de arquivo (multipart). Devolve o status junto: 202 = processamento em segundo plano. */
+  const enviarArquivo = useCallback(
+    async <T,>(caminho: string, formulario: FormData): Promise<{ status: number; corpo: T }> => {
+      const resposta = await chamar(caminho, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'X-Empresa-Id': selecao },
+        body: formulario,
+      })
+      return { status: resposta.status, corpo: (await resposta.json()) as T }
+    },
+    [token, selecao],
+  )
+
+  /** POST sem corpo que devolve JSON e status (ex.: confirmar uma importação). */
+  const postarComStatus = useCallback(
+    async <T,>(caminho: string): Promise<{ status: number; corpo: T }> => {
+      const resposta = await chamar(caminho, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'X-Empresa-Id': selecao } })
+      return { status: resposta.status, corpo: (await resposta.json()) as T }
+    },
+    [token, selecao],
+  )
+
   /** Exportações: 200 = arquivo para baixar; 202 = gerado em segundo plano (aviso no sininho). */
   const baixar = useCallback(
     async (caminho: string): Promise<ResultadoDownload> => {
@@ -71,5 +93,5 @@ export function useApi() {
     [token, selecao],
   )
 
-  return { getJson, post, enviar, baixar }
+  return { getJson, post, enviar, enviarArquivo, postarComStatus, baixar }
 }

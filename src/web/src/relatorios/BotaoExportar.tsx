@@ -3,6 +3,7 @@ import { useApi } from '../api/useApi'
 import { ErroDeApi } from '../auth/api'
 import { Icone, type NomeIcone } from '../components/Icone'
 import { useFecharAoClicarFora } from '../components/useFecharAoClicarFora'
+import { salvarArquivo } from './salvarArquivo'
 
 const FORMATOS: { formato: string; rotulo: string; descricao: string; icone: NomeIcone; tom: string }[] = [
   { formato: 'pdf', rotulo: 'PDF', descricao: 'Formatado para impressão', icone: 'file', tom: 'bg-danger-soft text-danger' },
@@ -36,12 +37,7 @@ export function BotaoExportar({ relatorio, parametros = {} }: { relatorio: strin
         setAviso({ tipo: 'status', texto: resultado.mensagem })
         return
       }
-      const url = URL.createObjectURL(resultado.blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = resultado.nome
-      link.click()
-      URL.revokeObjectURL(url)
+      salvarArquivo(resultado.blob, resultado.nome)
       setAviso({ tipo: 'status', texto: `Download iniciado: ${resultado.nome}` })
     } catch (e) {
       setAviso({ tipo: 'erro', texto: e instanceof ErroDeApi ? e.message : 'Não foi possível exportar o relatório.' })
