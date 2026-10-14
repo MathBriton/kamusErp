@@ -1,5 +1,6 @@
 using Kamus.Api.Infra;
 using Kamus.Infrastructure.Auditoria;
+using Kamus.Infrastructure.Busca;
 using Kamus.Infrastructure.MultiTenancy;
 using Kamus.Infrastructure.Persistence;
 using Kamus.Modules.Identidade;
@@ -27,6 +28,7 @@ app.MapKamusDocumentacaoApi();
 app.MapHealthChecks("/health");
 app.MapVersao();
 app.MapKamusAuditoria();
+app.MapKamusBusca();
 app.MapModuloIdentidade();
 app.MapModuloNotificacoes();
 

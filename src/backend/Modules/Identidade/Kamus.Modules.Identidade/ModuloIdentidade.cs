@@ -1,6 +1,7 @@
 using System.Threading.RateLimiting;
 using Kamus.Infrastructure.Persistence;
 using Kamus.Modules.Identidade.Aplicacao;
+using Kamus.Modules.Identidade.Busca;
 using Kamus.Modules.Identidade.Dominio;
 using Kamus.Modules.Identidade.Endpoints;
 using Kamus.Modules.Identidade.Persistencia;
@@ -32,6 +33,7 @@ public static class ModuloIdentidade
         services.AddSingleton<IPasswordHasher<Usuario>, PasswordHasher<Usuario>>();
         services.AddSingleton<TokenService>();
         services.AddScoped<AutenticacaoService>();
+        services.AddScoped<Kamus.SharedKernel.Busca.IProvedorDeBusca, ProvedorDeBuscaIdentidade>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(o =>

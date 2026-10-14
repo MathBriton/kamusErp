@@ -38,3 +38,21 @@ POST {{api}}/api/auth/logout
 GET {{api}}/api/empresas/ativa
 Authorization: Bearer {{login.response.body.accessToken}}
 X-Empresa-Id: todas
+
+### Histórico de alterações (Dono/Gerente; troque X-Empresa-Id pelo id de uma empresa)
+GET {{api}}/api/auditoria?tipo=Evento
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: todas
+
+### Minhas notificações
+GET {{api}}/api/notificacoes
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Disparar uma notificação de teste (aparece no sininho em tempo real)
+POST {{api}}/api/notificacoes/teste
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Pesquisa global
+GET {{api}}/api/busca?q=shop
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: todas
