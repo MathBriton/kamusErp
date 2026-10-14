@@ -14,4 +14,10 @@ public interface IEmpresaAtiva
 
     /// <summary>Perfil do usuário na empresa ativa ("Dono" na visão consolidada).</summary>
     string? Perfil { get; }
+
+    /// <summary>Nome fantasia, ou "Todas as empresas (N)" na visão consolidada.</summary>
+    string? Nome { get; }
+
+    /// <summary>CNPJ formatado; nulo na visão consolidada.</summary>
+    string? Cnpj { get; }
 }

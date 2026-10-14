@@ -56,3 +56,8 @@ Authorization: Bearer {{login.response.body.accessToken}}
 GET {{api}}/api/busca?q=shop
 Authorization: Bearer {{login.response.body.accessToken}}
 X-Empresa-Id: todas
+
+### Exportar o histórico (pdf, xlsx ou csv) — use "Send and save" no REST Client para salvar o arquivo
+GET {{api}}/api/relatorios/historico-de-alteracoes.xlsx?tipo=Evento
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: todas

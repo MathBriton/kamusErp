@@ -8,7 +8,7 @@ namespace Kamus.Infrastructure.Auditoria;
 
 public static class AuditoriaEndpoints
 {
-    private static readonly string[] PerfisComAcesso = ["Dono", "Gerente"];
+    internal static readonly string[] PerfisComAcesso = ["Dono", "Gerente"];
 
     public sealed record RegistroDto(Guid Id, DateTimeOffset OcorridoEm, string Tipo, string? Evento, string? Entidade, string? EntidadeId,
         string Descricao, string UsuarioNome, string? Ip, IReadOnlyList<AlteracaoDeCampo> Alteracoes);
@@ -39,20 +39,11 @@ public static class AuditoriaEndpoints
 
         pagina = Math.Max(1, pagina);
         tamanho = Math.Clamp(tamanho, 1, 200);
-        var empresas = empresaAtiva.EmpresaIds;
-
-        // Registros da(s) empresa(s) ativa(s) + registros gerais do cliente (sem empresa: logins, usuários...).
-        var consulta = db.Registros.AsNoTracking().Where(r => r.EmpresaId == null || empresas.Contains(r.EmpresaId.Value));
-        if (!string.IsNullOrWhiteSpace(entidade)) consulta = consulta.Where(r => r.Entidade == entidade);
-        if (!string.IsNullOrWhiteSpace(entidadeId)) consulta = consulta.Where(r => r.EntidadeId == entidadeId);
-        if (tipo is not null) consulta = consulta.Where(r => r.Tipo == tipo);
-        if (!string.IsNullOrWhiteSpace(evento)) consulta = consulta.Where(r => r.Evento == evento);
-        if (de is not null) consulta = consulta.Where(r => r.OcorridoEm >= de);
-        if (ate is not null) consulta = consulta.Where(r => r.OcorridoEm <= ate);
+        var consulta = new FiltrosDoHistorico(entidade, entidadeId, tipo, evento, de, ate)
+            .Aplicar(db.Registros.AsNoTracking(), empresaAtiva.EmpresaIds);
 
         var total = await consulta.CountAsync(ct);
         var itens = await consulta
-            .OrderByDescending(r => r.OcorridoEm)
             .Skip((pagina - 1) * tamanho)
             .Take(tamanho)
             .ToListAsync(ct);

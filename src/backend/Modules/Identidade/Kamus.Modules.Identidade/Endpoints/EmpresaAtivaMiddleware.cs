@@ -65,11 +65,15 @@ internal static class EmpresaAtivaMiddleware
         if (!Guid.TryParse(valor, out var empresaId))
             return Problema(StatusCodes.Status400BadRequest, $"Valor inválido no header {Header}: use o id da empresa ou '{Consolidado}'.");
 
-        var acesso = await db.AcessosEmpresa.AsNoTracking().SingleOrDefaultAsync(a => a.UsuarioId == usuarioId && a.EmpresaId == empresaId, ct);
+        var acesso = await (
+            from a in db.AcessosEmpresa.AsNoTracking()
+            join e in db.Empresas.AsNoTracking() on a.EmpresaId equals e.Id
+            where a.UsuarioId == usuarioId && a.EmpresaId == empresaId
+            select new { a.Perfil, e.NomeFantasia, e.Cnpj }).SingleOrDefaultAsync(ct);
         if (acesso is null)
             return Problema(StatusCodes.Status403Forbidden, "Você não tem acesso a esta empresa.");
 
-        empresaAtiva.Definir(empresaId, acesso.Perfil.ToString());
+        empresaAtiva.Definir(empresaId, acesso.Perfil.ToString(), acesso.NomeFantasia, acesso.Cnpj.Formatado);
         return null;
     }
 
