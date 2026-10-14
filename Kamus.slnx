@@ -3,6 +3,10 @@
   <Folder Name="/src/backend/">
     <Project Path="src/backend/Kamus.Api/Kamus.Api.csproj" />
   </Folder>
+  <Folder Name="/src/backend/Modules/" />
+  <Folder Name="/src/backend/Modules/Identidade/">
+    <Project Path="src/backend/Modules/Identidade/Kamus.Modules.Identidade/Kamus.Modules.Identidade.csproj" />
+  </Folder>
   <Folder Name="/src/backend/Shared/">
     <Project Path="src/backend/Shared/Kamus.Infrastructure/Kamus.Infrastructure.csproj" />
     <Project Path="src/backend/Shared/Kamus.SharedKernel/Kamus.SharedKernel.csproj" />

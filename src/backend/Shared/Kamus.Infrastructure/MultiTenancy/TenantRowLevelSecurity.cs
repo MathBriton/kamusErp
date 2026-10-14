@@ -20,6 +20,28 @@ public static class TenantRowLevelSecurity
             WITH CHECK ({TenantColumn} = NULLIF(current_setting('{SessionSetting}', true), '')::uuid);
         """;
 
+    /// <summary>Papel com que a aplicação conecta (sem superusuário, para o RLS valer).</summary>
+    public const string AppRole = "kamus_app";
+
+    /// <summary>
+    /// Permissões de leitura/escrita do <see cref="AppRole"/> no schema do módulo (se o papel existir).
+    /// Migrations rodam com o dono do schema; a aplicação nunca altera estrutura.
+    /// </summary>
+    public static string GrantAppRoleSql(string schema) => $$"""
+        DO $$
+        BEGIN
+            IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{{AppRole}}') THEN
+                GRANT USAGE ON SCHEMA {{schema}} TO {{AppRole}};
+                GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA {{schema}} TO {{AppRole}};
+                ALTER DEFAULT PRIVILEGES IN SCHEMA {{schema}} GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {{AppRole}};
+            END IF;
+        END
+        $$;
+        """;
+
+    public static void GrantKamusAppRole(this MigrationBuilder migrationBuilder, string schema) =>
+        migrationBuilder.Sql(GrantAppRoleSql(schema));
+
     /// <summary>Use nas migrations logo após criar cada tabela de negócio.</summary>
     public static void EnableTenantRowLevelSecurity(this MigrationBuilder migrationBuilder, string schema, string table) =>
         migrationBuilder.Sql(EnableSql(schema, table));

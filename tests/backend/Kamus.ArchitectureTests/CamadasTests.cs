@@ -18,6 +18,16 @@ public class CamadasTests
     }
 
     [Fact]
+    public void Modulos_NaoDependemDaApi()
+    {
+        var resultado = Types.InAssembly(typeof(Kamus.Modules.Identidade.ModuloIdentidade).Assembly)
+            .ShouldNot().HaveDependencyOn("Kamus.Api")
+            .GetResult();
+
+        resultado.IsSuccessful.ShouldBeTrue(string.Join(", ", resultado.FailingTypeNames ?? []));
+    }
+
+    [Fact]
     public void Infrastructure_NaoDependeDaApi()
     {
         var resultado = Types.InAssembly(Infrastructure)

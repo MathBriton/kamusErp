@@ -1,0 +1,79 @@
+using System.Net.Mail;
+
+namespace Kamus.Modules.Identidade.Dominio;
+
+/// <summary>
+/// Usuário que faz login. Não implementa <c>ITenantOwned</c> de propósito: no login o tenant ainda
+/// não é conhecido, então a busca por e-mail precisa enxergar todos. O <see cref="TenantId"/> é
+/// gravado e define o tenant da sessão após a senha ser validada. E-mail é único no sistema.
+/// </summary>
+public sealed class Usuario
+{
+    public const int MaximoDeFalhas = 5;
+    public static readonly TimeSpan TempoDeBloqueio = TimeSpan.FromMinutes(15);
+
+    public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
+    public string Nome { get; private set; } = "";
+    public string Email { get; private set; } = "";
+    public string SenhaHash { get; private set; } = "";
+    public bool Ativo { get; private set; }
+    public int FalhasDeLogin { get; private set; }
+    public DateTimeOffset? BloqueadoAte { get; private set; }
+    public DateTimeOffset? UltimoLoginEm { get; private set; }
+
+    private Usuario() { }
+
+    public static Usuario Criar(Guid tenantId, string nome, string email, Guid? id = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(nome);
+        return new Usuario
+        {
+            Id = id ?? Guid.NewGuid(),
+            TenantId = tenantId,
+            Nome = nome.Trim(),
+            Email = NormalizarEmail(email) ?? throw new ArgumentException("E-mail inválido.", nameof(email)),
+            Ativo = true,
+        };
+    }
+
+    /// <summary>E-mail em minúsculas e sem espaços, ou <c>null</c> se não for um e-mail válido.</summary>
+    public static string? NormalizarEmail(string? email)
+    {
+        var limpo = email?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(limpo) || !MailAddress.TryCreate(limpo, out var endereco) || endereco.Address != limpo)
+            return null;
+        return limpo;
+    }
+
+    public void DefinirSenhaHash(string hash)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(hash);
+        SenhaHash = hash;
+    }
+
+    public bool EstaBloqueado(DateTimeOffset agora) => BloqueadoAte is { } ate && agora < ate;
+
+    public void RegistrarFalhaDeLogin(DateTimeOffset agora)
+    {
+        if (BloqueadoAte is { } ate && agora >= ate)
+        {
+            BloqueadoAte = null;
+            FalhasDeLogin = 0;
+        }
+
+        FalhasDeLogin++;
+        if (FalhasDeLogin >= MaximoDeFalhas)
+        {
+            BloqueadoAte = agora + TempoDeBloqueio;
+            FalhasDeLogin = 0;
+        }
+    }
+
+    public void RegistrarLoginComSucesso(DateTimeOffset agora)
+    {
+        FalhasDeLogin = 0;
+        BloqueadoAte = null;
+        UltimoLoginEm = agora;
+    }
+}

@@ -26,6 +26,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Kamus: Host=db;Port=5432;Database=${POSTGRES_DB:-kamus};Username=kamus_app;Password=${KAMUS_APP_PASSWORD:-kamus_app_dev}
+      # Migrations rodam com o dono do banco; a aplicação usa o kamus_app (sujeito ao RLS)
+      ConnectionStrings__KamusMigrations: Host=db;Port=5432;Database=${POSTGRES_DB:-kamus};Username=${POSTGRES_USER:-kamus};Password=${POSTGRES_PASSWORD:-kamus_dev}
+      Seed__SenhaAdmin: ${SEED_ADMIN_PASSWORD:-Kamus@Dev123}
     ports:
       - "8080:8080"
     depends_on:

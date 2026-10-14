@@ -12,3 +12,24 @@ GET {{api}}/api/versao
 
 ### Documento OpenAPI (a tela interativa fica em {{api}}/scalar)
 GET {{api}}/openapi/v1.json
+
+### Login com o usuário de teste (dados em memória)
+# @name login
+POST {{api}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@kamus.local",
+  "senha": "Kamus@Dev123",
+  "manterConectado": false
+}
+
+### Usuário logado (usa o token do login acima)
+GET {{api}}/api/auth/me
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Renovar a sessão (usa o cookie kamus_refresh devolvido no login)
+POST {{api}}/api/auth/refresh
+
+### Sair
+POST {{api}}/api/auth/logout
