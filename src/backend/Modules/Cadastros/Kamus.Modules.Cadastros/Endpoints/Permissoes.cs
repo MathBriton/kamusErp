@@ -10,6 +10,9 @@ internal static class Permissoes
     public static readonly string[] Fornecedores = ["Dono", "Gerente", "Estoquista", "Financeiro"];
     public static readonly string[] Gestao = ["Dono", "Gerente"];
 
+    /// <summary>Quem cadastra produtos, grades e cores. Todos os perfis consultam o catálogo.</summary>
+    public static readonly string[] Catalogo = ["Dono", "Gerente", "Estoquista"];
+
     public static bool PodeClientes(string? perfil) => Clientes.Contains(perfil);
 
     public static bool PodeFornecedores(string? perfil) => Fornecedores.Contains(perfil);

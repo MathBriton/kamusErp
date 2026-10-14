@@ -12,7 +12,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Kamus.Modules.Cadastros;
 
-/// <summary>Clientes, fornecedores e vendedores.</summary>
+/// <summary>Clientes, fornecedores, vendedores e o catálogo de produtos (grades, cores, produtos e SKUs).</summary>
 public static class ModuloCadastros
 {
     public static IServiceCollection AddModuloCadastros(this IServiceCollection services, IConfiguration configuration)
@@ -22,8 +22,9 @@ public static class ModuloCadastros
         services.AddScoped<IProvedorDeBusca, ProvedorDeBuscaCadastros>();
         services.AddScoped<IRelatorio, RelatorioDeClientes>();
         services.AddScoped<IRelatorio, RelatorioDeFornecedores>();
+        services.AddScoped<IRelatorio, RelatorioDeProdutos>();
         return services;
     }
 
-    public static IEndpointRouteBuilder MapModuloCadastros(this IEndpointRouteBuilder app) => app.MapPessoas().MapVendedores();
+    public static IEndpointRouteBuilder MapModuloCadastros(this IEndpointRouteBuilder app) => app.MapPessoas().MapVendedores().MapGradesECores().MapProdutos();
 }

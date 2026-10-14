@@ -23,6 +23,77 @@ namespace Kamus.Modules.Cadastros.Persistencia.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Kamus.Modules.Cadastros.Dominio.Cor", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Hex")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("hex");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("nome");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cores");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_cores_tenant_id");
+
+                    b.HasIndex("TenantId", "Nome")
+                        .IsUnique()
+                        .HasDatabaseName("ix_cores_tenant_id_nome");
+
+                    b.ToTable("cores", "cadastros");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Cadastros.Dominio.GradeDeTamanhos", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("nome");
+
+                    b.Property<string>("Tamanhos")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("tamanhos");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_grades");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_grades_tenant_id");
+
+                    b.HasIndex("TenantId", "Nome")
+                        .IsUnique()
+                        .HasDatabaseName("ix_grades_tenant_id_nome");
+
+                    b.ToTable("grades", "cadastros");
+                });
+
             modelBuilder.Entity("Kamus.Modules.Cadastros.Dominio.Pessoa", b =>
                 {
                     b.Property<Guid>("Id")
@@ -171,6 +242,158 @@ namespace Kamus.Modules.Cadastros.Persistencia.Migrations
                     b.ToTable("pessoas", "cadastros");
                 });
 
+            modelBuilder.Entity("Kamus.Modules.Cadastros.Dominio.Produto", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ativo");
+
+                    b.Property<string>("Categoria")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("categoria");
+
+                    b.Property<string>("Colecao")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("colecao");
+
+                    b.Property<DateTimeOffset>("CriadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em");
+
+                    b.Property<string>("Descricao")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("descricao");
+
+                    b.Property<Guid?>("FornecedorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fornecedor_id");
+
+                    b.Property<Guid>("GradeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("grade_id");
+
+                    b.Property<string>("Marca")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("marca");
+
+                    b.Property<decimal?>("PrecoCusto")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("preco_custo");
+
+                    b.Property<decimal>("PrecoVenda")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("preco_venda");
+
+                    b.Property<string>("Referencia")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("referencia");
+
+                    b.Property<string>("ReferenciaDoFornecedor")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("referencia_do_fornecedor");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_produtos");
+
+                    b.HasIndex("FornecedorId")
+                        .HasDatabaseName("ix_produtos_fornecedor_id");
+
+                    b.HasIndex("GradeId")
+                        .HasDatabaseName("ix_produtos_grade_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_produtos_tenant_id");
+
+                    b.HasIndex("TenantId", "Referencia")
+                        .IsUnique()
+                        .HasDatabaseName("ix_produtos_tenant_id_referencia");
+
+                    b.ToTable("produtos", "cadastros");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Cadastros.Dominio.Sku", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ativo");
+
+                    b.Property<string>("CodigoDeBarras")
+                        .IsRequired()
+                        .HasMaxLength(14)
+                        .HasColumnType("character varying(14)")
+                        .HasColumnName("codigo_de_barras");
+
+                    b.Property<Guid>("CorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cor_id");
+
+                    b.Property<int>("OrdemTamanho")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordem_tamanho");
+
+                    b.Property<decimal?>("PrecoVenda")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("preco_venda");
+
+                    b.Property<Guid>("ProdutoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("produto_id");
+
+                    b.Property<string>("Tamanho")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("tamanho");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_skus");
+
+                    b.HasIndex("CorId")
+                        .HasDatabaseName("ix_skus_cor_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_skus_tenant_id");
+
+                    b.HasIndex("TenantId", "CodigoDeBarras")
+                        .IsUnique()
+                        .HasDatabaseName("ix_skus_tenant_id_codigo_de_barras");
+
+                    b.HasIndex("ProdutoId", "CorId", "Tamanho")
+                        .IsUnique()
+                        .HasDatabaseName("ix_skus_produto_id_cor_id_tamanho");
+
+                    b.ToTable("skus", "cadastros");
+                });
+
             modelBuilder.Entity("Kamus.Modules.Cadastros.Dominio.Vendedor", b =>
                 {
                     b.Property<Guid>("Id")
@@ -213,6 +436,44 @@ namespace Kamus.Modules.Cadastros.Persistencia.Migrations
                         .HasDatabaseName("ix_vendedores_tenant_id");
 
                     b.ToTable("vendedores", "cadastros");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Cadastros.Dominio.Produto", b =>
+                {
+                    b.HasOne("Kamus.Modules.Cadastros.Dominio.Pessoa", null)
+                        .WithMany()
+                        .HasForeignKey("FornecedorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_produtos_pessoas_fornecedor_id");
+
+                    b.HasOne("Kamus.Modules.Cadastros.Dominio.GradeDeTamanhos", null)
+                        .WithMany()
+                        .HasForeignKey("GradeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_produtos_grades_grade_id");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Cadastros.Dominio.Sku", b =>
+                {
+                    b.HasOne("Kamus.Modules.Cadastros.Dominio.Cor", null)
+                        .WithMany()
+                        .HasForeignKey("CorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_skus_cores_cor_id");
+
+                    b.HasOne("Kamus.Modules.Cadastros.Dominio.Produto", null)
+                        .WithMany("Skus")
+                        .HasForeignKey("ProdutoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_skus_produtos_produto_id");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Cadastros.Dominio.Produto", b =>
+                {
+                    b.Navigation("Skus");
                 });
 #pragma warning restore 612, 618
         }
