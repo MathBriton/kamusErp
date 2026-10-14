@@ -1,0 +1,14 @@
+# Requisições prontas para testar a API em localhost.
+# VS Code (extensão REST Client), Visual Studio e Rider executam este arquivo direto.
+# Suba a API antes: dotnet run --project src/backend/Kamus.Api
+
+@api = http://localhost:5249
+
+### Saúde (sem banco configurado responde "Degraded")
+GET {{api}}/health
+
+### Versão e commit em execução
+GET {{api}}/api/versao
+
+### Documento OpenAPI (a tela interativa fica em {{api}}/scalar)
+GET {{api}}/openapi/v1.json

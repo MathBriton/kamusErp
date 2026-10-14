@@ -16,6 +16,8 @@ public sealed class MultiTenancyTests(PostgresFixture db) : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
+        db.ExigirBanco();
+
         // Schema criado pelo admin (dono das tabelas); a aplicação usa o papel kamus_app.
         await db.ExecuteAsAdminAsync($"DROP SCHEMA IF EXISTS {TestDbContext.Schema} CASCADE;");
         await using (var admin = CreateContext(null, db.AdminConnectionString))

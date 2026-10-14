@@ -9,6 +9,7 @@ public sealed class HealthCheckTests(PostgresFixture db)
     [Fact]
     public async Task Health_ComBancoDisponivel_RetornaHealthy()
     {
+        db.ExigirBanco();
         await using var factory = new KamusApiFactory(db.AdminConnectionString);
         using var client = factory.CreateClient();
 

@@ -6,6 +6,10 @@
     <ProjectReference Include="..\Shared\Kamus.Infrastructure\Kamus.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Scalar.AspNetCore" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="Kamus.IntegrationTests" />
   </ItemGroup>
 </Project>
