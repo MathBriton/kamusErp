@@ -30,11 +30,17 @@ Precisa apenas do .NET SDK 10 e do Node.js.
 ```bash
 dotnet run --project src/backend/Kamus.Api   # API em http://localhost:5249 (abre a tela de testes)
 cd src/web && npm install && npm run dev     # web em http://localhost:5173 (proxy para a API)
+cd src/admin && npm install && npm run dev   # Painel Administrativo em http://localhost:5174 (opcional)
 ```
 
 **Logins de teste** (senha `Kamus@Dev123`, cliente "Loja Demo" com 2 CNPJs):
 - `admin@kamus.local` — perfil Dono nas duas empresas (vê tudo, inclusive a visão consolidada)
 - `vendedor@kamus.local` — perfil Vendedor só no CNPJ Centro (menu reduzido)
+
+**Painel Administrativo** (operador do SaaS, http://localhost:5174): `superadmin@kamus.local`, senha `Kamus@Admin123`.
+Lá você registra pagamentos (o cliente é liberado na hora), cria clientes, cancela/reativa licenças e ajusta valor e carência.
+Para ver a tela de bloqueio no web do cliente: cancele a licença da "Loja Demo" no painel e recarregue o web; reative para voltar.
+
 Sem banco, os dados ficam **em memória**: são recriados a cada vez que a API sobe e somem quando ela para.
 
 | O quê | Onde |
@@ -48,10 +54,12 @@ Sem banco, os dados ficam **em memória**: são recriados a cada vez que a API s
 | Notificações | `GET /api/notificacoes` · tempo real em `/hubs/notificacoes` · `POST /api/notificacoes/teste` dispara uma de teste |
 | Pesquisa global | `GET /api/busca?q=...` · **Ctrl+K** na aplicação web |
 | Exportação | `GET /api/relatorios/historico-de-alteracoes.pdf` (ou `.xlsx`, `.csv`) · botão **Exportar** no histórico |
-
-Para ver a geração em segundo plano (aviso no sininho) com poucos dados: `Relatorios__LimiteSincrono=1 dotnet run --project src/backend/Kamus.Api`.
+| Licença do cliente | `GET /api/licenca` e `/api/licenca/pagamentos` · tela em Configurações → Licença e assinatura |
+| Painel Administrativo | http://localhost:5174 · API em `/admin-api/*` (token próprio) |
 | Versão | http://localhost:5249/api/versao |
 | Requisições prontas | [`src/backend/Kamus.Api/Kamus.Api.http`](src/backend/Kamus.Api/Kamus.Api.http) (VS Code com REST Client, Visual Studio, Rider) |
+
+Para ver a geração em segundo plano (aviso no sininho) com poucos dados: `Relatorios__LimiteSincrono=1 dotnet run --project src/backend/Kamus.Api`.
 
 A documentação da API (`/scalar`, `/openapi`) só existe em ambiente de desenvolvimento.
 
@@ -61,7 +69,7 @@ A documentação da API (`/scalar`, `/openapi`) só existe em ambiente de desenv
 
 ```bash
 cp .env.example .env
-docker compose up -d --build   # web :5173, API :8080, PostgreSQL :5432
+docker compose up -d --build   # web :5173, painel :5174, API :8080, PostgreSQL :5432
 ```
 
 **API local + PostgreSQL do Docker:**
@@ -79,6 +87,7 @@ Para o `npm run dev` usar a API do Compose: `KAMUS_API_URL=http://localhost:8080
 ```bash
 dotnet test --solution Kamus.slnx   # backend
 cd src/web && npm test              # frontend
+cd src/admin && npm test            # Painel Administrativo
 ```
 
 Os testes que precisam de PostgreSQL usam Testcontainers (Docker). **Sem Docker na máquina eles são pulados com aviso** e o restante roda normalmente; no CI (`CI=true`) eles são obrigatórios e a falta de Docker é erro.
@@ -95,7 +104,9 @@ Versionamento semântico calculado a partir de [Conventional Commits](https://ww
 src/backend/Kamus.Api                    API (ponto de entrada)
 src/backend/Shared/Kamus.SharedKernel    Tipos de domínio compartilhados (sem dependências de framework)
 src/backend/Shared/Kamus.Infrastructure  EF Core, multi-tenancy (filtro global + Row Level Security)
-src/web                                  Frontend React
+src/backend/Modules/                     Módulos: Identidade, Notificacoes, Licenciamento (+ API do painel)
+src/web                                  Frontend React (cliente)
+src/admin                                Painel Administrativo (operador do SaaS)
 tests/backend/                           Testes unitários, de integração e de arquitetura
 docker/                                  Scripts de inicialização dos containers
 ```
@@ -114,15 +125,21 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 3 | Compras: precisa de pedido de compra ou só a entrada de mercadoria? | Em aberto |
 | 4 | Comissão sobre venda **faturada** ou **recebida** como padrão? | Em aberto |
 | 5 | Crediário: multa/juros padrão e dias de atraso para bloquear novas compras | Em aberto |
-| 6 | Modelo de cobrança do SaaS (por loja, usuário ou plano) | Provisório: **plano único "Piloto"** com limites por cliente |
-| 7 | Licença: dias de carência e uso durante a carência | Provisório: **5 dias, uso normal com aviso** |
-| 8 | Licença: cliente suspenso pode exportar os próprios dados? | Provisório: **sim** |
-| 9 | Período de teste (trial) de cliente novo | Provisório: **14 dias** |
-| 10 | Painel Admin: só o dono usa ou haverá equipe (suporte, financeiro)? | Provisório: **só SuperAdmin** |
+| 6 | Modelo de cobrança do SaaS (por loja, usuário ou plano) | Provisório e implementado (v0.6.0): **plano único "Piloto"**, valor e limites por cliente |
+| 7 | Licença: dias de carência e uso durante a carência | Provisório e implementado: **5 dias, uso normal com banner** (ajustável por cliente) |
+| 8 | Licença: cliente suspenso pode exportar os próprios dados? | Provisório e implementado: **sim** (hoje só o histórico; os demais relatórios entram conforme forem criados) |
+| 9 | Período de teste (trial) de cliente novo | Provisório e implementado: **14 dias** (ajustável ao criar) |
+| 10 | Painel Admin: só o dono usa ou haverá equipe (suporte, financeiro)? | Provisório e implementado: **só SuperAdmin** |
 | 11 | Troca: prazo padrão e validade do vale-troca | Em aberto |
 | 12 | Condicional: prazo de devolução e limite por cliente | Em aberto |
 | 13 | Resumo diário: blocos ligados por padrão | Em aberto |
 | 14 | Idioma/moeda: só Brasil? | Assumido **só Brasil** (pt-BR, R$) |
+| 15 | Valor padrão da mensalidade | Provisório: **R$ 199,90** (alterável por cliente no painel) |
+| 16 | Limites de CNPJs/lojas/usuários devem **impedir** cadastros acima do limite? | Provisório: **só informativos** por enquanto |
+| 17 | Avisos de vencimento: 7, 3, 1 e 0 dias antes, na carência e na suspensão, só para os Donos — está bom? | Provisório |
+| 18 | Cobrança automática (Pix/boleto com baixa automática) ou registro manual no painel? | Provisório: **manual**; gateway depois |
+| 19 | E-mail/WhatsApp de suporte exibido na tela de bloqueio | Provisório: `suporte@kamus.com.br` (fictício) |
+| 20 | Cliente criado no painel recebe senha provisória: obrigar troca no primeiro acesso? | Em aberto (hoje não obriga) |
 
 ### Débitos técnicos
 
@@ -135,7 +152,14 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Desenvolvimento sem persistência (EF Core InMemory) | Dados somem ao reiniciar; RLS só é testado no CI | Quando houver banco local ou servidor |
 | SignalR com um único servidor | Com mais de uma instância da API, notificações não chegam a todos | Ao escalar: backplane (Redis) |
 | Sem CD (deploy automático) | Releases geram imagens, mas ninguém as publica | Quando houver servidor |
-| Imagem web do Docker não é testada localmente (limite do Docker Hub no ambiente) | Só validada no CI de release | — |
+| Imagens web e admin do Docker não são testadas localmente (limite do Docker Hub no ambiente) | Só validadas no CI de release | — |
+| API do Painel Administrativo no **mesmo processo** da API do cliente (`/admin-api`) | Uma falha/ataque no painel atinge a mesma aplicação; mitigado com chave e esquema próprios, filtro por IP e 404 sem chave | Separar em `Kamus.Admin.Api` quando houver PostgreSQL em produção |
+| SuperAdmin **sem 2FA** | Só senha + bloqueio após 5 falhas + filtro por IP | Antes de ir para produção |
+| Token do painel guardado no `sessionStorage` (8 h, sem renovação nem revogação) | Exposto a XSS na aba do painel; sair não invalida o token no servidor | Junto com o 2FA |
+| Limites de CNPJs/lojas/usuários **não são aplicados** | O cliente pode cadastrar acima do limite | Quando houver cadastro de empresas/usuários (v0.7.0) |
+| Cache da licença por instância (1 min) e rotina de avisos em cada instância | Com várias instâncias: até 1 min para bloquear/liberar nas outras; avisos podem duplicar | Ao escalar (cache distribuído / rotina única) |
+| Cliente **sem licença cadastrada não é bloqueado** | Um tenant criado fora do painel usa sem cobrança | Ao ir para produção: criar licença para todos os tenants existentes |
+| Senha provisória do cliente novo não exige troca no primeiro acesso | O operador conhece a senha do Dono | Com a tela de "trocar senha" |
 
 ## Multi-tenancy em uma frase
 

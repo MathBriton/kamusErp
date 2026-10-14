@@ -40,7 +40,9 @@ O `CLAUDE.md` apenas importa este arquivo. **Ao terminar uma tarefa, atualize a 
 # Rodar (localhost, sem banco)
 dotnet run --project src/backend/Kamus.Api        # API http://localhost:5249 (abre /scalar)
 cd src/web && npm install && npm run dev          # Web http://localhost:5173 (proxy /api e /health → 5249)
+cd src/admin && npm install && npm run dev        # Painel Administrativo http://localhost:5174 (proxy /admin-api → 5249)
 # Login de teste: admin@kamus.local / Kamus@Dev123  (tenant "Loja Demo", 2 CNPJs)
+# Painel: superadmin@kamus.local / Kamus@Admin123
 
 # Testes backend — ATENÇÃO: usa Microsoft Testing Platform, então é --solution
 dotnet test --solution Kamus.slnx
@@ -50,8 +52,9 @@ CI=true dotnet test --solution Kamus.slnx         # simula o CI: falta de Docker
 dotnet format Kamus.slnx --verify-no-changes
 dotnet build Kamus.slnx -c Release                # TreatWarningsAsErrors = true
 
-# Web (o CI roda exatamente isto)
+# Web e Painel (o CI roda exatamente isto, em cada pasta)
 cd src/web && npm ci && npm run lint && npm run typecheck && npm test && npm run build
+cd src/admin && npm ci && npm run lint && npm run typecheck && npm test && npm run build
 
 # Script de release
 node --test .github/scripts/release/*.test.mjs    # (Node 22 exige o caminho do arquivo, não a pasta)
@@ -74,11 +77,13 @@ src/backend/Shared/Kamus.Infrastructure/Busca      Pesquisa global (/api/busca) 
 src/backend/Shared/Kamus.Infrastructure/Relatorios Exportação PDF/Excel/CSV (/api/relatorios/{codigo}.{formato}) + segundo plano
 src/backend/Modules/Identidade/...            Módulo Identidade: Dominio/, Aplicacao/, Persistencia/, Endpoints/, Busca/, Seed/
 src/backend/Modules/Notificacoes/...          Módulo Notificacoes: notificações por usuário + SignalR (/hubs/notificacoes)
-src/web/src                                   auth/, api/, busca/, empresa/, layout/, navegacao/, notificacoes/, pages/, relatorios/, theme/, test/
+src/backend/Modules/Licenciamento/...         Licença por cliente (/api/licenca, bloqueio 402, avisos) + API do Painel (Administracao/, /admin-api)
+src/web/src                                   auth/, api/, busca/, empresa/, layout/, licenca/, navegacao/, notificacoes/, pages/, relatorios/, theme/, test/
+src/admin/src                                 Painel Administrativo (operador do SaaS): login SuperAdmin, clientes, pagamentos
 tests/backend/Kamus.UnitTests                 Unitários (domínio puro)
 tests/backend/Kamus.IntegrationTests          API via WebApplicationFactory; InMemory e PostgreSQL (Testcontainers)
 tests/backend/Kamus.ArchitectureTests         Regras de dependência entre camadas
-.github/workflows                             backend-ci, web-ci, scripts-ci, pr-title, release
+.github/workflows                             backend-ci, web-ci, admin-ci, scripts-ci, pr-title, release
 docs/                                         mockups, RELEASES.md
 ```
 
@@ -93,7 +98,9 @@ na tela — PDF, Excel, CSV, histórico e segundo plano vêm de graça. **Lembre
 
 **Módulos conversam só pelo SharedKernel** (há teste de arquitetura): `INotificador` (notificar usuários),
 `IRegistradorDeEventos` (eventos no histórico), `IProvedorDeBusca`, `IRelatorio`, `IEmpresaAtiva`
-(id, perfil, nome e CNPJ da empresa ativa), `IUsuarioAtual`.
+(id, perfil, nome e CNPJ da empresa ativa), `IUsuarioAtual`, `IDiretorioDeClientes` (tenants e Donos) e
+`ICadastroDeClientes` (criar tenant + empresa + Dono) — esses dois implementados pela Identidade.
+Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e chame `TenantContext.Definir(tenantId)`.
 
 ## 6. Regras inegociáveis
 
@@ -160,6 +167,13 @@ na tela — PDF, Excel, CSV, histórico e segundo plano vêm de graça. **Lembre
 - `pkill -f`/`pgrep -f` com um padrão que aparece no próprio comando mata o shell (exit 144): pare processos pelo PID.
 - No frontend, telas implementadas entram em `PAGINAS_IMPLEMENTADAS` (`src/web/src/App.tsx`); item do menu sem
   `previstoPara` precisa ter tela lá.
+- Painel Administrativo só existe com `Admin:Chave` (≥ 32 caracteres; em Development vem do appsettings). Sem ela,
+  `/admin-api` dá 404. `Admin:IpsPermitidos` restringe por IP. O token do painel não vale na API do cliente e vice-versa.
+- Licença: o estado é calculado pela data de **Brasília** (`CalendarioBrasilia`, UTC−3 fixo). Nos testes, mude o vencimento
+  pelo `LicenciamentoDbContext` e chame `CacheDeLicencas.Invalidar(tenant)` (cache de 1 min).
+- Testes de integração: `KamusApiFactory` fixa `Seed:SenhaSuperAdmin` (no PostgreSQL compartilhado, o primeiro a subir cria o
+  SuperAdmin). Rodar só alguns testes: `dotnet run --project tests/backend/Kamus.IntegrationTests -- -method "*Nome*"`.
+- Testes web: chamadas não mapeadas no `mockApi` dão 404; `GET /api/licenca` com 404 = "sem licença" (nenhum banner).
 
 ---
 
@@ -167,8 +181,8 @@ na tela — PDF, Excel, CSV, histórico e segundo plano vêm de graça. **Lembre
 
 **Última atualização:** 2026-10-14
 
-**Releases:** v0.1.0 → **v0.4.0** lançadas (a v0.4.0 trouxe histórico, notificações e pesquisa global). Na `main`,
-pronto para a próxima release (**v0.5.0**): exportação de relatórios em PDF, Excel e CSV.
+**Releases:** v0.1.0 → **v0.5.0** lançadas. Na `main`, pronto para a próxima release (**v0.6.0**): licenciamento e
+Painel Administrativo.
 
 **O que existe hoje:**
 - Login (JWT 15 min + refresh rotativo em cookie HttpOnly `kamus_refresh`, bloqueio após 5 falhas, 10 logins/min
@@ -176,34 +190,32 @@ pronto para a próxima release (**v0.5.0**): exportação de relatórios em PDF,
   CNPJ Centro), senha `Kamus@Dev123`, com notificações de boas-vindas.
 - Empresa ativa: header `X-Empresa-Id` validado em `EmpresaAtivaMiddleware`; `IEmpresaAtiva` traz id, perfil,
   nome e CNPJ. `GET /api/empresas/ativa`.
-- Histórico de alterações automático (`AuditoriaInterceptor`), eventos de segurança e de exportação,
-  `GET /api/auditoria` (Dono/Gerente), tela em Configurações.
-- Notificações por usuário com SignalR (`/hubs/notificacoes`), sininho no web; links `/api/...` nas notificações
-  abrem direto no navegador (download).
+- Histórico de alterações automático, eventos de segurança e de exportação, `GET /api/auditoria` (Dono/Gerente).
+- Notificações por usuário com SignalR (`/hubs/notificacoes`), sininho no web.
 - Pesquisa global `GET /api/busca` + Ctrl+K.
-- **Exportação:** `GET /api/relatorios/{codigo}.{formato}` (pdf, xlsx, csv) com os filtros da tela na query string;
-  controla perfil, registra evento `exportacao` no histórico; acima de `Relatorios:LimiteSincrono` (padrão 2000
-  linhas) gera em segundo plano (`ExportacaoEmSegundoPlano`), guarda o arquivo em memória por 60 min e notifica
-  com link `/api/relatorios/arquivos/{id}` (id aleatório = segredo do link). Primeiro relatório:
-  `historico-de-alteracoes`. Web: `src/web/src/relatorios/BotaoExportar.tsx`.
-- Para testar o segundo plano localmente: `Relatorios__LimiteSincrono=1 dotnet run --project src/backend/Kamus.Api`.
-- Testes: 126 backend, 62 web.
+- Exportação `GET /api/relatorios/{codigo}.{formato}` (pdf, xlsx, csv), segundo plano acima de `Relatorios:LimiteSincrono`.
+- **Licenciamento (v0.6.0):** `Licenca` por tenant (estado calculado pelas datas: Trial, Ativa, Carencia, Suspensa,
+  Cancelada) e `Pagamento`. `GET /api/licenca` e `/api/licenca/pagamentos` (Dono). `LicencaMiddleware` responde 402 com
+  `codigo` para suspensa/cancelada, deixando livres login, licença, notificações, empresas e relatórios. Rotina horária
+  (`RotinaDeVencimentos` → `VerificadorDeVencimentos`) avisa os Donos uma única vez por marco. Seed dá à Loja Demo uma
+  licença Ativa (~3 semanas) com um pagamento.
+- **Web do cliente:** `LicencaProvider` (consulta ao entrar, a cada 5 min e em qualquer 402), banner de carência /
+  vencimento próximo, `TelaDeBloqueio` (verificar novamente, suporte, exportar), Configurações → Licença e assinatura.
+- **Painel Administrativo:** API em `/admin-api` no mesmo processo (esquema "Admin", `Admin:Chave`, filtro por IP),
+  SuperAdmin `superadmin@kamus.local` / `Kamus@Admin123` em Development (produção: `Admin:EmailInicial`/`SenhaInicial`).
+  Resumo, clientes, detalhe, novo cliente (senha provisória), registrar pagamento (libera na hora + avisa Donos),
+  cancelar/reativar, valor/carência/limites, registro somente-inclusão das ações. Web em `src/admin` (porta 5174, âmbar),
+  `admin-ci`, imagem `kamus-admin` na release, serviço `admin` no docker-compose.
+- Testes: 178 backend (unit + integração InMemory/PostgreSQL + arquitetura), 71 web, 10 admin. E2E manual em localhost
+  (painel cancela → cliente bloqueado → pagamento libera na hora → notificação) feito com Playwright.
 
-**Próximo passo — v0.6.0: licenciamento + Painel Administrativo** (ver `LEVANTAMENTO.md` 5.8):
-1. Módulo Licenciamento: `Licenca` por tenant (plano, estado Trial/Ativa/Carência/Suspensa/Cancelada, pago até,
-   dias de carência, limites de CNPJs/lojas/usuários, histórico de pagamentos).
-2. Middleware que bloqueia o tenant suspenso (HTTP 402 `LICENCA_SUSPENSA`), deixando login e status acessíveis;
-   rotina diária que muda estados e notifica "licença vence em X dias" (`INotificador`).
-3. Web do cliente: banner de carência e tela de bloqueio (mockups 08 e 09); Configurações → Licença.
-4. Painel Admin separado (`src/admin` + `Kamus.Admin.Api`): login próprio de SuperAdmin (2FA depois), lista de
-   clientes/licenças, "Registrar pagamento" que libera na hora, auditoria das ações (mockup 10).
-5. Decisões pendentes com o dono (seção 12 do `LEVANTAMENTO.md`, perguntas 9–12): dias de carência, uso na
-   carência, exportação de dados quando suspenso, planos.
+**Próximo passo — v0.7.0: Cadastros** (ver `LEVANTAMENTO.md` 4.1 e 4.7):
+1. Empresas e lojas (cadastro/edição; aplicar `LimiteDeCnpjs`/`LimiteDeLojas` da licença).
+2. Usuários e perfis por empresa (convite, ativar/desativar, troca de senha — inclusive a provisória; aplicar `LimiteDeUsuarios`).
+3. Ficha do cliente (4.7.5), fornecedores, vendedores.
+4. Produtos com grade cor × tamanho (4.1.1), SKU/EAN, etiquetas; provedor de busca e relatório exportável.
+5. Importação por planilha (4.7.4).
+Antes, confirmar com o dono as dúvidas do README (seção "Dúvidas em aberto"), principalmente 1–5 e 15–20.
 
-**Pendências conhecidas:**
-- Branch órfã `release-please--branches--main--components--kamus` no GitHub (pode ser apagada pela interface).
-- Perguntas em aberto para o dono: seção 12 do `LEVANTAMENTO.md` (prazos de troca, comissão, crediário etc.).
-- Gravação do histórico acontece logo após o `SaveChanges` (não na mesma transação); revisar quando houver
-  PostgreSQL em produção.
-- Arquivos de relatório em segundo plano ficam em memória (somem ao reiniciar); quando houver servidor, usar disco
-  ou armazenamento de objetos.
+**Pendências conhecidas:** ver "Dúvidas em aberto e débitos técnicos" no `README.md` (lista viva — acrescente lá).
+Também: branch órfã `release-please--branches--main--components--kamus` no GitHub (pode ser apagada pela interface).

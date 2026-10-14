@@ -61,3 +61,69 @@ X-Empresa-Id: todas
 GET {{api}}/api/relatorios/historico-de-alteracoes.xlsx?tipo=Evento
 Authorization: Bearer {{login.response.body.accessToken}}
 X-Empresa-Id: todas
+
+### Situação da licença do cliente (funciona mesmo suspensa)
+GET {{api}}/api/licenca
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Pagamentos da licença (perfil Dono; troque X-Empresa-Id pelo id de uma empresa)
+GET {{api}}/api/licenca/pagamentos
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: todas
+
+### ---------- Painel Administrativo (token próprio; não vale na API do cliente) ----------
+
+# @name loginAdmin
+POST {{api}}/admin-api/login
+Content-Type: application/json
+
+{
+  "email": "superadmin@kamus.local",
+  "senha": "Kamus@Admin123"
+}
+
+### Resumo (clientes por situação e receita mensal)
+GET {{api}}/admin-api/resumo
+Authorization: Bearer {{loginAdmin.response.body.token}}
+
+### Clientes com a situação da licença
+GET {{api}}/admin-api/clientes
+Authorization: Bearer {{loginAdmin.response.body.token}}
+
+### Registrar pagamento do cliente de demonstração (libera na hora)
+POST {{api}}/admin-api/clientes/d0000000-0000-0000-0000-000000000001/pagamentos
+Authorization: Bearer {{loginAdmin.response.body.token}}
+Content-Type: application/json
+
+{
+  "valor": 199.90,
+  "meses": 1,
+  "forma": "Pix"
+}
+
+### Cancelar / reativar a licença do cliente de demonstração
+POST {{api}}/admin-api/clientes/d0000000-0000-0000-0000-000000000001/cancelar
+Authorization: Bearer {{loginAdmin.response.body.token}}
+
+###
+POST {{api}}/admin-api/clientes/d0000000-0000-0000-0000-000000000001/reativar
+Authorization: Bearer {{loginAdmin.response.body.token}}
+
+### Novo cliente (a resposta traz a senha provisória do Dono)
+POST {{api}}/admin-api/clientes
+Authorization: Bearer {{loginAdmin.response.body.token}}
+Content-Type: application/json
+
+{
+  "nome": "Ateliê Flor de Lis",
+  "razaoSocial": "Flor de Lis Moda LTDA",
+  "nomeFantasia": "Ateliê Flor de Lis",
+  "cnpj": "11.222.333/0001-81",
+  "nomeDoDono": "Ana Flor",
+  "emailDoDono": "ana@flordelis.com.br",
+  "valorMensal": 149.90
+}
+
+### Ações administrativas recentes
+GET {{api}}/admin-api/acoes
+Authorization: Bearer {{loginAdmin.response.body.token}}

@@ -489,11 +489,11 @@ stateDiagram-v2
 - Módulo **Licenciamento** no backend com a entidade `Licenca` por tenant: plano, estado, **pago até**, dias de carência, limites do plano (nº de CNPJs, lojas, usuários) e histórico de pagamentos.
 - **Middleware** em toda requisição verifica a licença do tenant (com cache curto, ex.: 1 min). Se suspensa, a API responde **HTTP 402** com código `LICENCA_SUSPENSA`; o frontend mostra a tela de bloqueio. Login e a tela de status continuam acessíveis.
 - **Liberação = você registra o pagamento no Painel Admin** → "pago até" avança → o cache é invalidado → **o cliente volta a usar na hora** (o SignalR avisa o navegador para recarregar).
-- Uma rotina diária move licenças vencidas para Carência/Suspensa e gera notificações "sua licença vence em X dias".
+- O estado é **calculado pelas datas** (pago até + dias de carência), então não depende de rotina para mudar. Uma rotina (a cada hora) só envia os avisos aos Donos: 7, 3, 1 e 0 dias antes do vencimento, ao entrar na carência e na suspensão — cada um uma única vez.
 - **Limites do plano** aplicados no backend (ex.: não deixa cadastrar o 3º CNPJ num plano de 2).
 
 **Painel Administrativo (o "outro lado"):**
-- **Aplicação separada** (`src/admin`) com **API própria** (`Kamus.Admin.Api`), em outro domínio/porta (ex.: `admin.kamus...`).
+- **Aplicação separada** (`src/admin`), em outro domínio/porta (ex.: `admin.kamus...`). **Implementado (v0.6.0):** a API do painel fica no **mesmo processo** da API (rotas `/admin-api`, esquema de autenticação e chave próprios) porque, sem banco local, dois processos não compartilham os dados em memória. Separar em `Kamus.Admin.Api` quando houver PostgreSQL em produção (ver Registro de decisões).
 - Autenticação **independente** dos clientes: usuário "SuperAdmin" com **2FA obrigatório** e, se possível, **restrição por IP** (só a sua máquina/VPN).
 - Funções: criar cliente (tenant + primeiro usuário + empresas), ver estado das licenças, **registrar pagamento / estender validade**, suspender/reativar, trocar plano, ver uso (último acesso, nº de usuários).
 - **Auditoria** de toda ação no painel (quem, quando, o quê, valor anterior/novo).
@@ -664,8 +664,8 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.2.0 | 0a+/0b | API em localhost sem banco, tela de testes (Scalar), login (JWT + refresh em cookie), bloqueio por tentativas, usuário de teste, dados em memória | ✅ lançada |
 | v0.3.0 | 0b | Shell (sidebar/topbar), seletor de CNPJ validado no backend, dashboard (estrutura), páginas previstas | ✅ lançada |
 | v0.4.0 | 0b | Notificações em tempo real, pesquisa global, histórico de alterações | ✅ lançada |
-| v0.5.0 | 0b | Exportação PDF/Excel/CSV (com geração em segundo plano) | ✅ pronta |
-| v0.6.0 | 0b | Licenciamento + Painel Administrativo | ⏳ |
+| v0.5.0 | 0b | Exportação PDF/Excel/CSV (com geração em segundo plano) | ✅ lançada |
+| v0.6.0 | 0b | Licenciamento + Painel Administrativo | ✅ pronta |
 | v0.7.0 | 1 | Cadastros (empresas, ficha do cliente, fornecedores, vendedores, produtos com grade, importação por planilha) | ⏳ |
 | v0.8.0 | 2 | Estoque (+ importação de XML da NF-e) | ⏳ |
 | v0.9.0 | 3 | Financeiro | ⏳ |
@@ -692,10 +692,10 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 6. ~~Crediário próprio~~ → **sim**, ver 4.7.8. Valores padrão de multa/juros e dias de atraso para bloqueio?
 7. **Modelo de cobrança do SaaS:** por loja, por usuário, por plano/módulos?
 8. **Idioma/moeda:** só Brasil (pt-BR, BRL) ou pensar em internacionalização?
-9. **Licença — carência:** quantos dias após o vencimento até suspender? Durante a carência, uso normal ou **somente leitura**?
-10. **Licença — suspensão:** cliente suspenso pode ao menos **exportar os próprios dados**? (boa prática e argumento de confiança na venda)
-11. **Planos:** haverá planos diferentes (ex.: por nº de CNPJs/lojas/usuários) ou preço único no piloto?
-12. **Painel Admin:** só você vai usar, ou haverá outras pessoas (suporte, financeiro)?
+9. **Licença — carência:** quantos dias após o vencimento até suspender? Durante a carência, uso normal ou **somente leitura**? *Provisório (v0.6.0): 5 dias, uso normal com banner; ajustável por cliente no painel.*
+10. **Licença — suspensão:** cliente suspenso pode ao menos **exportar os próprios dados**? (boa prática e argumento de confiança na venda) *Provisório: sim.*
+11. **Planos:** haverá planos diferentes (ex.: por nº de CNPJs/lojas/usuários) ou preço único no piloto? *Provisório: plano único "Piloto", R$ 199,90, valor e limites ajustáveis por cliente.*
+12. **Painel Admin:** só você vai usar, ou haverá outras pessoas (suporte, financeiro)? *Provisório: só SuperAdmin.*
 13. **Troca:** prazo padrão (30 dias?) e validade padrão do vale-troca (90 dias? sem validade?).
 14. **Condicional:** prazo padrão de devolução e limite padrão por cliente.
 15. **Resumo diário:** quais blocos vêm ligados por padrão?
@@ -791,3 +791,9 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | 2026-10-14 | Exportação por definição única de relatório (`IRelatorio` → `DadosDoRelatorio`) renderizada em PDF (QuestPDF, licença Community), Excel (ClosedXML) e CSV (`;`, UTF-8 com BOM); endpoint único `/api/relatorios/{codigo}.{formato}` | Aceita |
 | 2026-10-14 | Relatórios acima de 2.000 linhas são gerados em segundo plano e avisados no sininho; o arquivo fica disponível por 60 minutos por um link secreto | Aceita |
 | 2026-10-14 | Pesquisa global por provedores de busca de cada módulo; comparação sem acento em memória enquanto os volumes são pequenos (produtos usarão `unaccent` + `pg_trgm`) | Aceita |
+| 2026-10-14 | Respostas provisórias para a licença (perguntas 9–12): carência de 5 dias com uso normal, suspenso pode exportar os dados, avaliação de 14 dias, plano único "Piloto" (R$ 199,90) com valor/carência/limites por cliente, só SuperAdmin no painel | Provisória |
+| 2026-10-14 | Estado da licença **calculado pelas datas** (pago até / avaliação + carência), sem rotina que "vire" o estado; pagamento em dia ou na carência estende a partir do vencimento, suspenso recomeça da data do pagamento | Aceita |
+| 2026-10-14 | Licenças, pagamentos, administradores e ações do painel **sem RLS** (são dados do operador do SaaS); do lado do cliente toda consulta filtra o tenant explicitamente; ações administrativas são somente-inclusão | Aceita |
+| 2026-10-14 | Bloqueio por licença = HTTP 402 com `codigo` (`LICENCA_SUSPENSA`/`LICENCA_CANCELADA`); continuam liberados login, `/api/licenca`, notificações, empresas e exportação de relatórios. Cliente sem licença cadastrada não é bloqueado | Aceita |
+| 2026-10-14 | Painel Administrativo: web separado (`src/admin`), mas a API fica no **mesmo processo** (`/admin-api`, esquema "Admin" com chave própria `Admin:Chave`; sem chave o painel não existe; filtro opcional por IP). Motivo: sem banco local, processos separados não compartilham dados. Separar quando houver PostgreSQL em produção | Aceita (provisória) |
+| 2026-10-14 | 2FA do SuperAdmin adiado (login com senha + bloqueio após 5 falhas + filtro por IP); limites de CNPJs/lojas/usuários registrados, mas ainda não aplicados | Aceita (débito) |
