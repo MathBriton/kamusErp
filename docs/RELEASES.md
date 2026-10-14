@@ -13,6 +13,7 @@ O Kamus usa **versionamento semântico** (`MAJOR.MINOR.PATCH`) calculado automat
    - publica as imagens Docker no GHCR:
      - `ghcr.io/mathbriton/kamus-api:X.Y.Z` (+ `X.Y` e `latest`)
      - `ghcr.io/mathbriton/kamus-web:X.Y.Z` (+ `X.Y` e `latest`)
+     - `ghcr.io/mathbriton/kamus-admin:X.Y.Z` (Painel Administrativo; + `X.Y` e `latest`)
 
 Se não houver commits `feat`/`fix`/`perf` desde a última release, o modo automático não lança nada (avisa no resumo da execução).
 

@@ -1,0 +1,39 @@
+name: admin-ci
+
+on:
+  pull_request:
+    paths:
+      - "src/admin/**"
+      - ".github/workflows/admin-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/admin/**"
+      - ".github/workflows/admin-ci.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: src/admin
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/admin/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

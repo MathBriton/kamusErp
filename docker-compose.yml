@@ -29,6 +29,7 @@ services:
       # Migrations rodam com o dono do banco; a aplicação usa o kamus_app (sujeito ao RLS)
       ConnectionStrings__KamusMigrations: Host=db;Port=5432;Database=${POSTGRES_DB:-kamus};Username=${POSTGRES_USER:-kamus};Password=${POSTGRES_PASSWORD:-kamus_dev}
       Seed__SenhaAdmin: ${SEED_ADMIN_PASSWORD:-Kamus@Dev123}
+      Seed__SenhaSuperAdmin: ${SEED_SUPERADMIN_PASSWORD:-Kamus@Admin123}
     ports:
       - "8080:8080"
     depends_on:
@@ -40,6 +41,15 @@ services:
       context: src/web
     ports:
       - "5173:80"
+    depends_on:
+      - api
+
+  # Painel Administrativo (operador do SaaS). Em produção, exponha só para IPs/VPN do operador.
+  admin:
+    build:
+      context: src/admin
+    ports:
+      - "5174:80"
     depends_on:
       - api
 

@@ -44,7 +44,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Jobs "build-test" do backend-ci e do web-ci (os que rodaram para este commit)
+          # Jobs "build-test" do backend-ci, web-ci e admin-ci (os que rodaram para este commit)
           checks=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs" \
             --jq '[.check_runs[] | select(.name == "build-test")]')
           echo "$checks" | jq -r '.[] | "\(.name): \(.status) / \(.conclusion)"'
@@ -90,6 +90,9 @@ jobs:
           - image: kamus-web
             context: src/web
             dockerfile: src/web/Dockerfile
+          - image: kamus-admin
+            context: src/admin
+            dockerfile: src/admin/Dockerfile
     steps:
       - uses: actions/checkout@v5
         with:
