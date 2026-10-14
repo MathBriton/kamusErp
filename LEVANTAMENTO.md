@@ -666,7 +666,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.4.0 | 0b | Notificações em tempo real, pesquisa global, histórico de alterações | ✅ lançada |
 | v0.5.0 | 0b | Exportação PDF/Excel/CSV (com geração em segundo plano) | ✅ lançada |
 | v0.6.0 | 0b | Licenciamento + Painel Administrativo | ✅ lançada |
-| v0.7.0 | 1 | Empresas (CNPJs) e usuários: perfis por empresa, senha provisória com troca obrigatória, limites do plano | ✅ pronta |
+| v0.7.0 | 1 | Empresas (CNPJs) e usuários: perfis por empresa, senha provisória com troca obrigatória, limites do plano | ✅ lançada |
 | v0.8.0 | 1 | Ficha do cliente, fornecedores e vendedores | ⏳ |
 | v0.9.0 | 1 | Produtos com grade (cor × tamanho), SKUs, códigos de barras internos | ⏳ |
 | v0.10.0 | 1 | Importação por planilha | ⏳ |
