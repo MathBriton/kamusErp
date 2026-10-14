@@ -665,13 +665,16 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.3.0 | 0b | Shell (sidebar/topbar), seletor de CNPJ validado no backend, dashboard (estrutura), páginas previstas | ✅ lançada |
 | v0.4.0 | 0b | Notificações em tempo real, pesquisa global, histórico de alterações | ✅ lançada |
 | v0.5.0 | 0b | Exportação PDF/Excel/CSV (com geração em segundo plano) | ✅ lançada |
-| v0.6.0 | 0b | Licenciamento + Painel Administrativo | ✅ pronta |
-| v0.7.0 | 1 | Cadastros (empresas, ficha do cliente, fornecedores, vendedores, produtos com grade, importação por planilha) | ⏳ |
-| v0.8.0 | 2 | Estoque (+ importação de XML da NF-e) | ⏳ |
-| v0.9.0 | 3 | Financeiro | ⏳ |
-| v0.10.0 | 4 | Vendas (registro, troca e vale-troca, comissão) | ⏳ |
-| v0.11.0 | 5 | Crediário e condicional | ⏳ |
-| v0.12.0 | 6 | Dashboard real, app mobile, resumo diário | ⏳ |
+| v0.6.0 | 0b | Licenciamento + Painel Administrativo | ✅ lançada |
+| v0.7.0 | 1 | Empresas (CNPJs) e usuários: perfis por empresa, senha provisória com troca obrigatória, limites do plano | ✅ pronta |
+| v0.8.0 | 1 | Ficha do cliente, fornecedores e vendedores | ⏳ |
+| v0.9.0 | 1 | Produtos com grade (cor × tamanho), SKUs, códigos de barras internos | ⏳ |
+| v0.10.0 | 1 | Importação por planilha | ⏳ |
+| v0.11.0 | 2 | Estoque (lojas/locais de estoque + importação de XML da NF-e) | ⏳ |
+| v0.12.0 | 3 | Financeiro | ⏳ |
+| v0.13.0 | 4 | Vendas (registro, troca e vale-troca, comissão) | ⏳ |
+| v0.14.0 | 5 | Crediário e condicional | ⏳ |
+| v0.15.0 | 6 | Dashboard real, app mobile, resumo diário | ⏳ |
 | v1.0.0 | 7 | Produção e primeira loja piloto | ⏳ depende de servidor |
 
 ---
@@ -798,3 +801,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | 2026-10-14 | Painel Administrativo: web separado (`src/admin`), mas a API fica no **mesmo processo** (`/admin-api`, esquema "Admin" com chave própria `Admin:Chave`; sem chave o painel não existe; filtro opcional por IP). Motivo: sem banco local, processos separados não compartilham dados. Separar quando houver PostgreSQL em produção | Aceita (provisória) |
 | 2026-10-14 | 2FA do SuperAdmin adiado (login com senha + bloqueio após 5 falhas + filtro por IP); limites de CNPJs/lojas/usuários registrados, mas ainda não aplicados | Aceita (débito) |
 | 2026-10-14 | Painel Administrativo é a ferramenta do **operador do SaaS** (não do cliente). Fica no mesmo repositório (`src/admin` + `/admin-api`), mas deve rodar como serviço separado ao publicar; não evolui além do atual até haver mais clientes. Próxima evolução: gateway de cobrança (baixa automática), deixando o painel para exceções | Aceita |
+| 2026-10-14 | Fase 1 (Cadastros) dividida em quatro releases menores (v0.7.0 a v0.10.0), como foi feito na fundação | Aceita |
+| 2026-10-14 | Gestão de empresas e usuários só para o perfil Dono. Usuário novo (e Dono criado no Painel) recebe **senha provisória** exibida uma vez; o token marca `trocar_senha` e a API responde 403 `TROCAR_SENHA` até a troca. Senha: 8+ caracteres com letras e números | Aceita |
+| 2026-10-14 | Limites da licença aplicados: CNPJs no cadastro de empresa, usuários **ativos** no cadastro/reativação (409 `LIMITE_DA_LICENCA`). O limite de lojas espera o cadastro de lojas/locais de estoque (v0.11.0) | Aceita |
+| 2026-10-14 | O cliente sempre mantém pelo menos um Dono ativo; ninguém desativa o próprio usuário; CNPJ de empresa não muda depois de cadastrado | Aceita |

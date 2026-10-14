@@ -75,14 +75,25 @@ export async function entrar(email: string, senha: string, manterConectado: bool
   return (await postJson('/api/auth/login', { email, senha, manterConectado })).json()
 }
 
-/** Restaura/renova a sessão pelo cookie. Retorna null quando não há sessão válida. */
-export async function renovar(): Promise<Sessao | null> {
-  try {
-    return await (await postJson('/api/auth/refresh')).json()
-  } catch (erro) {
-    if (erro instanceof ErroDeApi && erro.status !== 0) return null
-    throw erro
-  }
+let renovacaoEmAndamento: Promise<Sessao | null> | null = null
+
+/**
+ * Restaura/renova a sessão pelo cookie. Retorna null quando não há sessão válida.
+ * Chamadas simultâneas compartilham a mesma requisição: o token de sessão é de uso único e um segundo
+ * uso seria tratado pelo servidor como roubo (derruba todas as sessões).
+ */
+export function renovar(): Promise<Sessao | null> {
+  renovacaoEmAndamento ??= (async () => {
+    try {
+      return (await (await postJson('/api/auth/refresh')).json()) as Sessao
+    } catch (erro) {
+      if (erro instanceof ErroDeApi && erro.status !== 0) return null
+      throw erro
+    } finally {
+      renovacaoEmAndamento = null
+    }
+  })()
+  return renovacaoEmAndamento
 }
 
 export async function sair(): Promise<void> {

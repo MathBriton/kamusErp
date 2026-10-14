@@ -39,6 +39,7 @@ cd src/admin && npm install && npm run dev   # Painel Administrativo em http://l
 
 **Painel Administrativo** (operador do SaaS, http://localhost:5174): `superadmin@kamus.local`, senha `Kamus@Admin123`.
 Lá você registra pagamentos (o cliente é liberado na hora), cria clientes, cancela/reativa licenças e ajusta valor e carência.
+Usuário criado em Configurações → Usuários recebe uma **senha provisória** e precisa trocá-la no primeiro acesso.
 Para ver a tela de bloqueio no web do cliente: cancele a licença da "Loja Demo" no painel e recarregue o web; reative para voltar.
 
 Sem banco, os dados ficam **em memória**: são recriados a cada vez que a API sobe e somem quando ela para.
@@ -55,6 +56,7 @@ Sem banco, os dados ficam **em memória**: são recriados a cada vez que a API s
 | Pesquisa global | `GET /api/busca?q=...` · **Ctrl+K** na aplicação web |
 | Exportação | `GET /api/relatorios/historico-de-alteracoes.pdf` (ou `.xlsx`, `.csv`) · botão **Exportar** no histórico |
 | Licença do cliente | `GET /api/licenca` e `/api/licenca/pagamentos` · tela em Configurações → Licença e assinatura |
+| Empresas e usuários | `/api/empresas`, `/api/usuarios`, `POST /api/auth/trocar-senha` · Configurações → Empresas / Usuários e permissões (perfil Dono) |
 | Painel Administrativo | http://localhost:5174 · API em `/admin-api/*` (token próprio) |
 | Versão | http://localhost:5249/api/versao |
 | Requisições prontas | [`src/backend/Kamus.Api/Kamus.Api.http`](src/backend/Kamus.Api/Kamus.Api.http) (VS Code com REST Client, Visual Studio, Rider) |
@@ -139,7 +141,9 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 17 | Avisos de vencimento: 7, 3, 1 e 0 dias antes, na carência e na suspensão, só para os Donos — está bom? | Provisório |
 | 18 | Cobrança automática (Pix/boleto com baixa automática) ou registro manual no painel? | Provisório: **manual**; gateway depois |
 | 19 | E-mail/WhatsApp de suporte exibido na tela de bloqueio | Provisório: `suporte@kamus.com.br` (fictício) |
-| 20 | Cliente criado no painel recebe senha provisória: obrigar troca no primeiro acesso? | Em aberto (hoje não obriga) |
+| 20 | Cliente criado no painel recebe senha provisória: obrigar troca no primeiro acesso? | Provisório e implementado (v0.7.0): **sim**, para todo usuário com senha provisória |
+| 21 | Gerente pode cadastrar/desativar usuários (ex.: vendedores da própria empresa)? | Provisório: **não**, só o Dono |
+| 22 | "Loja" é diferente de "empresa (CNPJ)"? Ex.: duas lojas no mesmo CNPJ | Provisório: loja = local de estoque, cadastrado no Estoque (v0.11.0) |
 
 ### Débitos técnicos
 
@@ -159,7 +163,9 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Limites de CNPJs/lojas/usuários **não são aplicados** | O cliente pode cadastrar acima do limite | Quando houver cadastro de empresas/usuários (v0.7.0) |
 | Cache da licença por instância (1 min) e rotina de avisos em cada instância | Com várias instâncias: até 1 min para bloquear/liberar nas outras; avisos podem duplicar | Ao escalar (cache distribuído / rotina única) |
 | Cliente **sem licença cadastrada não é bloqueado** | Um tenant criado fora do painel usa sem cobrança | Ao ir para produção: criar licença para todos os tenants existentes |
-| Senha provisória do cliente novo não exige troca no primeiro acesso | O operador conhece a senha do Dono | Com a tela de "trocar senha" |
+| Renovação de sessão simultânea em duas abas é tratada como roubo de token e encerra as sessões | O usuário pode ser deslogado ao abrir várias abas ao mesmo tempo (na mesma aba já foi resolvido no web) | Aceitar o token anterior por alguns segundos após a troca |
+| Limite de **lojas** ainda não aplicado | Depende do cadastro de lojas/locais | v0.11.0 (Estoque) |
+| Sem "esqueci minha senha" por e-mail | Quem esquece depende do Dono redefinir | Quando houver envio de e-mail |
 
 ## Multi-tenancy em uma frase
 

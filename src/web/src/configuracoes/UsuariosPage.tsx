@@ -98,7 +98,7 @@ export function UsuariosPage() {
                     {!u.ativo ? (
                       <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted">Inativo</span>
                     ) : u.deveTrocarSenha ? (
-                      <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning">Aguardando 1º acesso</span>
+                      <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-warning">Aguardando 1º acesso</span>
                     ) : (
                       <span className="rounded-full bg-success-soft px-2 py-0.5 text-xs font-semibold text-success">Ativo</span>
                     )}

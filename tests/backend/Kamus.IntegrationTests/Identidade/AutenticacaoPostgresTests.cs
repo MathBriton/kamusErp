@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using Kamus.IntegrationTests.Infra;
+using Kamus.SharedKernel.Clientes;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 
 namespace Kamus.IntegrationTests.Identidade;
@@ -103,8 +105,18 @@ public sealed class AutenticacaoPostgresTests(PostgresFixture db)
     {
         db.ExigirBanco();
         await using var api = CriarApi();
+        // Cliente próprio do teste: o banco é compartilhado e os outros testes contam as empresas da Loja Demo.
+        await using (var escopo = api.Services.CreateAsyncScope())
+            (await escopo.ServiceProvider.GetRequiredService<ICadastroDeClientes>().CriarAsync(new NovoCliente(
+                "Cliente Gestão", "Gestão Moda LTDA", "Gestão Moda", "11.222.333/0001-81", "Dona Gestão", "dona@gestao.com", SenhaDemo), Ct))
+                .TenantId.ShouldNotBeNull();
         using var admin = api.CreateClient();
-        var login = await admin.PostAsJsonAsync(new Uri("/api/auth/login", UriKind.Relative), new { email = "admin@kamus.local", senha = SenhaDemo }, Ct);
+        var login = await admin.PostAsJsonAsync(new Uri("/api/auth/login", UriKind.Relative), new { email = "dona@gestao.com", senha = SenhaDemo }, Ct);
+        var provisoria = (await login.Content.ReadFromJsonAsync<SessaoComEmpresasDto>(Ct))!;
+        admin.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", provisoria.AccessToken);
+        (await admin.PostAsJsonAsync(new Uri("/api/auth/trocar-senha", UriKind.Relative), new { senhaAtual = SenhaDemo, novaSenha = "GestaoModa2026" }, Ct))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        login = await admin.PostAsJsonAsync(new Uri("/api/auth/login", UriKind.Relative), new { email = "dona@gestao.com", senha = "GestaoModa2026" }, Ct);
         var sessao = (await login.Content.ReadFromJsonAsync<SessaoComEmpresasDto>(Ct))!;
         admin.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", sessao.AccessToken);
         admin.DefaultRequestHeaders.Add("X-Empresa-Id", sessao.Empresas[0].Id.ToString());

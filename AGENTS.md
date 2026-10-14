@@ -181,41 +181,34 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 
 **Última atualização:** 2026-10-14
 
-**Releases:** v0.1.0 → **v0.5.0** lançadas. Na `main`, pronto para a próxima release (**v0.6.0**): licenciamento e
-Painel Administrativo.
+**Releases:** v0.1.0 → **v0.6.0** lançadas. Na `main`, pronto para a próxima release (**v0.7.0**): empresas e usuários.
+O plano de releases da fase 1 foi dividido (ver `LEVANTAMENTO.md` → Plano de releases).
 
 **O que existe hoje:**
 - Login (JWT 15 min + refresh rotativo em cookie HttpOnly `kamus_refresh`, bloqueio após 5 falhas, 10 logins/min
   por IP). Seeds (só Development): `admin@kamus.local` (Dono nos 2 CNPJs) e `vendedor@kamus.local` (Vendedor no
-  CNPJ Centro), senha `Kamus@Dev123`, com notificações de boas-vindas.
-- Empresa ativa: header `X-Empresa-Id` validado em `EmpresaAtivaMiddleware`; `IEmpresaAtiva` traz id, perfil,
-  nome e CNPJ. `GET /api/empresas/ativa`.
-- Histórico de alterações automático, eventos de segurança e de exportação, `GET /api/auditoria` (Dono/Gerente).
-- Notificações por usuário com SignalR (`/hubs/notificacoes`), sininho no web.
-- Pesquisa global `GET /api/busca` + Ctrl+K.
-- Exportação `GET /api/relatorios/{codigo}.{formato}` (pdf, xlsx, csv), segundo plano acima de `Relatorios:LimiteSincrono`.
-- **Licenciamento (v0.6.0):** `Licenca` por tenant (estado calculado pelas datas: Trial, Ativa, Carencia, Suspensa,
-  Cancelada) e `Pagamento`. `GET /api/licenca` e `/api/licenca/pagamentos` (Dono). `LicencaMiddleware` responde 402 com
-  `codigo` para suspensa/cancelada, deixando livres login, licença, notificações, empresas e relatórios. Rotina horária
-  (`RotinaDeVencimentos` → `VerificadorDeVencimentos`) avisa os Donos uma única vez por marco. Seed dá à Loja Demo uma
-  licença Ativa (~3 semanas) com um pagamento.
-- **Web do cliente:** `LicencaProvider` (consulta ao entrar, a cada 5 min e em qualquer 402), banner de carência /
-  vencimento próximo, `TelaDeBloqueio` (verificar novamente, suporte, exportar), Configurações → Licença e assinatura.
-- **Painel Administrativo:** API em `/admin-api` no mesmo processo (esquema "Admin", `Admin:Chave`, filtro por IP),
-  SuperAdmin `superadmin@kamus.local` / `Kamus@Admin123` em Development (produção: `Admin:EmailInicial`/`SenhaInicial`).
-  Resumo, clientes, detalhe, novo cliente (senha provisória), registrar pagamento (libera na hora + avisa Donos),
-  cancelar/reativar, valor/carência/limites, registro somente-inclusão das ações. Web em `src/admin` (porta 5174, âmbar),
-  `admin-ci`, imagem `kamus-admin` na release, serviço `admin` no docker-compose.
-- Testes: 178 backend (unit + integração InMemory/PostgreSQL + arquitetura), 71 web, 10 admin. E2E manual em localhost
-  (painel cancela → cliente bloqueado → pagamento libera na hora → notificação) feito com Playwright.
+  CNPJ Centro), senha `Kamus@Dev123`. No web, `renovar()` compartilha a chamada em andamento (o refresh é de uso único).
+- Empresa ativa: header `X-Empresa-Id` validado em `EmpresaAtivaMiddleware`; `IEmpresaAtiva` traz id, perfil, nome e CNPJ.
+- Histórico de alterações, notificações (SignalR), pesquisa global, exportação PDF/Excel/CSV.
+- Licenciamento (`/api/licenca`, bloqueio 402, avisos) e Painel Administrativo (`/admin-api` + `src/admin`).
+- **v0.7.0 — Empresas e usuários (perfil Dono):** `/api/empresas` (listar, cadastrar — quem cadastra vira Dono —,
+  editar sem mudar CNPJ) e `/api/usuarios` (listar com perfis por empresa, cadastrar com senha provisória, editar
+  perfis, desativar/reativar, redefinir senha). Senha provisória → claim `trocar_senha` → `SenhaProvisoriaMiddleware`
+  responde 403 `TROCAR_SENHA` (só `/api/auth/*` passa) até `POST /api/auth/trocar-senha`. `PoliticaDeSenha` (8+, letras
+  e números). Limites da licença via `ILimitesDoCliente` (SharedKernel, implementado pelo Licenciamento): 409
+  `LIMITE_DA_LICENCA`. Sempre sobra um Dono ativo. Web: tela "Crie sua senha", "Trocar senha" no menu do usuário,
+  Configurações → Empresas e Usuários e permissões. Migration `SenhaProvisoria` (coluna `deve_trocar_senha`).
+- Testes: 206 backend, 85 web, 10 admin. E2E em localhost com Playwright (empresa nova, usuário com senha provisória,
+  troca obrigatória, desativação, limite de CNPJs pelo painel).
 
-**Próximo passo — v0.7.0: Cadastros** (ver `LEVANTAMENTO.md` 4.1 e 4.7):
-1. Empresas e lojas (cadastro/edição; aplicar `LimiteDeCnpjs`/`LimiteDeLojas` da licença).
-2. Usuários e perfis por empresa (convite, ativar/desativar, troca de senha — inclusive a provisória; aplicar `LimiteDeUsuarios`).
-3. Ficha do cliente (4.7.5), fornecedores, vendedores.
-4. Produtos com grade cor × tamanho (4.1.1), SKU/EAN, etiquetas; provedor de busca e relatório exportável.
-5. Importação por planilha (4.7.4).
-Antes, confirmar com o dono as dúvidas do README (seção "Dúvidas em aberto"), principalmente 1–5 e 15–20.
+**Próximo passo — v0.8.0: ficha do cliente, fornecedores e vendedores** (ver `LEVANTAMENTO.md` 4.1, 4.7.5 e 4.7.9):
+1. Módulo novo `Cadastros` (schema `cadastros`, RLS) com `Pessoa` (física/jurídica, CPF/CNPJ opcional no cliente) e papéis
+   cliente/fornecedor; contatos, endereço, observações; ficha do cliente com preferências (tamanhos, cores) e consentimento
+   LGPD (opt-in de marketing com data); aniversariantes.
+2. Vendedores: cadastro simples (com ou sem usuário vinculado) e % de comissão padrão.
+3. Provedor de busca (clientes/fornecedores) e relatório exportável (lista de clientes, aniversariantes).
+4. Telas no web (Cadastros → Clientes, Fornecedores, Vendedores) com WhatsApp em 1 clique.
+Antes, vale confirmar com o dono as dúvidas do README (1–5, 15–22).
 
 **Pendências conhecidas:** ver "Dúvidas em aberto e débitos técnicos" no `README.md` (lista viva — acrescente lá).
 Também: branch órfã `release-please--branches--main--components--kamus` no GitHub (pode ser apagada pela interface).
