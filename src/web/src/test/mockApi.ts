@@ -45,3 +45,12 @@ export function empresaAtivaHandler(sessao = sessaoDemo) {
     return empresa ? json({ consolidado: false, empresas: [resumo(empresa)] }) : problema(403, 'Você não tem acesso a esta empresa.')
   }
 }
+
+export const notificacoesDemo = {
+  naoLidas: 2,
+  itens: [
+    { id: 'n1', tipo: 'usuario_bloqueado', titulo: 'Usuário bloqueado por tentativas de acesso', mensagem: 'vendedor@kamus.local bloqueado por 15 minutos', link: '/configuracoes/historico', empresaId: null, criadaEm: new Date(Date.now() - 5 * 60_000).toISOString(), lidaEm: null },
+    { id: 'n2', tipo: 'boas_vindas', titulo: 'Bem-vindo ao Kamus', mensagem: 'Ambiente de demonstração', link: '/', empresaId: null, criadaEm: new Date(Date.now() - 3600_000).toISOString(), lidaEm: null },
+    { id: 'n3', tipo: 'historico', titulo: 'Notificação antiga já lida', mensagem: 'Lida ontem', link: null, empresaId: null, criadaEm: new Date(Date.now() - 86_400_000).toISOString(), lidaEm: new Date().toISOString() },
+  ],
+}

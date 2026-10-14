@@ -16,11 +16,13 @@ const itemBase = 'flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm font-m
 export function Sidebar({ menu, recolhido, onAlternarRecolhido, onNavegar }: Props) {
   const { pathname } = useLocation()
   const grupoDaRota = menu.find((g) => g.itens?.some((i) => pathname.startsWith(i.rota)))?.titulo
-  const [abertos, setAbertos] = useState<Set<string>>(() => new Set(grupoDaRota ? [grupoDaRota] : []))
+  const [alternados, setAlternados] = useState<Set<string>>(new Set())
+  // O grupo da página atual abre sozinho (inclusive ao chegar por link/notificação); o usuário pode fechá-lo.
+  const estaAberto = (titulo: string) => (titulo === grupoDaRota) !== alternados.has(titulo)
 
   const alternarGrupo = (titulo: string) => {
     if (recolhido) onAlternarRecolhido()
-    setAbertos((atual) => {
+    setAlternados((atual) => {
       const novo = new Set(atual)
       if (novo.has(titulo)) novo.delete(titulo)
       else novo.add(titulo)
@@ -51,7 +53,7 @@ export function Sidebar({ menu, recolhido, onAlternarRecolhido, onNavegar }: Pro
               <button
                 type="button"
                 onClick={() => alternarGrupo(grupo.titulo)}
-                aria-expanded={abertos.has(grupo.titulo)}
+                aria-expanded={estaAberto(grupo.titulo)}
                 title={recolhido ? grupo.titulo : undefined}
                 className={`${itemBase} w-full ${grupoDaRota === grupo.titulo ? 'text-foreground' : 'text-muted'} hover:bg-surface-2 hover:text-foreground ${recolhido ? 'justify-center' : ''}`}
               >
@@ -59,11 +61,11 @@ export function Sidebar({ menu, recolhido, onAlternarRecolhido, onNavegar }: Pro
                 {!recolhido && (
                   <>
                     <span className="flex-1 text-left">{grupo.titulo}</span>
-                    <Icone nome={abertos.has(grupo.titulo) ? 'chevronDown' : 'chevronRight'} className="size-4" />
+                    <Icone nome={estaAberto(grupo.titulo) ? 'chevronDown' : 'chevronRight'} className="size-4" />
                   </>
                 )}
               </button>
-              {!recolhido && abertos.has(grupo.titulo) && (
+              {!recolhido && estaAberto(grupo.titulo) && (
                 <div className="mt-0.5 mb-1 ml-[22px] space-y-0.5 border-l border-border pl-3">
                   {grupo.itens.map((item) => (
                     <NavLink key={item.rota} to={item.rota} onClick={onNavegar} className={classeLink}>

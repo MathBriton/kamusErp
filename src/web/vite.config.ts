@@ -13,6 +13,7 @@ export default defineConfig({
     proxy: {
       '/api': apiUrl,
       '/health': apiUrl,
+      '/hubs': { target: apiUrl, ws: true },
     },
   },
   test: {

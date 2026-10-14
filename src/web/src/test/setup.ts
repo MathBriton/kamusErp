@@ -1,9 +1,14 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
+import { limparSignalr } from './signalrFake'
+
+// Nenhum teste abre conexão real de tempo real.
+vi.mock('@microsoft/signalr', () => import('./signalrFake'))
 
 afterEach(() => {
   cleanup()
+  limparSignalr()
   localStorage.clear()
   document.documentElement.className = ''
   vi.restoreAllMocks()

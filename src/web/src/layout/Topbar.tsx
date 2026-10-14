@@ -1,6 +1,5 @@
-import { useRef, useState } from 'react'
 import { Icone } from '../components/Icone'
-import { useFecharAoClicarFora } from '../components/useFecharAoClicarFora'
+import { Sino } from '../notificacoes/Sino'
 import { useTheme } from '../theme/ThemeContext'
 import type { ThemePreference } from '../theme/theme'
 import { MenuUsuario } from './MenuUsuario'
@@ -17,9 +16,6 @@ interface Props {
 
 export function Topbar({ usuario, onAbrirMenu }: Props) {
   const { preference, setPreference } = useTheme()
-  const [notificacoesAbertas, setNotificacoesAbertas] = useState(false)
-  const refNotificacoes = useRef<HTMLDivElement>(null)
-  useFecharAoClicarFora(refNotificacoes, notificacoesAbertas, () => setNotificacoesAbertas(false))
 
   const botaoIcone = 'grid size-10 place-items-center rounded-lg border border-border bg-surface text-muted hover:text-foreground'
 
@@ -44,25 +40,7 @@ export function Topbar({ usuario, onAbrirMenu }: Props) {
       <div className="ml-auto flex items-center gap-2">
         <SeletorEmpresa />
 
-        <div ref={refNotificacoes} className="relative">
-          <button
-            type="button"
-            onClick={() => setNotificacoesAbertas((v) => !v)}
-            aria-label="Notificações"
-            aria-expanded={notificacoesAbertas}
-            className={botaoIcone}
-          >
-            <Icone nome="bell" />
-          </button>
-          {notificacoesAbertas && (
-            <div className="absolute right-0 z-30 mt-2 w-80 rounded-xl border border-border bg-surface p-4 shadow-lg">
-              <p className="font-semibold">Notificações</p>
-              <p className="mt-3 text-sm text-muted">
-                Nenhuma notificação por enquanto. Alertas de estoque, contas e relatórios em tempo real chegam na v0.4.0.
-              </p>
-            </div>
-          )}
-        </div>
+        <Sino />
 
         <button
           type="button"

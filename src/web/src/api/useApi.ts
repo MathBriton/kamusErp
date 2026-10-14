@@ -20,5 +20,16 @@ export function useApi() {
     [token, selecao],
   )
 
-  return { getJson }
+  const post = useCallback(
+    async (caminho: string, signal?: AbortSignal): Promise<void> => {
+      await chamar(caminho, {
+        method: 'POST',
+        signal,
+        headers: { Authorization: `Bearer ${token}`, 'X-Empresa-Id': selecao },
+      })
+    },
+    [token, selecao],
+  )
+
+  return { getJson, post }
 }
