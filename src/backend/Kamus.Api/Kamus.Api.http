@@ -250,3 +250,67 @@ Maria Silva;529.982.247-25;(13) 99876-5432;Santos;SP
 POST {{api}}/api/importacoes/{{validacao.response.body.id}}/confirmar
 Authorization: Bearer {{login.response.body.accessToken}}
 X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### ---------- Estoque ----------
+
+### Lojas da empresa ativa (a primeira é criada no primeiro acesso)
+# @name lojas
+GET {{api}}/api/estoque/lojas
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Nova loja (Dono; respeita o limite de lojas do plano)
+POST {{api}}/api/estoque/lojas
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "nome": "Depósito" }
+
+### Entrada de mercadoria (custo vazio = custo do cadastro do produto)
+POST {{api}}/api/estoque/entradas
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{
+  "lojaId": "{{lojas.response.body.$[0].id}}",
+  "documento": "NF 1234",
+  "itens": [{ "skuId": "COLE-O-ID-DO-SKU", "quantidade": 5, "custoUnitario": 25.00 }]
+}
+
+### Ajuste (negativo baixa; motivo: Perda, Avaria, Furto, Correcao ou Outro)
+POST {{api}}/api/estoque/ajustes
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "lojaId": "{{lojas.response.body.$[0].id}}", "motivo": "Avaria", "itens": [{ "skuId": "COLE-O-ID-DO-SKU", "quantidade": -1 }] }
+
+### Transferência entre lojas da mesma empresa
+POST {{api}}/api/estoque/transferencias
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "origemId": "{{lojas.response.body.$[0].id}}", "destinoId": "ID-DA-OUTRA-LOJA", "itens": [{ "skuId": "COLE-O-ID-DO-SKU", "quantidade": 2 }] }
+
+### Posição por produto (filtros: lojaId, busca)
+GET {{api}}/api/estoque/posicao
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Matriz cor × tamanho de um produto
+GET {{api}}/api/estoque/posicao/COLE-O-ID-DO-PRODUTO
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Kardex de um SKU (ou ?produtoId=)
+GET {{api}}/api/estoque/kardex?skuId=COLE-O-ID-DO-SKU
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Modelo da planilha de estoque inicial
+GET {{api}}/api/importacoes/estoque-inicial/modelo.xlsx
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}

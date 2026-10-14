@@ -75,11 +75,13 @@ src/backend/Shared/Kamus.Infrastructure       KamusDbContext (isolamento por ten
 src/backend/Shared/Kamus.Infrastructure/Auditoria  Histórico de alterações (interceptor, schema auditoria, /api/auditoria)
 src/backend/Shared/Kamus.Infrastructure/Busca      Pesquisa global (/api/busca) — junta os IProvedorDeBusca dos módulos
 src/backend/Shared/Kamus.Infrastructure/Relatorios Exportação PDF/Excel/CSV (/api/relatorios/{codigo}.{formato}) + segundo plano
-src/backend/Shared/Kamus.Infrastructure/Planilhas  Leitura de .xlsx/.csv (LeitorDePlanilha) e modelos de importação (ModeloDePlanilha)
+src/backend/Shared/Kamus.Infrastructure/Planilhas  Leitura de .xlsx/.csv (LeitorDePlanilha, ValoresDaPlanilha) e modelos (ModeloDePlanilha)
+src/backend/Shared/Kamus.Infrastructure/Importacao Importação genérica (/api/importacoes): IImportador, sessões, confirmação e segundo plano
 src/backend/Modules/Identidade/...            Módulo Identidade: Dominio/, Aplicacao/, Persistencia/, Endpoints/, Busca/, Seed/
 src/backend/Modules/Notificacoes/...          Módulo Notificacoes: notificações por usuário + SignalR (/hubs/notificacoes)
 src/backend/Modules/Licenciamento/...         Licença por cliente (/api/licenca, bloqueio 402, avisos) + API do Painel (Administracao/, /admin-api)
-src/backend/Modules/Cadastros/...             Clientes/fornecedores (/api/pessoas), vendedores, grades, cores e produtos com SKUs (/api/produtos)
+src/backend/Modules/Cadastros/...             Clientes/fornecedores (/api/pessoas), vendedores, grades, cores e produtos com SKUs (/api/produtos); ICatalogoDeProdutos
+src/backend/Modules/Estoque/...               Lojas, saldos, movimentos/kardex, custo médio (/api/estoque/...), estoque inicial por planilha
 src/web/src                                   auth/, api/, busca/, cadastros/, configuracoes/, empresa/, layout/, licenca/, navegacao/, notificacoes/, pages/, relatorios/, theme/, test/
 src/admin/src                                 Painel Administrativo (operador do SaaS): login SuperAdmin, clientes, pagamentos
 tests/backend/Kamus.UnitTests                 Unitários (domínio puro)
@@ -92,7 +94,8 @@ docs/                                         mockups, RELEASES.md
 Novo módulo = `src/backend/Modules/<Nome>/Kamus.Modules.<Nome>` com as mesmas pastas, um `DbContext`
 próprio herdando de `KamusDbContext` registrado com `AddKamusDbContext<T>(config, schema)` (isso já liga
 auditoria, RLS e registra as migrations para `AplicarMigracoesKamusAsync`), schema próprio,
-`AddModulo<Nome>()` / `MapModulo<Nome>()` chamados no `Program.cs`. Para aparecer na pesquisa global,
+`AddModulo<Nome>()` / `MapModulo<Nome>()` chamados no `Program.cs`. Para importar por planilha, registre um `IImportador`
+(`Kamus.Infrastructure.Importacao`; recebe `ContextoDaImportacao` com usuário e empresa). Para aparecer na pesquisa global,
 registre um `IProvedorDeBusca`. Para ter relatório exportável, registre um `IRelatorio` (código, título,
 perfis e `GerarAsync` devolvendo `DadosDoRelatorio`) e use `<BotaoExportar relatorio="codigo" parametros={filtros}/>`
 na tela — PDF, Excel, CSV, histórico e segundo plano vêm de graça. **Lembre de adicionar o `.csproj` novo no `src/backend/Kamus.Api/Dockerfile`**
@@ -100,7 +103,7 @@ na tela — PDF, Excel, CSV, histórico e segundo plano vêm de graça. **Lembre
 
 **Módulos conversam só pelo SharedKernel** (há teste de arquitetura): `INotificador` (notificar usuários),
 `IRegistradorDeEventos` (eventos no histórico), `IProvedorDeBusca`, `IRelatorio`, `IEmpresaAtiva`
-(id, perfil, nome e CNPJ da empresa ativa), `IUsuarioAtual`, `IDiretorioDeClientes` (tenants e Donos) e
+(id, perfil, nome e CNPJ da empresa ativa), `IUsuarioAtual`, `ICatalogoDeProdutos` (produtos/SKUs, implementado pelo Cadastros), `IDiretorioDeClientes` (tenants e Donos) e
 `ICadastroDeClientes` (criar tenant + empresa + Dono) — esses dois implementados pela Identidade.
 Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e chame `TenantContext.Definir(tenantId)`.
 
@@ -183,38 +186,32 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 
 **Última atualização:** 2026-10-14
 
-**Releases:** v0.1.0 → **v0.10.0** lançadas (a v0.10.0 trouxe a importação por planilha e encerrou a fase 1, cadastros). Próxima: **v0.11.0** (estoque).
-Plano de releases em `LEVANTAMENTO.md` → Plano de releases.
+**Releases:** v0.1.0 → v0.10.0 lançadas; **v0.11.0 (estoque, parte 1)** pronta para lançar. Próxima: **v0.12.0** (XML da NF-e, inventário, etiquetas).
+Plano de releases em `LEVANTAMENTO.md` → Plano de releases (renumerado: financeiro v0.13.0, vendas v0.14.0, crediário v0.15.0, dashboard v0.16.0).
 
 **O que existe hoje:**
-- Fundação: login (JWT + refresh rotativo; o web compartilha renovações simultâneas), empresa ativa (`X-Empresa-Id`),
-  histórico de alterações, notificações (SignalR), pesquisa global, exportação PDF/Excel/CSV.
-- Licenciamento (`/api/licenca`, 402, avisos) e Painel Administrativo (`/admin-api` + `src/admin`).
-- v0.7.0: `/api/empresas` e `/api/usuarios` (Dono), senha provisória (403 `TROCAR_SENHA`), limites do plano (409 `LIMITE_DA_LICENCA`).
-- v0.8.0: `Pessoa` cliente/fornecedor (`/api/pessoas`, aniversariantes, LGPD), `/api/vendedores`.
-- v0.9.0: grades, cores, produtos com SKUs (cor × tamanho) e códigos de barras (`/api/produtos`).
-- **v0.10.0 — importação por planilha:**
-  - `Kamus.Infrastructure.Planilhas`: `LeitorDePlanilha.Ler(stream, nome)` (.xlsx 1ª aba ou .csv `;`/`,`; cabeçalho normalizado
-    sem acento/pontuação — "CPF/CNPJ" → `cpfcnpj`; números invariantes, datas aaaa-mm-dd; linhas numeradas como no Excel; máx.
-    5.000) e `ModeloDePlanilha.Gerar` (aba Dados com exemplo + aba Instruções).
-  - `Cadastros/Importacao`: `IImportador` (Tipo, Perfis, Colunas, `ValidarAsync` sem gravar, `ImportarAsync` revalida e grava
-    só as válidas) com `ImportadorDeClientes`/`ImportadorDeFornecedores` (casam por documento → telefone → nome; células vazias
-    mantêm dados) e `ImportadorDeProdutos` (uma linha por SKU; cores novas criadas; produto novo desativa combinações
-    ausentes). `SessoesDeImportacao` guarda a planilha validada por 30 min (uso único, mesmo usuário/tenant).
-  - Endpoints `/api/importacoes/{tipo}/modelo.xlsx`, `/{tipo}/validar` (multipart `arquivo`, `DisableAntiforgery`),
-    `/{id}/confirmar` (200 com contagens; 202 + sininho `importacao_concluida` acima de `Importacao:LimiteSincrono`, padrão 500).
-  - Web: `cadastros/ImportacaoPage.tsx` (tipo → modelo → enviar → prévia com erros primeiro → importar),
-    `relatorios/salvarArquivo.ts`, `useApi().enviarArquivo` e `postarComStatus`.
-- Testes: 314 backend, 111 web, 10 admin. E2E em localhost: baixar o modelo, enviar de volta, prévia e importação
-  (clientes e produtos), 3 execuções seguidas.
+- Fundação: login (JWT + refresh rotativo), empresa ativa (`X-Empresa-Id`), histórico de alterações, notificações (SignalR),
+  pesquisa global, exportação PDF/Excel/CSV, licenciamento + Painel Administrativo (`/admin-api`, `src/admin`).
+- v0.7.0–v0.10.0: empresas e usuários (Dono, limites do plano), pessoas, vendedores, grades/cores/produtos com SKUs,
+  importação por planilha (agora genérica em `Kamus.Infrastructure.Importacao`: tipos clientes, fornecedores, produtos, estoque-inicial).
+- **v0.11.0 — estoque (módulo `Kamus.Modules.Estoque`, schema `estoque`, RLS em lojas/saldos/movimentos):**
+  - `Loja` (por empresa; a 1ª nasce no primeiro acesso com o nome fantasia; Dono cria/renomeia/desativa; `LimiteDeLojas` → 409).
+  - `SaldoDeEstoque` (loja × SKU, custo médio ponderado 4 casas, `Versao` = concorrência) e `MovimentoDeEstoque` (kardex imutável,
+    `Sequencia` desempata dentro da operação). Movimentos manuais não deixam saldo negativo (409 `ESTOQUE_INSUFICIENTE`).
+  - Endpoints `/api/estoque/lojas`, `/entradas`, `/ajustes` (motivo; evento `ajuste_de_estoque` no histórico), `/transferencias`
+    (mesma empresa), `/posicao`, `/posicao/{produtoId}` (matriz + total por loja), `/kardex`. Custos só para Dono/Gerente/Estoquista/Financeiro.
+  - Relatório `posicao-de-estoque`; importador `estoque-inicial` (quantidade absoluta por SKU e loja).
+  - `ICatalogoDeProdutos` (SharedKernel) para outros módulos lerem produto/SKUs sem depender do Cadastros.
+  - Web: `estoque/` — PosicaoPage (matriz + kardex), MovimentacaoPage (entrada/ajuste/transferência digitando na grade, lista de itens),
+    LojasPage (Configurações → Lojas), MatrizDeEstoque (leitura e digitação), `?tipo=estoque-inicial` na importação.
+- Testes: 361 backend, 120 web, 10 admin. E2E em localhost (lojas, 2 entradas com custo médio, ajuste, transferência, erro de saldo,
+  posição/matriz/kardex, estoque inicial por CSV, modo escuro), 3 execuções seguidas.
 
-**Próximo passo — v0.11.0: estoque** (ver `LEVANTAMENTO.md` 4.2 e 4.7.4 XML):
-1. Lojas/locais de estoque por empresa (aplicar `LimiteDeLojas`); saldo por SKU e local.
-2. Movimentações (entrada, saída, ajuste com motivo, transferência entre lojas), custo médio, kardex.
-3. Entrada de mercadoria digitando na matriz cor × tamanho; importação de XML da NF-e (fornecedor pelo CNPJ, de-para
-   memorizado, contas a pagar ficam para o financeiro).
-4. Estoque inicial por planilha (novo `IImportador`), posição de estoque em matriz, etiquetas (PDF), inventário.
-Talvez dividir em duas releases (movimentação/posição e depois XML/inventário/etiquetas).
+**Próximo passo — v0.12.0: estoque, parte 2** (ver `LEVANTAMENTO.md` 4.2 e 4.7.4 XML):
+1. Importação do XML da NF-e de entrada: fornecedor pelo CNPJ, de-para (código do fornecedor → SKU) memorizado, gera entrada
+   (contas a pagar ficam para o financeiro).
+2. Inventário: foto do saldo, contagem (digitação na matriz / leitor), comparação, aprovação, ajuste pela diferença.
+3. Etiquetas em PDF (código de barras, cor, tamanho, preço), quantidade = recebida na entrada.
 
 **Pendências conhecidas:** ver "Dúvidas em aberto e débitos técnicos" no `README.md` (lista viva — acrescente lá).
 Também: branch órfã `release-please--branches--main--components--kamus` no GitHub (pode ser apagada pela interface).

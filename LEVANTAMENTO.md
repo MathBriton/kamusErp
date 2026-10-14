@@ -670,11 +670,12 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.8.0 | 1 | Ficha do cliente, fornecedores e vendedores | ✅ lançada |
 | v0.9.0 | 1 | Produtos com grade (cor × tamanho), SKUs, códigos de barras internos | ✅ lançada |
 | v0.10.0 | 1 | Importação por planilha | ✅ lançada |
-| v0.11.0 | 2 | Estoque (lojas/locais de estoque + importação de XML da NF-e) | ⏳ |
-| v0.12.0 | 3 | Financeiro | ⏳ |
-| v0.13.0 | 4 | Vendas (registro, troca e vale-troca, comissão) | ⏳ |
-| v0.14.0 | 5 | Crediário e condicional | ⏳ |
-| v0.15.0 | 6 | Dashboard real, app mobile, resumo diário | ⏳ |
+| v0.11.0 | 2 | Estoque: lojas, saldo por SKU, entrada/ajuste/transferência, custo médio, kardex, posição em matriz, estoque inicial por planilha | ✅ pronta |
+| v0.12.0 | 2 | Estoque: importação de XML da NF-e, inventário, etiquetas | ⏳ |
+| v0.13.0 | 3 | Financeiro | ⏳ |
+| v0.14.0 | 4 | Vendas (registro, troca e vale-troca, comissão) | ⏳ |
+| v0.15.0 | 5 | Crediário e condicional | ⏳ |
+| v0.16.0 | 6 | Dashboard real, app mobile, resumo diário | ⏳ |
 | v1.0.0 | 7 | Produção e primeira loja piloto | ⏳ depende de servidor |
 
 ---
@@ -816,3 +817,10 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | 2026-10-14 | Importação por planilha (.xlsx ou .csv) de clientes, fornecedores e produtos: validar é simulação (nada é gravado); confirmar importa só as linhas válidas; acima de 500 linhas roda em segundo plano com aviso no sininho. Máximo de 5.000 linhas e 5 MB por arquivo | Aceita |
 | 2026-10-14 | Reimportação segura: pessoas casadas por CPF/CNPJ, depois telefone, depois nome; produtos por referência + cor + tamanho. Célula vazia mantém o dado existente | Aceita |
 | 2026-10-14 | Produtos importados: cores inexistentes são criadas; grade precisa existir; em produto novo, combinações ausentes da planilha ficam desativadas; em produto existente, as ausentes não mudam | Aceita |
+| 2026-10-14 | Estoque dividido em duas releases: v0.11.0 (lojas, saldo, entrada/ajuste/transferência, custo médio, kardex, posição em matriz, estoque inicial por planilha) e v0.12.0 (XML da NF-e, inventário, etiquetas). Financeiro passa a v0.13.0, vendas v0.14.0, crediário/condicional v0.15.0, dashboard/mobile v0.16.0 | Aceita |
+| 2026-10-14 | Loja = local de estoque de uma empresa (CNPJ). A primeira loja nasce no primeiro acesso, com o nome fantasia; o Dono cria outras dentro do limite de lojas do plano | Aceita |
+| 2026-10-14 | Movimentos manuais (ajuste, transferência) não deixam o saldo negativo (409 com o disponível). "Permitir negativo com alerta" vale para a venda (v0.14.0) | Aceita (provisória) |
+| 2026-10-14 | Transferência só entre lojas da mesma empresa (entre CNPJs exige nota fiscal) | Aceita (provisória) |
+| 2026-10-14 | Custo médio ponderado com 4 casas; ajuste positivo e transferência entram pelo custo médio vigente; entrada sem custo usa o custo do cadastro do produto | Aceita |
+| 2026-10-14 | Estoque inicial por planilha define a quantidade **absoluta** por SKU e loja (reimportar corrige, não soma) e gera movimento "Estoque inicial" pela diferença | Aceita |
+| 2026-10-14 | Custos (custo médio, valor em custo, kardex) só para Dono, Gerente, Estoquista e Financeiro; Vendedor vê quantidades | Aceita (provisória) |
