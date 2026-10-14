@@ -20,7 +20,7 @@ internal abstract class RelatorioDePessoas(CadastrosDbContext db, IEmpresaAtiva 
 
         var linhas = pessoas.Select(p => (IReadOnlyList<object?>)
         [
-            p.Nome, p.NomeFantasia, p.DocumentoFormatado, p.Telefone, p.Email,
+            p.Nome, p.NomeFantasia, p.DocumentoFormatado, Dominio.Telefone.Formatar(p.Telefone), p.Email,
             p.Endereco.Cidade is null ? null : $"{p.Endereco.Cidade}/{p.Endereco.Uf}",
             p.DataNascimento, p.ConsentimentoMarketingEm is null ? "Não" : "Sim", p.Ativo ? "Ativo" : "Inativo",
         ]).ToList();

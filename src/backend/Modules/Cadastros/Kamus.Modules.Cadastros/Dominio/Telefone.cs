@@ -12,6 +12,10 @@ public static class Telefone
         return digitos.Length is 10 or 11 && digitos[0] != '0' ? digitos : null;
     }
 
+    /// <summary>"13998765432" → "(13) 99876-5432".</summary>
+    public static string? Formatar(string? telefone) =>
+        telefone is null ? null : $"({telefone[..2]}) {telefone[2..^4]}-{telefone[^4..]}";
+
     /// <summary>Número para links do WhatsApp (wa.me/55...).</summary>
     public static string? ParaWhatsApp(string? telefone) => telefone is null ? null : "55" + telefone;
 }

@@ -667,7 +667,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.5.0 | 0b | Exportação PDF/Excel/CSV (com geração em segundo plano) | ✅ lançada |
 | v0.6.0 | 0b | Licenciamento + Painel Administrativo | ✅ lançada |
 | v0.7.0 | 1 | Empresas (CNPJs) e usuários: perfis por empresa, senha provisória com troca obrigatória, limites do plano | ✅ lançada |
-| v0.8.0 | 1 | Ficha do cliente, fornecedores e vendedores | ⏳ |
+| v0.8.0 | 1 | Ficha do cliente, fornecedores e vendedores | ✅ pronta |
 | v0.9.0 | 1 | Produtos com grade (cor × tamanho), SKUs, códigos de barras internos | ⏳ |
 | v0.10.0 | 1 | Importação por planilha | ⏳ |
 | v0.11.0 | 2 | Estoque (lojas/locais de estoque + importação de XML da NF-e) | ⏳ |
@@ -805,3 +805,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | 2026-10-14 | Gestão de empresas e usuários só para o perfil Dono. Usuário novo (e Dono criado no Painel) recebe **senha provisória** exibida uma vez; o token marca `trocar_senha` e a API responde 403 `TROCAR_SENHA` até a troca. Senha: 8+ caracteres com letras e números | Aceita |
 | 2026-10-14 | Limites da licença aplicados: CNPJs no cadastro de empresa, usuários **ativos** no cadastro/reativação (409 `LIMITE_DA_LICENCA`). O limite de lojas espera o cadastro de lojas/locais de estoque (v0.11.0) | Aceita |
 | 2026-10-14 | O cliente sempre mantém pelo menos um Dono ativo; ninguém desativa o próprio usuário; CNPJ de empresa não muda depois de cadastrado | Aceita |
+| 2026-10-14 | Clientes e fornecedores são a mesma entidade **Pessoa** com papéis (uma pessoa pode ser os dois), pertencente ao cliente do SaaS (vale em todos os CNPJs). CPF/CNPJ opcional, único por cliente do SaaS | Aceita |
+| 2026-10-14 | Permissões: clientes (Dono, Gerente, Vendedor, Financeiro), fornecedores (Dono, Gerente, Estoquista, Financeiro), inativar (Dono, Gerente), anonimizar LGPD (Dono), vendedores (Dono e Gerente alteram; todos veem) | Aceita |
+| 2026-10-14 | LGPD: consentimento de marketing é opt-in com data registrada; anonimizar apaga dados pessoais e mantém o registro (para o histórico de vendas). Mensagem de aniversário só é oferecida a quem aceitou | Aceita |
+| 2026-10-14 | Endereço e preferências guardados como colunas da pessoa (o EF InMemory, usado em localhost, não consulta tipos complexos); o histórico registra cada campo (ex.: `EnderecoCidade`) | Aceita |

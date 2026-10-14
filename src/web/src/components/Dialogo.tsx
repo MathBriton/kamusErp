@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 
 /** Janela sobreposta centralizada. Esc ou clique fora fecham. */
-export function Dialogo({ titulo, onFechar, children }: { titulo: string; onFechar: () => void; children: ReactNode }) {
+export function Dialogo({ titulo, onFechar, largo = false, children }: { titulo: string; onFechar: () => void; largo?: boolean; children: ReactNode }) {
   useEffect(() => {
     const aoTeclar = (e: KeyboardEvent) => e.key === 'Escape' && onFechar()
     window.addEventListener('keydown', aoTeclar)
@@ -15,7 +15,7 @@ export function Dialogo({ titulo, onFechar, children }: { titulo: string; onFech
         role="dialog"
         aria-modal="true"
         aria-label={titulo}
-        className="relative max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-border bg-surface p-6 shadow-xl"
+        className={`relative max-h-[90dvh] w-full ${largo ? 'max-w-2xl' : 'max-w-lg'} overflow-y-auto rounded-2xl border border-border bg-surface p-6 shadow-xl`}
       >
         <header className="mb-4 flex items-start justify-between gap-4">
           <h2 className="text-lg font-bold">{titulo}</h2>

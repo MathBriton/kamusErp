@@ -146,7 +146,7 @@ export function PessoasPage({ papel }: { papel: Papel }) {
           )}
         </section>
 
-        {papel === 'cliente' && <Aniversariantes />}
+        {papel === 'cliente' && <Aniversariantes versao={versao} />}
       </div>
 
       {ficha && (
@@ -165,7 +165,8 @@ export function PessoasPage({ papel }: { papel: Papel }) {
   )
 }
 
-function Aniversariantes() {
+/** `versao` muda a cada cadastro salvo: a lista é recarregada. */
+function Aniversariantes({ versao }: { versao: number }) {
   const { getJson } = useApi()
   const [lista, setLista] = useState<Aniversariante[]>([])
 
@@ -175,7 +176,7 @@ function Aniversariantes() {
       .then(setLista)
       .catch(() => {})
     return () => controle.abort()
-  }, [getJson])
+  }, [getJson, versao])
 
   return (
     <section aria-label="Aniversariantes da semana" className="h-fit rounded-2xl border border-border bg-surface p-4 shadow-sm">

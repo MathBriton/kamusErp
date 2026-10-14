@@ -5,7 +5,7 @@ import { Campo } from '../components/Campo'
 import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
 import { useEmpresa } from '../empresa/EmpresaContext'
-import type { Papel, Pessoa } from './tipos'
+import { formatarTelefone, type Papel, type Pessoa } from './tipos'
 
 const vazio = (papel: Papel) => ({
   tipo: (papel === 'cliente' ? 'Fisica' : 'Juridica') as Pessoa['tipo'],
@@ -19,7 +19,7 @@ type Form = ReturnType<typeof vazio>
 
 const doCadastro = (p: Pessoa): Form => ({
   tipo: p.tipo, nome: p.nome, nomeFantasia: p.nomeFantasia ?? '', documento: p.documento ?? '', ehCliente: p.ehCliente, ehFornecedor: p.ehFornecedor,
-  telefone: p.telefone ?? '', email: p.email ?? '', dataNascimento: p.dataNascimento ?? '', observacoes: p.observacoes ?? '', aceitaMarketing: p.aceitaMarketing,
+  telefone: p.telefone ? formatarTelefone(p.telefone) : '', email: p.email ?? '', dataNascimento: p.dataNascimento ?? '', observacoes: p.observacoes ?? '', aceitaMarketing: p.aceitaMarketing,
   endereco: Object.fromEntries(Object.entries(p.endereco).map(([k, v]) => [k, v ?? ''])) as Form['endereco'],
   preferencias: Object.fromEntries(Object.entries(p.preferencias).map(([k, v]) => [k, v ?? ''])) as Form['preferencias'],
 })
@@ -78,7 +78,7 @@ export function FichaDaPessoa({ papel, pessoa, onFechar, onSalvo }: {
   const campoPequeno = 'h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm'
 
   return (
-    <Dialogo titulo={titulo} onFechar={onFechar}>
+    <Dialogo titulo={titulo} onFechar={onFechar} largo>
       <form onSubmit={salvar} className="space-y-4">
         <fieldset disabled={anonimizado} className="space-y-4">
           <Secao titulo="Dados">

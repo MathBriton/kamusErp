@@ -57,13 +57,17 @@ describe('Cadastros → Clientes', () => {
     expect(within(card).getByRole('link', { name: 'Parabenizar Maria Silva' }).getAttribute('href')).toContain('Feliz%20anivers%C3%A1rio')
   })
 
-  it('novo cliente: ficha com preferências e consentimento', async () => {
+  it('novo cliente: ficha com preferências e consentimento; aniversariantes recarregam', async () => {
     let enviado: Record<string, unknown> | null = null
+    let salvo = false
     api({
       'POST /api/pessoas': (init) => {
         enviado = corpo(init)
+        salvo = true
         return json({ ...maria, id: 'p2', nome: 'Ana Costa' }, 201)
       },
+      'GET /api/pessoas/aniversariantes?periodo=semana': () =>
+        json(salvo ? [...aniversariantes, { ...aniversariantes[0], id: 'p2', nome: 'Ana Costa' }] : aniversariantes),
     })
     renderApp('/cadastros/clientes')
     await screen.findByRole('cell', { name: 'Maria Silva' })
@@ -81,6 +85,8 @@ describe('Cadastros → Clientes', () => {
       tipo: 'Fisica', nome: 'Ana Costa', documento: '111.444.777-35', ehCliente: true, ehFornecedor: false,
       telefone: '(13) 99876-5432', aceitaMarketing: true, preferencias: { calca: '38' },
     })
+    const card = screen.getByRole('region', { name: 'Aniversariantes da semana' })
+    expect(await within(card).findByText('Ana Costa')).toBeInTheDocument()
   })
 
   it('erro de validação aparece na ficha', async () => {

@@ -57,6 +57,7 @@ Sem banco, os dados ficam **em memória**: são recriados a cada vez que a API s
 | Exportação | `GET /api/relatorios/historico-de-alteracoes.pdf` (ou `.xlsx`, `.csv`) · botão **Exportar** no histórico |
 | Licença do cliente | `GET /api/licenca` e `/api/licenca/pagamentos` · tela em Configurações → Licença e assinatura |
 | Empresas e usuários | `/api/empresas`, `/api/usuarios`, `POST /api/auth/trocar-senha` · Configurações → Empresas / Usuários e permissões (perfil Dono) |
+| Clientes, fornecedores e vendedores | `/api/pessoas` (papel, busca, aniversariantes, anonimizar), `/api/vendedores` · Cadastros → Clientes / Fornecedores / Vendedores · relatórios `clientes` e `fornecedores` |
 | Painel Administrativo | http://localhost:5174 · API em `/admin-api/*` (token próprio) |
 | Versão | http://localhost:5249/api/versao |
 | Requisições prontas | [`src/backend/Kamus.Api/Kamus.Api.http`](src/backend/Kamus.Api/Kamus.Api.http) (VS Code com REST Client, Visual Studio, Rider) |
@@ -106,7 +107,7 @@ Versionamento semântico calculado a partir de [Conventional Commits](https://ww
 src/backend/Kamus.Api                    API (ponto de entrada)
 src/backend/Shared/Kamus.SharedKernel    Tipos de domínio compartilhados (sem dependências de framework)
 src/backend/Shared/Kamus.Infrastructure  EF Core, multi-tenancy (filtro global + Row Level Security)
-src/backend/Modules/                     Módulos: Identidade, Notificacoes, Licenciamento (+ API do painel)
+src/backend/Modules/                     Módulos: Identidade, Notificacoes, Licenciamento (+ API do painel), Cadastros
 src/web                                  Frontend React (cliente)
 src/admin                                Painel Administrativo (operador do SaaS)
 tests/backend/                           Testes unitários, de integração e de arquitetura
@@ -144,6 +145,9 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 20 | Cliente criado no painel recebe senha provisória: obrigar troca no primeiro acesso? | Provisório e implementado (v0.7.0): **sim**, para todo usuário com senha provisória |
 | 21 | Gerente pode cadastrar/desativar usuários (ex.: vendedores da própria empresa)? | Provisório: **não**, só o Dono |
 | 22 | "Loja" é diferente de "empresa (CNPJ)"? Ex.: duas lojas no mesmo CNPJ | Provisório: loja = local de estoque, cadastrado no Estoque (v0.11.0) |
+| 23 | Cadastro de cliente: CPF obrigatório? (hoje opcional; ajuda no crediário) | Provisório: **opcional** |
+| 24 | Vendedor pode cadastrar e editar clientes? | Provisório: **sim** (não inativa nem anonimiza) |
+| 25 | Mensagem padrão de aniversário no WhatsApp — texto e se oferece desconto | Provisório: texto fixo ("Preparamos um mimo para você na loja") |
 
 ### Débitos técnicos
 
@@ -166,6 +170,10 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Renovação de sessão simultânea em duas abas é tratada como roubo de token e encerra as sessões | O usuário pode ser deslogado ao abrir várias abas ao mesmo tempo (na mesma aba já foi resolvido no web) | Aceitar o token anterior por alguns segundos após a troca |
 | Limite de **lojas** ainda não aplicado | Depende do cadastro de lojas/locais | v0.11.0 (Estoque) |
 | Sem "esqueci minha senha" por e-mail | Quem esquece depende do Dono redefinir | Quando houver envio de e-mail |
+| Busca e aniversariantes de clientes filtram **em memória** | Lento com dezenas de milhares de clientes | Com PostgreSQL em produção: `unaccent`/`pg_trgm` e consulta por mês/dia |
+| Modelos de mensagem do WhatsApp fixos no código | A loja não personaliza o texto | Configurações de mensagens (junto com o resumo diário) |
+| Ficha do cliente ainda sem histórico de compras, vale-troca e crediário | Visão 360° incompleta | Conforme vendas (v0.13.0) e crediário (v0.14.0) |
+| Sem busca de endereço por CEP | Digitação manual | Integração com serviço de CEP (ViaCEP) |
 
 ## Multi-tenancy em uma frase
 

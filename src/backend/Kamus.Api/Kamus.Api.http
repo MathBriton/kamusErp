@@ -161,3 +161,38 @@ Content-Type: application/json
   "senhaAtual": "Kamus@Dev123",
   "novaSenha": "NovaSenha2026"
 }
+
+### ---------- Clientes, fornecedores e vendedores ----------
+
+### Clientes (busca sem acento por nome, CPF, telefone ou e-mail)
+GET {{api}}/api/pessoas?papel=cliente&busca=maria
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Cadastrar cliente
+POST {{api}}/api/pessoas
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{
+  "tipo": "Fisica",
+  "nome": "Maria Silva",
+  "documento": "529.982.247-25",
+  "ehCliente": true,
+  "telefone": "(13) 99876-5432",
+  "dataNascimento": "1990-10-14",
+  "endereco": { "cidade": "Santos", "uf": "SP" },
+  "preferencias": { "blusa": "M", "calca": "40", "calcado": "37" },
+  "aceitaMarketing": true
+}
+
+### Aniversariantes (hoje, semana ou mes)
+GET {{api}}/api/pessoas/aniversariantes?periodo=semana
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Vendedores
+GET {{api}}/api/vendedores
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}

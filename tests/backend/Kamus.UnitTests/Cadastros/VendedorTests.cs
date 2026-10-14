@@ -37,3 +37,13 @@ public class VendedorTests
         vendedor.Ativo.ShouldBeTrue();
     }
 }
+
+public class TelefoneTests
+{
+    [Theory]
+    [InlineData("13998765432", "(13) 99876-5432")]
+    [InlineData("1133334444", "(11) 3333-4444")]
+    [InlineData(null, null)]
+    public void Formatar(string? digitos, string? esperado) =>
+        Kamus.Modules.Cadastros.Dominio.Telefone.Formatar(digitos).ShouldBe(esperado);
+}

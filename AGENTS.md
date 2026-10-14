@@ -78,7 +78,8 @@ src/backend/Shared/Kamus.Infrastructure/Relatorios Exportação PDF/Excel/CSV (/
 src/backend/Modules/Identidade/...            Módulo Identidade: Dominio/, Aplicacao/, Persistencia/, Endpoints/, Busca/, Seed/
 src/backend/Modules/Notificacoes/...          Módulo Notificacoes: notificações por usuário + SignalR (/hubs/notificacoes)
 src/backend/Modules/Licenciamento/...         Licença por cliente (/api/licenca, bloqueio 402, avisos) + API do Painel (Administracao/, /admin-api)
-src/web/src                                   auth/, api/, busca/, empresa/, layout/, licenca/, navegacao/, notificacoes/, pages/, relatorios/, theme/, test/
+src/backend/Modules/Cadastros/...             Clientes/fornecedores (Pessoa com papéis, /api/pessoas) e vendedores (/api/vendedores)
+src/web/src                                   auth/, api/, busca/, cadastros/, configuracoes/, empresa/, layout/, licenca/, navegacao/, notificacoes/, pages/, relatorios/, theme/, test/
 src/admin/src                                 Painel Administrativo (operador do SaaS): login SuperAdmin, clientes, pagamentos
 tests/backend/Kamus.UnitTests                 Unitários (domínio puro)
 tests/backend/Kamus.IntegrationTests          API via WebApplicationFactory; InMemory e PostgreSQL (Testcontainers)
@@ -181,34 +182,39 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 
 **Última atualização:** 2026-10-14
 
-**Releases:** v0.1.0 → **v0.7.0** lançadas (a v0.7.0 trouxe empresas e usuários). Próxima: **v0.8.0**.
-O plano de releases da fase 1 foi dividido (ver `LEVANTAMENTO.md` → Plano de releases).
+**Releases:** v0.1.0 → **v0.7.0** lançadas. Na `main`, pronto para a **v0.8.0** (clientes, fornecedores e vendedores).
+Plano de releases da fase 1 dividido (ver `LEVANTAMENTO.md` → Plano de releases).
 
 **O que existe hoje:**
-- Login (JWT 15 min + refresh rotativo em cookie HttpOnly `kamus_refresh`, bloqueio após 5 falhas, 10 logins/min
-  por IP). Seeds (só Development): `admin@kamus.local` (Dono nos 2 CNPJs) e `vendedor@kamus.local` (Vendedor no
-  CNPJ Centro), senha `Kamus@Dev123`. No web, `renovar()` compartilha a chamada em andamento (o refresh é de uso único).
-- Empresa ativa: header `X-Empresa-Id` validado em `EmpresaAtivaMiddleware`; `IEmpresaAtiva` traz id, perfil, nome e CNPJ.
-- Histórico de alterações, notificações (SignalR), pesquisa global, exportação PDF/Excel/CSV.
-- Licenciamento (`/api/licenca`, bloqueio 402, avisos) e Painel Administrativo (`/admin-api` + `src/admin`).
-- **v0.7.0 — Empresas e usuários (perfil Dono):** `/api/empresas` (listar, cadastrar — quem cadastra vira Dono —,
-  editar sem mudar CNPJ) e `/api/usuarios` (listar com perfis por empresa, cadastrar com senha provisória, editar
-  perfis, desativar/reativar, redefinir senha). Senha provisória → claim `trocar_senha` → `SenhaProvisoriaMiddleware`
-  responde 403 `TROCAR_SENHA` (só `/api/auth/*` passa) até `POST /api/auth/trocar-senha`. `PoliticaDeSenha` (8+, letras
-  e números). Limites da licença via `ILimitesDoCliente` (SharedKernel, implementado pelo Licenciamento): 409
-  `LIMITE_DA_LICENCA`. Sempre sobra um Dono ativo. Web: tela "Crie sua senha", "Trocar senha" no menu do usuário,
-  Configurações → Empresas e Usuários e permissões. Migration `SenhaProvisoria` (coluna `deve_trocar_senha`).
-- Testes: 206 backend, 85 web, 10 admin. E2E em localhost com Playwright (empresa nova, usuário com senha provisória,
-  troca obrigatória, desativação, limite de CNPJs pelo painel).
+- Fundação: login (JWT + refresh rotativo; o web compartilha renovações simultâneas), empresa ativa (`X-Empresa-Id`),
+  histórico de alterações, notificações (SignalR), pesquisa global, exportação PDF/Excel/CSV.
+- Licenciamento (`/api/licenca`, 402, avisos) e Painel Administrativo (`/admin-api` + `src/admin`).
+- v0.7.0: `/api/empresas` e `/api/usuarios` (Dono), senha provisória com troca obrigatória (403 `TROCAR_SENHA`),
+  limites do plano (`ILimitesDoCliente`, 409 `LIMITE_DA_LICENCA`).
+- **v0.8.0 — módulo Cadastros** (schema `cadastros`, RLS em `pessoas` e `vendedores`):
+  - `Pessoa` = cliente e/ou fornecedor (papéis), do tenant (vale em todos os CNPJs). CPF (`Cpf` no SharedKernel) ou CNPJ
+    opcional e único por tenant (índice parcial). Telefone com DDD (só dígitos; `WhatsApp` = 55+telefone). Endereço e
+    preferências de moda como colunas (`EnderecoCidade`...) porque o InMemory não consulta complex types. Consentimento de
+    marketing com data (opt-in). `Anonimizar` (LGPD) apaga dados e mantém o registro.
+  - `/api/pessoas`: lista por papel com busca sem acento (em memória), situação, paginação; ficha; criar/editar (409 com
+    `existenteId` se o documento já existe); inativar/reativar (Dono/Gerente); anonimizar (Dono); `/aniversariantes`.
+    Permissões em `Endpoints/Permissoes.cs`.
+  - `/api/vendedores` (Dono/Gerente alteram; todos veem), comissão 0–100%, vínculo opcional a um usuário
+    (`IDiretorioDeClientes.UsuariosDoTenantAtualAsync`).
+  - Pesquisa global (grupos Clientes/Fornecedores, link `?id=` abre a ficha) e relatórios `clientes`/`fornecedores`.
+  - `CalendarioBrasilia` agora está em `Kamus.SharedKernel.Tempo`.
+  - Web: `src/web/src/cadastros/` (`PessoasPage` serve clientes e fornecedores, `FichaDaPessoa`, `VendedoresPage`),
+    aniversariantes da semana com parabéns no WhatsApp; `components/Dialogo.tsx` (prop `largo`), `components/estilos.ts`.
+- Testes: 259 backend, 97 web, 10 admin. E2E em localhost com Playwright (cliente, CPF repetido, busca global pelo CPF,
+  edição registrada no histórico, CSV, fornecedor, vendedor vinculado).
 
-**Próximo passo — v0.8.0: ficha do cliente, fornecedores e vendedores** (ver `LEVANTAMENTO.md` 4.1, 4.7.5 e 4.7.9):
-1. Módulo novo `Cadastros` (schema `cadastros`, RLS) com `Pessoa` (física/jurídica, CPF/CNPJ opcional no cliente) e papéis
-   cliente/fornecedor; contatos, endereço, observações; ficha do cliente com preferências (tamanhos, cores) e consentimento
-   LGPD (opt-in de marketing com data); aniversariantes.
-2. Vendedores: cadastro simples (com ou sem usuário vinculado) e % de comissão padrão.
-3. Provedor de busca (clientes/fornecedores) e relatório exportável (lista de clientes, aniversariantes).
-4. Telas no web (Cadastros → Clientes, Fornecedores, Vendedores) com WhatsApp em 1 clique.
-Antes, vale confirmar com o dono as dúvidas do README (1–5, 15–22).
+**Próximo passo — v0.9.0: produtos com grade** (ver `LEVANTAMENTO.md` 4.1.1):
+1. Grades de tamanho reutilizáveis (PP–GG, 36–48, infantil, Único) com ordem; cores.
+2. Produto (modelo: descrição, marca, categoria, coleção, referência do fornecedor, preço base, custo, markup) e SKUs gerados
+   por grade × cores (desativar combinações), preço opcional por SKU.
+3. Código de barras por SKU: EAN do fornecedor ou interno (EAN-13 com prefixo 2), único por tenant.
+4. Telas Cadastros → Produtos e Grades e cores, matriz cor × tamanho; busca (nome, referência, SKU, EAN) e relatório.
+5. Etiquetas ficam para a entrada de mercadoria (v0.11.0).
 
 **Pendências conhecidas:** ver "Dúvidas em aberto e débitos técnicos" no `README.md` (lista viva — acrescente lá).
 Também: branch órfã `release-please--branches--main--components--kamus` no GitHub (pode ser apagada pela interface).
