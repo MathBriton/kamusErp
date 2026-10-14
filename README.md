@@ -31,11 +31,16 @@ dotnet run --project src/backend/Kamus.Api   # API em http://localhost:5249 (abr
 cd src/web && npm install && npm run dev     # web em http://localhost:5173 (proxy para a API)
 ```
 
+**Login de teste:** `admin@kamus.local` / `Kamus@Dev123` (cliente "Loja Demo" com 2 CNPJs).
+Sem banco, os dados ficam **em memória**: são recriados a cada vez que a API sobe e somem quando ela para.
+
 | O quê | Onde |
 |---|---|
+| **Aplicação web** (login) | http://localhost:5173 |
 | **Tela para testar a API** (Scalar) | http://localhost:5249/scalar |
 | Documento OpenAPI | http://localhost:5249/openapi/v1.json |
 | Saúde | http://localhost:5249/health → `Degraded` sem banco (normal neste modo) |
+| Autenticação | `POST /api/auth/login`, `/refresh`, `/logout` e `GET /api/auth/me` |
 | Versão | http://localhost:5249/api/versao |
 | Requisições prontas | [`src/backend/Kamus.Api/Kamus.Api.http`](src/backend/Kamus.Api/Kamus.Api.http) (VS Code com REST Client, Visual Studio, Rider) |
 

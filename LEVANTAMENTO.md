@@ -363,7 +363,7 @@ Itens transversais que existem **antes** de qualquer módulo de negócio. Todos 
 - **Segurança mínima desde o início:** senha com hash (padrão do Identity), bloqueio após N tentativas erradas, rate limit no endpoint de login, log de acesso (data, IP, sucesso/falha).
 - **Usuário de teste via seed — somente em ambiente `Development`:**
   - Tenant "Loja Demo" com **2 CNPJs** (para testar o seletor de empresa), 1 loja em cada, produtos com grade, alguns títulos financeiros e notificações de exemplo.
-  - Usuário: `admin@kamus.local`. A senha vem de variável de ambiente (`SEED_ADMIN_PASSWORD`), com valor padrão definido no `.env.example` — **nunca** senha real versionada no repositório.
+  - Usuário: `admin@kamus.local`, senha de desenvolvimento `Kamus@Dev123` (configuração `Seed:SenhaAdmin`, sobrescrevível pela variável `Seed__SenhaAdmin`). É uma senha só de testes locais — **nunca** senha real versionada no repositório.
   - O seed **não roda** em produção (verificação de ambiente + teste automatizado garantindo isso).
 - **Um usuário pode acessar várias empresas** do mesmo tenant, com perfis possivelmente diferentes em cada uma.
 - **Depois (não dia 1):** "esqueci minha senha" (exige envio de e-mail), 2FA para o perfil Dono.
@@ -654,6 +654,27 @@ kamusErp/
 | **7 — Produção** | Deploy na VPS, backups, monitoramento, primeira loja piloto |
 | *Futuro* | *PDV + Fiscal (após o estudo), importação de NFC-e como vendas, catálogo por link, sugestão de grade de compra, % vendido por coleção, integração com e-commerce, cobrança automática por boleto/PIX, conciliação bancária* |
 
+### Plano de releases
+
+A Fase 0b foi dividida em entregas menores. A numeração final é calculada pelos commits na hora de lançar ([docs/RELEASES.md](docs/RELEASES.md)).
+
+| Versão | Fase | Conteúdo | Status |
+|---|---|---|---|
+| v0.1.0 | 0a | Solução .NET, multi-tenancy (filtro + RLS), CNPJ alfanumérico, Docker, CI, web base com tema | ✅ lançada |
+| v0.2.0 | 0a+ | API em localhost sem banco, tela de testes (Scalar), testes sem Docker | ✅ pronta |
+| v0.3.0 | 0b | Login (JWT + refresh em cookie), bloqueio por tentativas, usuário de teste, dados em memória no desenvolvimento | ✅ pronta |
+| v0.4.0 | 0b | Shell (sidebar/topbar), seletor de CNPJ, dashboard (estrutura) | ⏳ |
+| v0.5.0 | 0b | Notificações em tempo real, pesquisa global, histórico de alterações | ⏳ |
+| v0.6.0 | 0b | Exportação PDF/Excel | ⏳ |
+| v0.7.0 | 0b | Licenciamento + Painel Administrativo | ⏳ |
+| v0.8.0 | 1 | Cadastros (empresas, ficha do cliente, fornecedores, vendedores, produtos com grade, importação por planilha) | ⏳ |
+| v0.9.0 | 2 | Estoque (+ importação de XML da NF-e) | ⏳ |
+| v0.10.0 | 3 | Financeiro | ⏳ |
+| v0.11.0 | 4 | Vendas (registro, troca e vale-troca, comissão) | ⏳ |
+| v0.12.0 | 5 | Crediário e condicional | ⏳ |
+| v0.13.0 | 6 | Dashboard real, app mobile, resumo diário | ⏳ |
+| v1.0.0 | 7 | Produção e primeira loja piloto | ⏳ depende de servidor |
+
 ---
 
 ## 12. Perguntas em aberto (para a próxima conversa)
@@ -757,3 +778,7 @@ kamusErp/
 | 2026-10-14 | API roda em localhost **sem Docker e sem PostgreSQL** (banco opcional; `/health` = Degraded) | Aceita |
 | 2026-10-14 | Tela de testes da API com OpenAPI + Scalar, só em Development; arquivo `.http` com requisições | Aceita |
 | 2026-10-14 | Testes com PostgreSQL pulados com aviso quando não há Docker local; obrigatórios no CI | Aceita |
+| 2026-10-14 | **Sem persistência local por enquanto:** em desenvolvimento os dados ficam em memória (EF Core InMemory) e os dados de demonstração são recriados a cada subida; PostgreSQL no CI e em produção | Aceita |
+| 2026-10-14 | Autenticação com o `PasswordHasher` do ASP.NET Core Identity e entidades próprias (sem as tabelas completas do Identity); JWT de 15 min + refresh token rotativo em cookie HttpOnly; bloqueio após 5 falhas por 15 min; limite de 10 logins/min por IP | Aceita |
+| 2026-10-14 | Tabelas `usuarios`, `tenants` e `refresh_tokens` sem RLS (lidas no login, antes de o tenant ser conhecido); `empresas` e `acessos_empresa` com RLS | Aceita |
+| 2026-10-14 | Migrations aplicadas na subida com uma conexão de dono do banco (`ConnectionStrings:KamusMigrations`); a aplicação usa o `kamus_app` | Aceita |
