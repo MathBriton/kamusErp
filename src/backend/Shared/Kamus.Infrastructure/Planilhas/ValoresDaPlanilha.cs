@@ -1,14 +1,14 @@
 using System.Globalization;
 
-namespace Kamus.Modules.Cadastros.Importacao;
+namespace Kamus.Infrastructure.Planilhas;
 
 /// <summary>Conversões tolerantes do que vem da planilha (o leitor entrega números invariantes e datas aaaa-mm-dd).</summary>
-internal static class Leitura
+public static class ValoresDaPlanilha
 {
     private static readonly string[] FormatosDeData = ["yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "dd-MM-yyyy"];
 
     /// <returns><c>(null, true)</c> se vazio; <c>(null, false)</c> se inválido.</returns>
-    public static (decimal? Valor, bool Ok) Decimal(string? texto)
+    public static (decimal? Valor, bool Ok) Numero(string? texto)
     {
         if (string.IsNullOrWhiteSpace(texto)) return (null, true);
         var t = texto.Replace("R$", "", StringComparison.Ordinal).Trim();

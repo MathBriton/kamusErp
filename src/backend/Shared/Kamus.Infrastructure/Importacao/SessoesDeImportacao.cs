@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Kamus.Infrastructure.Planilhas;
 
-namespace Kamus.Modules.Cadastros.Importacao;
+namespace Kamus.Infrastructure.Importacao;
 
 /// <summary>Planilha validada aguardando confirmação (30 minutos, em memória). Só quem enviou, no mesmo cliente, confirma.</summary>
 internal sealed class SessoesDeImportacao(TimeProvider relogio)

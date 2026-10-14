@@ -1,6 +1,6 @@
 using Kamus.Infrastructure.Planilhas;
 
-namespace Kamus.Modules.Cadastros.Importacao;
+namespace Kamus.Infrastructure.Importacao;
 
 public static class AcaoDaLinha
 {
@@ -12,15 +12,22 @@ public static class AcaoDaLinha
 /// <param name="Descricao">Resumo da linha para a prévia (ex.: "Maria Silva — cliente novo").</param>
 public sealed record LinhaValidada(int Numero, string Acao, string Descricao, IReadOnlyList<string> Erros);
 
-/// <param name="Criados">Pessoas: linhas que criaram cadastro. Produtos: produtos novos.</param>
+/// <param name="Criados">O que a importação criou (pessoas, produtos novos, saldos...).</param>
 /// <param name="Ignorados">Linhas com erro (não importadas).</param>
 public sealed record ResultadoDaImportacao(int Criados, int Atualizados, int Ignorados);
 
-/// <summary>Um tipo de planilha importável (clientes, fornecedores, produtos). Validar nunca grava; Importar revalida e grava só as linhas válidas.</summary>
-internal interface IImportador
+/// <summary>
+/// Um tipo de planilha importável (clientes, produtos, estoque inicial...). Validar nunca grava; Importar revalida e grava só
+/// as linhas válidas. Registre com <c>services.AddScoped&lt;IImportador, ...&gt;()</c>: modelo, prévia, confirmação e segundo plano vêm de graça.
+/// </summary>
+public interface IImportador
 {
+    /// <summary>Usado na URL: <c>/api/importacoes/{Tipo}/...</c>.</summary>
     string Tipo { get; }
     string Titulo { get; }
+
+    /// <summary>Tela aberta pelo aviso do sininho quando a importação roda em segundo plano.</summary>
+    string Link { get; }
     IReadOnlyCollection<string> Perfis { get; }
     IReadOnlyList<ColunaDoModelo> Colunas { get; }
 

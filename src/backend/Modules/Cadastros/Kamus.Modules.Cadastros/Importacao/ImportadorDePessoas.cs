@@ -1,3 +1,4 @@
+using Kamus.Infrastructure.Importacao;
 using Kamus.Infrastructure.Planilhas;
 using Kamus.Modules.Cadastros.Dominio;
 using Kamus.Modules.Cadastros.Endpoints;
@@ -17,6 +18,7 @@ internal abstract class ImportadorDePessoas(CadastrosDbContext db, TimeProvider 
     protected abstract bool Cliente { get; }
     public abstract string Tipo { get; }
     public abstract string Titulo { get; }
+    public string Link => $"/cadastros/{Tipo}";
     public IReadOnlyCollection<string> Perfis => Permissoes.Gestao;
 
     public IReadOnlyList<ColunaDoModelo> Colunas =>
@@ -67,7 +69,7 @@ internal abstract class ImportadorDePessoas(CadastrosDbContext db, TimeProvider 
                 "juridica" or "j" or "pj" or "pessoa juridica" => TipoPessoa.Juridica,
                 _ => digitos == 14 ? TipoPessoa.Juridica : digitos == 11 ? TipoPessoa.Fisica : null,
             };
-            var (nascimento, nascimentoOk) = Leitura.Data(l.Valor("nascimento", "datadenascimento"));
+            var (nascimento, nascimentoOk) = ValoresDaPlanilha.Data(l.Valor("nascimento", "datadenascimento"));
             if (!nascimentoOk) erros.Add("Data de nascimento inválida (use dd/mm/aaaa).");
 
             var normalizado = documento is null ? null
@@ -117,7 +119,7 @@ internal abstract class ImportadorDePessoas(CadastrosDbContext db, TimeProvider 
                     Estilo = l.Valor("estilo") ?? p.Estilo,
                 },
                 Observacoes = l.Valor("observacoes", "obs") ?? existente?.Observacoes,
-                AceitaMarketing = Leitura.SimNao(l.Valor("aceitamarketing", "aceitamensagens")) ?? existente?.ConsentimentoMarketingEm is not null,
+                AceitaMarketing = ValoresDaPlanilha.SimNao(l.Valor("aceitamarketing", "aceitamensagens")) ?? existente?.ConsentimentoMarketingEm is not null,
             };
             erros.AddRange(Pessoa.Validar(dados, hoje));
 

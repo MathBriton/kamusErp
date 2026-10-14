@@ -1,3 +1,4 @@
+using Kamus.Infrastructure.Importacao;
 using Kamus.Infrastructure.Planilhas;
 using Kamus.Modules.Cadastros.Dominio;
 using Kamus.Modules.Cadastros.Endpoints;
@@ -17,6 +18,7 @@ internal sealed class ImportadorDeProdutos(CadastrosDbContext db, TimeProvider r
 {
     public string Tipo => "produtos";
     public string Titulo => "Produtos";
+    public string Link => "/cadastros/produtos";
     public IReadOnlyCollection<string> Perfis => Permissoes.Catalogo;
 
     public IReadOnlyList<ColunaDoModelo> Colunas =>
@@ -64,8 +66,8 @@ internal sealed class ImportadorDeProdutos(CadastrosDbContext db, TimeProvider r
             var nomeDaGrade = porReferencia.Select(l => l.Valor("grade")).FirstOrDefault(v => v is not null);
             var grade = gradeDoProduto ?? grades.FirstOrDefault(g => Chave(g.Nome) == Chave(nomeDaGrade));
             string? Primeiro(params string[] colunas) => porReferencia.Select(l => l.Valor(colunas)).FirstOrDefault(v => v is not null);
-            var (preco, precoOk) = Leitura.Decimal(Primeiro("precodevenda", "preco"));
-            var (custo, custoOk) = Leitura.Decimal(Primeiro("custo", "precodecusto"));
+            var (preco, precoOk) = ValoresDaPlanilha.Numero(Primeiro("precodevenda", "preco"));
+            var (custo, custoOk) = ValoresDaPlanilha.Numero(Primeiro("custo", "precodecusto"));
 
             var dados = new DadosDoProduto
             {
@@ -116,7 +118,7 @@ internal sealed class ImportadorDeProdutos(CadastrosDbContext db, TimeProvider r
                         erros.Add($"Código de barras já usado no produto {dono.Referencia}.");
                     codigosNaPlanilha.TryAdd(codigo, l.Numero);
                 }
-                var (precoSku, precoSkuOk) = Leitura.Decimal(l.Valor("precodosku"));
+                var (precoSku, precoSkuOk) = ValoresDaPlanilha.Numero(l.Valor("precodosku"));
                 if (!precoSkuOk || precoSku < 0) erros.Add("Preço do SKU inválido.");
 
                 var corNova = cor is not null && cores.All(c => Chave(c.Nome) != Chave(cor));

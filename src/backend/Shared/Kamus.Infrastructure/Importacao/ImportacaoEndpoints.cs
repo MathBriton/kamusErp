@@ -8,12 +8,13 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
-namespace Kamus.Modules.Cadastros.Importacao;
+namespace Kamus.Infrastructure.Importacao;
 
 /// <summary>Importação em 4 passos: modelo → enviar e validar (simulação, nada é gravado) → confirmar → resultado.</summary>
-internal static class ImportacaoEndpoints
+public static partial class ImportacaoEndpoints
 {
     private const long TamanhoMaximo = 5 * 1024 * 1024;
     private const int LimiteSincronoPadrao = 500;
@@ -21,10 +22,17 @@ internal static class ImportacaoEndpoints
     public sealed record ValidacaoDto(Guid Id, string Tipo, string NomeDoArquivo, int Total, int Validas, int ComErro, int Criar, int Atualizar, IReadOnlyList<LinhaValidada> Linhas);
     public sealed record EmSegundoPlanoDto(string Mensagem);
 
-    public static IEndpointRouteBuilder MapImportacao(this IEndpointRouteBuilder app)
+    public static IServiceCollection AddKamusImportacao(this IServiceCollection services)
+    {
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<SessoesDeImportacao>();
+        return services;
+    }
+
+    public static IEndpointRouteBuilder MapKamusImportacao(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/importacoes").RequireAuthorization().WithTags("Importação por planilha");
-        g.MapGet("/{tipo}/modelo.xlsx", Modelo).WithSummary("Modelo .xlsx (clientes, fornecedores ou produtos) com instruções");
+        g.MapGet("/{tipo}/modelo.xlsx", Modelo).WithSummary("Modelo .xlsx do tipo (clientes, fornecedores, produtos, estoque-inicial...) com instruções");
         g.MapPost("/{tipo}/validar", Validar).DisableAntiforgery()
             .WithSummary("Envia a planilha (.xlsx ou .csv, campo 'arquivo') e devolve a prévia linha a linha. Não grava nada.")
             .Produces<ValidacaoDto>().ProducesProblem(StatusCodes.Status400BadRequest);
@@ -40,7 +48,7 @@ internal static class ImportacaoEndpoints
     private static IResult Problema(int status, string detalhe) => Results.Problem(statusCode: status, title: "Importação", detail: detalhe);
 
     private static IResult? Barrar(IImportador? importador, IEmpresaAtiva empresa) =>
-        importador is null ? Problema(StatusCodes.Status404NotFound, "Tipo de importação desconhecido. Use clientes, fornecedores ou produtos.")
+        importador is null ? Problema(StatusCodes.Status404NotFound, "Tipo de importação desconhecido.")
         : !importador.Perfis.Contains(empresa.Perfil) ? Problema(StatusCodes.Status403Forbidden, $"Seu perfil não importa {importador.Titulo.ToLowerInvariant()}.")
         : null;
 
@@ -108,19 +116,21 @@ internal static class ImportacaoEndpoints
         sp.GetRequiredService<TenantContext>().Definir(sessao.TenantId);
         var notificador = sp.GetRequiredService<INotificador>();
         var importador = sp.GetServices<IImportador>().Single(i => i.Tipo == sessao.Tipo);
-        var link = sessao.Tipo == "produtos" ? "/cadastros/produtos" : $"/cadastros/{sessao.Tipo}";
         try
         {
             var r = await importador.ImportarAsync(sessao.Tabela, CancellationToken.None);
             await notificador.NotificarAsync(new NovaNotificacao(usuarioId, "importacao_concluida",
                 $"Importação de {importador.Titulo.ToLowerInvariant()} concluída: {r.Criados} criados, {r.Atualizados} atualizados",
-                $"{sessao.NomeDoArquivo}: {r.Ignorados} linhas com erro foram ignoradas.", link, empresaId));
+                $"{sessao.NomeDoArquivo}: {r.Ignorados} linhas com erro foram ignoradas.", importador.Link, empresaId));
         }
         catch (Exception ex)
         {
-            sp.GetRequiredService<ILoggerFactory>().CreateLogger("Kamus.Cadastros").FalhaNaImportacao(ex, sessao.Tipo, sessao.TenantId);
+            FalhaNaImportacao(sp.GetRequiredService<ILoggerFactory>().CreateLogger("Kamus.Importacao"), ex, sessao.Tipo, sessao.TenantId);
             await notificador.NotificarAsync(new NovaNotificacao(usuarioId, "importacao_falhou", $"A importação de {importador.Titulo.ToLowerInvariant()} falhou",
-                $"{sessao.NomeDoArquivo}: nada foi gravado. Tente de novo ou fale com o suporte.", link, empresaId));
+                $"{sessao.NomeDoArquivo}: nada foi gravado. Tente de novo ou fale com o suporte.", importador.Link, empresaId));
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Falha na importação em segundo plano ({Tipo}) do cliente {TenantId}")]
+    private static partial void FalhaNaImportacao(ILogger logger, Exception ex, string tipo, Guid tenantId);
 }

@@ -1,3 +1,4 @@
+using Kamus.Infrastructure.Importacao;
 using Kamus.Infrastructure.Persistence;
 using Kamus.Modules.Cadastros.Busca;
 using Kamus.Modules.Cadastros.Endpoints;
@@ -27,9 +28,8 @@ public static class ModuloCadastros
         services.AddScoped<IImportador, ImportadorDeClientes>();
         services.AddScoped<IImportador, ImportadorDeFornecedores>();
         services.AddScoped<IImportador, ImportadorDeProdutos>();
-        services.AddSingleton<SessoesDeImportacao>();
         return services;
     }
 
-    public static IEndpointRouteBuilder MapModuloCadastros(this IEndpointRouteBuilder app) => app.MapPessoas().MapVendedores().MapGradesECores().MapProdutos().MapImportacao();
+    public static IEndpointRouteBuilder MapModuloCadastros(this IEndpointRouteBuilder app) => app.MapPessoas().MapVendedores().MapGradesECores().MapProdutos();
 }
