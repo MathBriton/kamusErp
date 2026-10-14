@@ -223,3 +223,30 @@ X-Empresa-Id: {{login.response.body.empresas[0].id}}
 GET {{api}}/api/produtos/por-codigo/2000000000015
 Authorization: Bearer {{login.response.body.accessToken}}
 X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### ---------- Importação por planilha ----------
+
+### Modelo de planilha (clientes, fornecedores ou produtos) — use "Send and save" para salvar
+GET {{api}}/api/importacoes/clientes/modelo.xlsx
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Validar (simulação): envie o arquivo no campo "arquivo"
+# @name validacao
+POST {{api}}/api/importacoes/clientes/validar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: multipart/form-data; boundary=kamus
+
+--kamus
+Content-Disposition: form-data; name="arquivo"; filename="clientes.csv"
+Content-Type: text/csv
+
+Nome;CPF/CNPJ;Telefone;Cidade;UF
+Maria Silva;529.982.247-25;(13) 99876-5432;Santos;SP
+--kamus--
+
+### Confirmar (importa as linhas válidas)
+POST {{api}}/api/importacoes/{{validacao.response.body.id}}/confirmar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}

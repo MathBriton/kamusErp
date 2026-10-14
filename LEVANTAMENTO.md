@@ -669,7 +669,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.7.0 | 1 | Empresas (CNPJs) e usuários: perfis por empresa, senha provisória com troca obrigatória, limites do plano | ✅ lançada |
 | v0.8.0 | 1 | Ficha do cliente, fornecedores e vendedores | ✅ lançada |
 | v0.9.0 | 1 | Produtos com grade (cor × tamanho), SKUs, códigos de barras internos | ✅ lançada |
-| v0.10.0 | 1 | Importação por planilha | ⏳ |
+| v0.10.0 | 1 | Importação por planilha | ✅ pronta |
 | v0.11.0 | 2 | Estoque (lojas/locais de estoque + importação de XML da NF-e) | ⏳ |
 | v0.12.0 | 3 | Financeiro | ⏳ |
 | v0.13.0 | 4 | Vendas (registro, troca e vale-troca, comissão) | ⏳ |
@@ -813,3 +813,6 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | 2026-10-14 | Código de barras por SKU: EAN do fornecedor (dígito verificador conferido) ou interno EAN-13 com prefixo 2, em sequência por cliente; único por cliente do SaaS | Aceita |
 | 2026-10-14 | Catálogo: Dono, Gerente e Estoquista cadastram; todos os perfis consultam (o vendedor precisa ver preço e grade) | Aceita |
 | 2026-10-14 | Markup exibido (preço ÷ custo), sem markup padrão por categoria por enquanto | Aceita (provisória) |
+| 2026-10-14 | Importação por planilha (.xlsx ou .csv) de clientes, fornecedores e produtos: validar é simulação (nada é gravado); confirmar importa só as linhas válidas; acima de 500 linhas roda em segundo plano com aviso no sininho. Máximo de 5.000 linhas e 5 MB por arquivo | Aceita |
+| 2026-10-14 | Reimportação segura: pessoas casadas por CPF/CNPJ, depois telefone, depois nome; produtos por referência + cor + tamanho. Célula vazia mantém o dado existente | Aceita |
+| 2026-10-14 | Produtos importados: cores inexistentes são criadas; grade precisa existir; em produto novo, combinações ausentes da planilha ficam desativadas; em produto existente, as ausentes não mudam | Aceita |

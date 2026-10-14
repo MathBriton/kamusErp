@@ -58,6 +58,7 @@ Sem banco, os dados ficam **em memória**: são recriados a cada vez que a API s
 | Licença do cliente | `GET /api/licenca` e `/api/licenca/pagamentos` · tela em Configurações → Licença e assinatura |
 | Empresas e usuários | `/api/empresas`, `/api/usuarios`, `POST /api/auth/trocar-senha` · Configurações → Empresas / Usuários e permissões (perfil Dono) |
 | Produtos | `/api/grades`, `/api/cores` (com `/padrao`), `/api/produtos` (SKUs, `/por-codigo/{ean}`, `/sugestoes`) · Cadastros → Produtos (matriz cor × tamanho) / Grades e cores · relatório `produtos` |
+| Importação por planilha | `/api/importacoes/{tipo}/modelo.xlsx`, `/{tipo}/validar` (multipart `arquivo`), `/{id}/confirmar` · Cadastros → Importar planilha |
 | Clientes, fornecedores e vendedores | `/api/pessoas` (papel, busca, aniversariantes, anonimizar), `/api/vendedores` · Cadastros → Clientes / Fornecedores / Vendedores · relatórios `clientes` e `fornecedores` |
 | Painel Administrativo | http://localhost:5174 · API em `/admin-api/*` (token próprio) |
 | Versão | http://localhost:5249/api/versao |
@@ -152,6 +153,8 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 26 | Markup padrão por categoria (sugerir preço a partir do custo)? | Provisório: só exibe o markup; sem sugestão automática |
 | 27 | Produto precisa de NCM/dados fiscais já agora? | Provisório: **não** (fiscal fora do piloto) |
 | 28 | Fotos de produto (por produto e por cor) | Em aberto: precisa de armazenamento de arquivos (servidor) |
+| 29 | Importação: estoque inicial, contas a pagar/receber e saldos de crediário também por planilha | Previstos nas releases de estoque, financeiro e crediário |
+| 30 | Importação: casar cliente pelo **nome** quando não há CPF nem telefone pode juntar homônimos | Provisório: casa pelo nome exato (sem acento); revisar com a loja piloto |
 
 ### Débitos técnicos
 
@@ -180,6 +183,8 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Sem busca de endereço por CEP | Digitação manual | Integração com serviço de CEP (ViaCEP) |
 | Busca de produtos em memória | Lenta com catálogos grandes | `pg_trgm` e índice por código de barras no PostgreSQL |
 | Grade em uso não pode ganhar tamanho novo | Para um tamanho novo é preciso criar outra grade | Permitir acrescentar tamanhos ao produto |
+| Planilha validada fica **em memória** por 30 min aguardando confirmação | Some se a API reiniciar (basta enviar de novo) | Com servidor: guardar em disco/armazenamento de objetos |
+| Importação em segundo plano grava como "Sistema" no histórico | O histórico não mostra quem importou (o aviso vai para quem enviou) | Propagar o usuário para tarefas em segundo plano |
 | Sequência do código interno calculada pelo maior existente | Duas criações simultâneas podem colidir (o índice único recusa uma) | Sequência no banco quando houver PostgreSQL em produção |
 
 ## Multi-tenancy em uma frase
