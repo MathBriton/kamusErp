@@ -10,8 +10,10 @@ import { useEmpresa } from '../empresa/EmpresaContext'
 import { MatrizDeEstoque } from './MatrizDeEstoque'
 import { MOTIVOS_DE_AJUSTE, pecas, PERFIS_QUE_MOVIMENTAM, type Matriz } from './tipos'
 import { useLojas } from './useLojas'
+import { BotaoEtiquetas } from './BotaoEtiquetas'
+import { salvarArquivo } from '../relatorios/salvarArquivo'
 
-export type Modo = 'entrada' | 'ajuste' | 'transferencia'
+export type Modo = 'entrada' | 'ajuste' | 'transferencia' | 'etiquetas'
 
 const TEXTOS: Record<Modo, { titulo: string; subtitulo: string; confirmar: string; feito: string }> = {
   entrada: {
@@ -25,6 +27,12 @@ const TEXTOS: Record<Modo, { titulo: string; subtitulo: string; confirmar: strin
     subtitulo: 'Use número negativo para baixar (perda, avaria, furto) e positivo para somar (sobra na contagem).',
     confirmar: 'Lançar ajuste',
     feito: 'Ajuste lançado',
+  },
+  etiquetas: {
+    titulo: 'Etiquetas',
+    subtitulo: 'Escolha os produtos e quantas etiquetas de cada cor e tamanho. As peças de uma entrada também podem ser impressas no fim do lançamento.',
+    confirmar: 'Gerar PDF',
+    feito: 'PDF gerado',
   },
   transferencia: {
     titulo: 'Transferências',
@@ -50,7 +58,7 @@ interface ItemDoProduto {
 
 /** Entrada, ajuste e transferência: escolhe o produto, digita na matriz cor × tamanho, junta numa lista e confirma tudo de uma vez. */
 export function MovimentacaoPage({ modo }: { modo: Modo }) {
-  const { getJson, enviar } = useApi()
+  const { getJson, enviar, baixar } = useApi()
   const { perfilAtual, consolidado } = useEmpresa()
   const textos = TEXTOS[modo]
   const [versaoDasLojas, setVersaoDasLojas] = useState(0)
@@ -70,6 +78,8 @@ export function MovimentacaoPage({ modo }: { modo: Modo }) {
   const [erro, setErro] = useState<string | null>(null)
   const [sucesso, setSucesso] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
+  const [formato, setFormato] = useState<'a4' | 'termica'>('a4')
+  const [ultimaOperacao, setUltimaOperacao] = useState<string | null>(null)
 
   const lojaEscolhida = lojaId || (ativas.length === 1 ? ativas[0]!.id : '')
 
@@ -142,6 +152,20 @@ export function MovimentacaoPage({ modo }: { modo: Modo }) {
     e.preventDefault()
     setErro(null)
     const corpoDosItens = itens.flatMap((i) => i.linhas.map((l) => ({ skuId: l.skuId, quantidade: l.quantidade, custoUnitario: i.custo })))
+    if (modo === 'etiquetas') {
+      setEnviando(true)
+      try {
+        const r = await baixar('/api/estoque/etiquetas', { formato, itens: corpoDosItens.map(({ skuId, quantidade }) => ({ skuId, quantidade })) })
+        if (r.tipo === 'arquivo') salvarArquivo(r.blob, r.nome)
+        setSucesso(`${textos.feito}: ${total} ${total === 1 ? 'etiqueta' : 'etiquetas'}.`)
+        setItens([])
+      } catch (ex) {
+        setErro(ex instanceof ErroDeApi ? ex.message : 'Não foi possível gerar as etiquetas.')
+      } finally {
+        setEnviando(false)
+      }
+      return
+    }
     const [caminho, corpo] =
       modo === 'entrada'
         ? ['/api/estoque/entradas', { lojaId: lojaEscolhida, documento, observacao, itens: corpoDosItens }]
@@ -150,8 +174,9 @@ export function MovimentacaoPage({ modo }: { modo: Modo }) {
           : ['/api/estoque/transferencias', { origemId: lojaEscolhida, destinoId, observacao, itens: corpoDosItens }]
     setEnviando(true)
     try {
-      const r = await enviar<{ quantidade: number }>('POST', caminho, corpo)
+      const r = await enviar<{ operacaoId: string; quantidade: number }>('POST', caminho, corpo)
       setSucesso(`${textos.feito}: ${pecas(r.quantidade)}.`)
+      setUltimaOperacao(modo === 'ajuste' ? null : r.operacaoId)
       setItens([])
       setDocumento('')
       setObservacao('')
@@ -176,8 +201,15 @@ export function MovimentacaoPage({ modo }: { modo: Modo }) {
       {sucesso && (
         <p role="status" className="mt-4 flex items-center gap-2 rounded-lg bg-success-soft px-3 py-2.5 text-sm text-success">
           <Icone nome="check" />
-          {sucesso} <Link to="/estoque/posicao" className="underline">Ver posição de estoque</Link>
+          {sucesso}
+          {modo !== 'etiquetas' && <Link to="/estoque/posicao" className="underline">Ver posição de estoque</Link>}
         </p>
+      )}
+      {sucesso && ultimaOperacao && modo !== 'etiquetas' && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted">Imprimir uma etiqueta por peça recebida:</span>
+          <BotaoEtiquetas operacaoId={ultimaOperacao} />
+        </div>
       )}
 
       <form onSubmit={confirmar} className="mt-6 space-y-6">
@@ -205,6 +237,14 @@ export function MovimentacaoPage({ modo }: { modo: Modo }) {
               <input value={documento} onChange={(e) => setDocumento(e.target.value)} placeholder="Ex.: NF 1234" maxLength={60} className={estilos.campo} />
             </Campo>
           )}
+          {modo === 'etiquetas' && (
+            <Campo rotulo="Formato">
+              <select value={formato} onChange={(e) => setFormato(e.target.value as 'a4' | 'termica')} className={estilos.campo}>
+                <option value="a4">Folha A4 (3 × 10 etiquetas)</option>
+                <option value="termica">Impressora térmica (40 × 25 mm)</option>
+              </select>
+            </Campo>
+          )}
           {modo === 'ajuste' && (
             <Campo rotulo="Motivo">
               <select value={motivo} onChange={(e) => setMotivo(e.target.value)} className={estilos.campo}>
@@ -215,9 +255,11 @@ export function MovimentacaoPage({ modo }: { modo: Modo }) {
               </select>
             </Campo>
           )}
-          <Campo rotulo={motivo === 'Outro' ? 'Observação (obrigatória)' : 'Observação (opcional)'} className="sm:col-span-2">
-            <input value={observacao} onChange={(e) => setObservacao(e.target.value)} maxLength={500} className={estilos.campo} />
-          </Campo>
+          {modo !== 'etiquetas' && (
+            <Campo rotulo={motivo === 'Outro' ? 'Observação (obrigatória)' : 'Observação (opcional)'} className="sm:col-span-2">
+              <input value={observacao} onChange={(e) => setObservacao(e.target.value)} maxLength={500} className={estilos.campo} />
+            </Campo>
+          )}
           {modo === 'transferencia' && ativas.length < 2 && lojas && (
             <p className="text-sm text-muted sm:col-span-2">
               Para transferir é preciso ter duas lojas na empresa. O Dono cadastra em <Link to="/configuracoes/lojas" className="text-primary underline">Configurações → Lojas</Link>.
@@ -275,6 +317,15 @@ export function MovimentacaoPage({ modo }: { modo: Modo }) {
                 </Campo>
               )}
               <div className="flex justify-end gap-2">
+                {modo === 'etiquetas' && (
+                  <button
+                    type="button"
+                    onClick={() => setValores(Object.fromEntries(matriz.celulas.filter((c) => c.quantidade > 0).map((c) => [c.skuId, String(c.quantidade)])))}
+                    className={estilos.botao}
+                  >
+                    Usar o saldo atual
+                  </button>
+                )}
                 <button type="button" onClick={() => setMatriz(null)} className={estilos.botao}>Cancelar</button>
                 <button type="button" onClick={adicionar} className={estilos.botaoPrimario}>Adicionar à lista</button>
               </div>

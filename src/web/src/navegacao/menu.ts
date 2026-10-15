@@ -46,9 +46,9 @@ export const MENU: GrupoMenu[] = [
       { titulo: 'Entrada de mercadoria', rota: '/estoque/entradas', descricao: 'Entrada digitando na matriz de grade, com custo médio.', perfis: [...GESTAO, 'Estoquista'] },
       { titulo: 'Ajustes', rota: '/estoque/ajustes', descricao: 'Perdas, avarias e correções com motivo obrigatório.', perfis: [...GESTAO, 'Estoquista'] },
       { titulo: 'Transferências', rota: '/estoque/transferencias', descricao: 'Transferência de peças entre lojas.', perfis: [...GESTAO, 'Estoquista'] },
-      { titulo: 'Entrada por XML da NF-e', rota: '/estoque/xml', previstoPara: 'v0.12.0', descricao: 'Importação do XML da nota do fornecedor, com de-para memorizado.', perfis: [...GESTAO, 'Estoquista'] },
-      { titulo: 'Inventário', rota: '/estoque/inventario', previstoPara: 'v0.12.0', descricao: 'Contagem física e ajuste pela diferença.', perfis: [...GESTAO, 'Estoquista'] },
-      { titulo: 'Etiquetas', rota: '/estoque/etiquetas', previstoPara: 'v0.12.0', descricao: 'Etiquetas com código de barras, cor, tamanho e preço.', perfis: [...GESTAO, 'Estoquista'] },
+      { titulo: 'Entrada por XML da NF-e', rota: '/estoque/xml', descricao: 'Importação do XML da nota do fornecedor, com de-para memorizado.', perfis: [...GESTAO, 'Estoquista'] },
+      { titulo: 'Inventário', rota: '/estoque/inventario', descricao: 'Contagem física e ajuste pela diferença.', perfis: [...GESTAO, 'Estoquista'] },
+      { titulo: 'Etiquetas', rota: '/estoque/etiquetas', descricao: 'Etiquetas com código de barras, cor, tamanho e preço.', perfis: [...GESTAO, 'Estoquista'] },
     ],
   },
   {

@@ -6,7 +6,14 @@ interface Props {
   /** Leitura: clicar numa célula (ex.: abrir o kardex). Sem isso, as células são só texto. */
   onCelula?: (celula: Celula) => void
   /** Digitação: quantidades por SKU (texto livre, validado por quem usa). */
-  digitacao?: { valores: Record<string, string>; onMudar: (skuId: string, valor: string) => void; permitirNegativo?: boolean; somenteAtivos?: boolean }
+  digitacao?: {
+    valores: Record<string, string>
+    onMudar: (skuId: string, valor: string) => void
+    permitirNegativo?: boolean
+    somenteAtivos?: boolean
+    /** Contagem cega (inventário): não mostra o saldo atual. */
+    ocultarSaldo?: boolean
+  }
 }
 
 /** Saldo (ou digitação de quantidades) em matriz cor × tamanho, com totais por cor e por tamanho. */
@@ -56,7 +63,9 @@ export function MatrizDeEstoque({ matriz, onCelula, digitacao }: Props) {
                         onChange={(e) => digitacao.onMudar(c.skuId, e.target.value.replace(digitacao.permitirNegativo ? /[^\d-]/g : /\D/g, ''))}
                         className="h-9 w-full rounded-lg border border-border bg-surface px-1 text-center tabular-nums disabled:bg-surface-2"
                       />
-                      <span className="mt-0.5 block text-center text-[11px] text-muted tabular-nums" title="Saldo atual">{`hoje ${c.quantidade}`}</span>
+                      {!digitacao.ocultarSaldo && (
+                        <span className="mt-0.5 block text-center text-[11px] text-muted tabular-nums" title="Saldo atual">{`hoje ${c.quantidade}`}</span>
+                      )}
                     </td>
                   )
                 }

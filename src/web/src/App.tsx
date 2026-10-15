@@ -18,6 +18,8 @@ import { ProdutosPage } from './cadastros/ProdutosPage'
 import { LojasPage } from './estoque/LojasPage'
 import { MovimentacaoPage } from './estoque/MovimentacaoPage'
 import { PosicaoPage } from './estoque/PosicaoPage'
+import { NotasPage } from './estoque/NotasPage'
+import { InventarioPage } from './estoque/InventarioPage'
 import { ImportacaoPage } from './cadastros/ImportacaoPage'
 import { HistoricoPage } from './pages/HistoricoPage'
 import { LoginPage } from './pages/LoginPage'
@@ -39,6 +41,9 @@ const PAGINAS_IMPLEMENTADAS: Record<string, ReactNode> = {
   '/estoque/entradas': <MovimentacaoPage key="entrada" modo="entrada" />,
   '/estoque/ajustes': <MovimentacaoPage key="ajuste" modo="ajuste" />,
   '/estoque/transferencias': <MovimentacaoPage key="transferencia" modo="transferencia" />,
+  '/estoque/xml': <NotasPage />,
+  '/estoque/inventario': <InventarioPage />,
+  '/estoque/etiquetas': <MovimentacaoPage key="etiquetas" modo="etiquetas" />,
   '/configuracoes/lojas': <LojasPage />,
 }
 

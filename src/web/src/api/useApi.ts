@@ -79,10 +79,19 @@ export function useApi() {
     [token, selecao],
   )
 
-  /** Exportações: 200 = arquivo para baixar; 202 = gerado em segundo plano (aviso no sininho). */
+  /** Exportações: 200 = arquivo para baixar; 202 = gerado em segundo plano (aviso no sininho). Com corpo, vira POST JSON (ex.: etiquetas). */
   const baixar = useCallback(
-    async (caminho: string): Promise<ResultadoDownload> => {
-      const resposta = await chamar(caminho, { headers: { Authorization: `Bearer ${token}`, 'X-Empresa-Id': selecao } })
+    async (caminho: string, corpo?: unknown): Promise<ResultadoDownload> => {
+      const resposta = await chamar(
+        caminho,
+        corpo === undefined
+          ? { headers: { Authorization: `Bearer ${token}`, 'X-Empresa-Id': selecao } }
+          : {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}`, 'X-Empresa-Id': selecao, 'Content-Type': 'application/json' },
+              body: JSON.stringify(corpo),
+            },
+      )
       if (resposta.status === 202) {
         const corpo = (await resposta.json()) as { mensagem: string }
         return { tipo: 'agendado', mensagem: corpo.mensagem }
