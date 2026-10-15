@@ -25,7 +25,8 @@ public class CamadasTests
                 typeof(Kamus.Modules.Notificacoes.ModuloNotificacoes).Assembly,
                 typeof(Kamus.Modules.Licenciamento.ModuloLicenciamento).Assembly,
                 typeof(Kamus.Modules.Cadastros.ModuloCadastros).Assembly,
-                typeof(Kamus.Modules.Estoque.ModuloEstoque).Assembly])
+                typeof(Kamus.Modules.Estoque.ModuloEstoque).Assembly,
+                typeof(Kamus.Modules.Financeiro.ModuloFinanceiro).Assembly])
             .ShouldNot().HaveDependencyOn("Kamus.Api")
             .GetResult();
 
@@ -36,13 +37,14 @@ public class CamadasTests
     public void Modulos_NaoDependemUnsDosOutros()
     {
         // Comunicação entre módulos só pelo SharedKernel (ex.: INotificador, IRegistradorDeEventos).
-        string[] modulos = ["Kamus.Modules.Identidade", "Kamus.Modules.Notificacoes", "Kamus.Modules.Licenciamento", "Kamus.Modules.Cadastros", "Kamus.Modules.Estoque"];
+        string[] modulos = ["Kamus.Modules.Identidade", "Kamus.Modules.Notificacoes", "Kamus.Modules.Licenciamento", "Kamus.Modules.Cadastros", "Kamus.Modules.Estoque", "Kamus.Modules.Financeiro"];
         System.Reflection.Assembly[] assemblies = [
             typeof(Kamus.Modules.Identidade.ModuloIdentidade).Assembly,
             typeof(Kamus.Modules.Notificacoes.ModuloNotificacoes).Assembly,
             typeof(Kamus.Modules.Licenciamento.ModuloLicenciamento).Assembly,
             typeof(Kamus.Modules.Cadastros.ModuloCadastros).Assembly,
-            typeof(Kamus.Modules.Estoque.ModuloEstoque).Assembly];
+            typeof(Kamus.Modules.Estoque.ModuloEstoque).Assembly,
+            typeof(Kamus.Modules.Financeiro.ModuloFinanceiro).Assembly];
 
         foreach (var assembly in assemblies)
         {
