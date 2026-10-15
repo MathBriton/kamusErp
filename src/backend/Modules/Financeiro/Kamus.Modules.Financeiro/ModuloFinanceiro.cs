@@ -1,7 +1,9 @@
 using Kamus.Infrastructure.Persistence;
+using Kamus.Modules.Financeiro.Aplicacao;
 using Kamus.Modules.Financeiro.Endpoints;
 using Kamus.Modules.Financeiro.Persistencia;
 using Kamus.Modules.Financeiro.Relatorios;
+using Kamus.SharedKernel.Financeiro;
 using Kamus.SharedKernel.Relatorios;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
@@ -17,6 +19,7 @@ public static class ModuloFinanceiro
     {
         services.AddKamusDbContext<FinanceiroDbContext>(configuration, FinanceiroDbContext.Schema);
         services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<IContasAPagar, ContasAPagar>();
         services.AddScoped<IRelatorio, RelatorioDeTitulos>();
         services.AddScoped<IRelatorio, RelatorioDeFluxo>();
         return services;

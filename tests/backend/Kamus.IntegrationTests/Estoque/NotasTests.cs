@@ -105,6 +105,31 @@ public sealed class NotasTests : IAsyncDisposable
         fornecedores.ShouldContain("Confecções Aurora LTDA");
         (await Importar(client, ExemploDeNfe.Xml([Camisetas]))).StatusCode.ShouldBe(HttpStatusCode.Conflict); // mesma chave
         (await client.GetAsync(U($"/api/estoque/etiquetas/operacao/{lancada.OperacaoId}"), Ct)).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        // As duplicatas viram contas a pagar (uma parcela por duplicata), na categoria "Compra de mercadorias".
+        var contas = await client.GetFromJsonAsync<JsonElement>(U("/api/financeiro/titulos?tipo=pagar&situacao=abertas"), Ct);
+        var itens = contas.GetProperty("itens").EnumerateArray().ToList();
+        itens.Select(i => (i.GetProperty("descricao").GetString(), i.GetProperty("vencimento").GetString(), i.GetProperty("valor").GetDecimal())).ShouldBe(
+            [("NF 1234/1 — Aurora Moda", "2026-11-10", nota.ValorTotal / 2), ("NF 1234/1 — Aurora Moda", "2026-12-10", nota.ValorTotal / 2)]);
+        itens[0].GetProperty("pessoaNome").GetString().ShouldBe("Confecções Aurora LTDA");
+        itens[0].GetProperty("categoria").GetString().ShouldBe("Compra de mercadorias");
+        itens[0].GetProperty("origem").GetString().ShouldBe("NotaDeEntrada");
+    }
+
+    [Fact]
+    public async Task NotaSemDuplicatas_GeraUmaContaAPagarNaEmissao()
+    {
+        var client = await Entrar(_api);
+        var camiseta = await CriarCamiseta(client);
+        var loja = (await Lojas(client)).Single();
+        var nota = await ImportarOk(client, ExemploDeNfe.Xml([Camisetas], comCobranca: false));
+        await Item(client, nota.Id, 1, new { produtoId = camiseta.Id, fator = 1, distribuicao = new[] { new { skuId = Sku(camiseta, "Azul", "M").Id, quantidade = 10 } } });
+
+        (await client.PostAsJsonAsync(U($"/api/estoque/notas/{nota.Id}/lancar"), new { lojaId = loja.Id }, Ct)).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var contas = await client.GetFromJsonAsync<JsonElement>(U("/api/financeiro/titulos?tipo=pagar&situacao=todas"), Ct);
+        var unica = contas.GetProperty("itens").EnumerateArray().Single();
+        (unica.GetProperty("vencimento").GetString(), unica.GetProperty("valor").GetDecimal()).ShouldBe(("2026-10-10", 260m));
     }
 
     [Fact]

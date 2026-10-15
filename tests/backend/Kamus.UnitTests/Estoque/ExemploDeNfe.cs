@@ -12,7 +12,7 @@ internal static class ExemploDeNfe
 
     private static string N(decimal v) => v.ToString("0.00##", CultureInfo.InvariantCulture);
 
-    public static string Xml(IReadOnlyList<Item> itens, string destinatario = "12345678000195", string? cStat = "100", string chave = Chave, string numero = "1234")
+    public static string Xml(IReadOnlyList<Item> itens, string destinatario = "12345678000195", string? cStat = "100", string chave = Chave, string numero = "1234", bool comCobranca = true)
     {
         var dets = string.Concat(itens.Select((i, n) => $"""
             <det nItem="{n + 1}"><prod><cProd>{i.Codigo}</cProd><cEAN>{i.Ean}</cEAN><xProd>{i.Descricao}</xProd><NCM>61091000</NCM><CFOP>5102</CFOP>
@@ -31,7 +31,7 @@ internal static class ExemploDeNfe
             <dest><CNPJ>{destinatario}</CNPJ><xNome>Kamus Moda Centro LTDA</xNome></dest>
             {dets}
             <total><ICMSTot><vNF>{N(total)}</vNF></ICMSTot></total>
-            <cobr><dup><nDup>001</nDup><dVenc>2026-11-10</dVenc><vDup>{N(Math.Round(total / 2, 2))}</vDup></dup><dup><nDup>002</nDup><dVenc>2026-12-10</dVenc><vDup>{N(total - Math.Round(total / 2, 2))}</vDup></dup></cobr>
+            {(comCobranca ? "" : "<!--")}<cobr><dup><nDup>001</nDup><dVenc>2026-11-10</dVenc><vDup>{N(Math.Round(total / 2, 2))}</vDup></dup><dup><nDup>002</nDup><dVenc>2026-12-10</dVenc><vDup>{N(total - Math.Round(total / 2, 2))}</vDup></dup></cobr>{(comCobranca ? "" : "-->")}
             </infNFe></NFe>
             """;
         return cStat is null ? nfe : $"<nfeProc xmlns=\"http://www.portalfiscal.inf.br/nfe\" versao=\"4.00\">{nfe}{prot}</nfeProc>";

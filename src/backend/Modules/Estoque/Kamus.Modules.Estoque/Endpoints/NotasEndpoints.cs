@@ -6,6 +6,7 @@ using Kamus.Modules.Estoque.Persistencia;
 using Kamus.SharedKernel.Auditoria;
 using Kamus.SharedKernel.Catalogo;
 using Kamus.SharedKernel.Documentos;
+using Kamus.SharedKernel.Financeiro;
 using Kamus.SharedKernel.MultiTenancy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -215,7 +216,7 @@ internal static class NotasEndpoints
     }
 
     private static async Task<IResult> Lancar(Guid id, LancarRequest r, Lojas lojas, EstoqueDbContext db, ICatalogoDeProdutos catalogo,
-        IDiretorioDeFornecedores fornecedores, IEmpresaAtiva empresa, IUsuarioAtual usuario, TimeProvider relogio, CancellationToken ct)
+        IDiretorioDeFornecedores fornecedores, IContasAPagar contasAPagar, IEmpresaAtiva empresa, IUsuarioAtual usuario, TimeProvider relogio, CancellationToken ct)
     {
         if (Barrar(empresa) is { } negado) return negado;
         var nota = await CarregarAsync(db, empresa, id, ct);
@@ -253,6 +254,14 @@ internal static class NotasEndpoints
         {
             return Permissoes.Problema(StatusCodes.Status409Conflict, "O estoque mudou enquanto a nota era lançada. Tente de novo.");
         }
+
+        // Duplicatas → contas a pagar (nota sem cobrança: à vista, vence na emissão). Registrar de novo não duplica (chave da NF-e).
+        var emissao = DateOnly.FromDateTime(nota.EmitidaEm.ToOffset(TimeSpan.FromHours(-3)).DateTime);
+        var parcelas = nota.Duplicatas.Count > 0
+            ? nota.Duplicatas.OrderBy(d => d.Vencimento).Select(d => new ParcelaAPagar(d.Vencimento, d.Valor)).ToList()
+            : [new ParcelaAPagar(emissao, nota.ValorTotal)];
+        await contasAPagar.RegistrarCompraAsync(new ContaAPagarDeCompra(nota.EmpresaId, "NotaDeEntrada", nota.Chave, $"NF {nota.Numero}/{nota.Serie} — {nota.FornecedorNome}",
+            fornecedor.Id, fornecedor.Nome, $"NF-e {nota.Numero}", emissao, parcelas), ct);
         return Results.Ok(new MovimentacoesEndpoints.OperacaoDto(op.Id, movimentos.Count, movimentos.Sum(m => m.Quantidade)));
     }
 
