@@ -289,4 +289,31 @@ public sealed class ProdutosTests : IAsyncDisposable
 
         (await catalogo.ProdutoAsync(camiseta.Id, Ct)).ShouldBeNull();
     }
+
+    [Fact]
+    public async Task DiretorioDeFornecedores_AchaPeloCnpjECadastraSeNaoExiste()
+    {
+        var client = await Entrar();
+        (await client.PostAsJsonAsync(U("/api/pessoas"), new { tipo = "Juridica", nome = "Cliente PJ LTDA", documento = "11.444.777/0001-61", ehCliente = true }, Ct))
+            .StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        await using var escopo = _factory.Services.CreateAsyncScope();
+        escopo.ServiceProvider.GetRequiredService<TenantContext>().Definir(TenantDemo);
+        var diretorio = escopo.ServiceProvider.GetRequiredService<IDiretorioDeFornecedores>();
+
+        (await diretorio.PorDocumentoAsync("11222333000181", Ct)).ShouldBeNull();
+        var novo = await diretorio.GarantirAsync(new NovoFornecedor("11222333000181", "Confecções Aurora LTDA", "Aurora Moda", "1133334444", "03016000",
+            "Rua Oriente", "100", "Brás", "São Paulo", "SP"), Ct);
+        novo.Nome.ShouldBe("Confecções Aurora LTDA");
+        (await diretorio.GarantirAsync(new NovoFornecedor("11222333000181", "Outro nome", null, null, null, null, null, null, null, null), Ct)).Id.ShouldBe(novo.Id);
+        (await diretorio.PorDocumentoAsync("11.222.333/0001-81", Ct))!.Id.ShouldBe(novo.Id);
+
+        var clienteQueVirouFornecedor = await diretorio.GarantirAsync(new NovoFornecedor("11444777000161", "Cliente PJ LTDA", null, null, null, null, null, null, null, null), Ct);
+        var pessoa = await client.GetFromJsonAsync<JsonElement>(U($"/api/pessoas/{clienteQueVirouFornecedor.Id}"), Ct);
+        pessoa.GetProperty("ehCliente").GetBoolean().ShouldBeTrue();
+        pessoa.GetProperty("ehFornecedor").GetBoolean().ShouldBeTrue();
+        var fornecedor = await client.GetFromJsonAsync<JsonElement>(U($"/api/pessoas/{novo.Id}"), Ct);
+        fornecedor.GetProperty("endereco").GetProperty("cidade").GetString().ShouldBe("São Paulo");
+        fornecedor.GetProperty("telefone").GetString().ShouldBe("1133334444");
+    }
 }

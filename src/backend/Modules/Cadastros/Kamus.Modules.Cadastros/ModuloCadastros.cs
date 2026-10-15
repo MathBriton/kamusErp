@@ -24,6 +24,7 @@ public static class ModuloCadastros
         services.AddKamusDbContext<CadastrosDbContext>(configuration, CadastrosDbContext.Schema);
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<ICatalogoDeProdutos, CatalogoDeProdutos>();
+        services.AddScoped<IDiretorioDeFornecedores, DiretorioDeFornecedores>();
         services.AddScoped<IProvedorDeBusca, ProvedorDeBuscaCadastros>();
         services.AddScoped<IRelatorio, RelatorioDeClientes>();
         services.AddScoped<IRelatorio, RelatorioDeFornecedores>();
