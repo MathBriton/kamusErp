@@ -21,6 +21,10 @@ import { PosicaoPage } from './estoque/PosicaoPage'
 import { NotasPage } from './estoque/NotasPage'
 import { InventarioPage } from './estoque/InventarioPage'
 import { ImportacaoPage } from './cadastros/ImportacaoPage'
+import { ContasPage } from './financeiro/ContasPage'
+import { ContasFinanceirasPage } from './financeiro/ContasFinanceirasPage'
+import { FluxoDeCaixaPage } from './financeiro/FluxoDeCaixaPage'
+import { CategoriasPage } from './financeiro/CategoriasPage'
 import { HistoricoPage } from './pages/HistoricoPage'
 import { LoginPage } from './pages/LoginPage'
 import { NaoEncontradaPage } from './pages/NaoEncontradaPage'
@@ -44,6 +48,11 @@ const PAGINAS_IMPLEMENTADAS: Record<string, ReactNode> = {
   '/estoque/xml': <NotasPage />,
   '/estoque/inventario': <InventarioPage />,
   '/estoque/etiquetas': <MovimentacaoPage key="etiquetas" modo="etiquetas" />,
+  '/financeiro/contas-a-pagar': <ContasPage key="pagar" tipo="pagar" />,
+  '/financeiro/contas-a-receber': <ContasPage key="receber" tipo="receber" />,
+  '/financeiro/fluxo-de-caixa': <FluxoDeCaixaPage />,
+  '/financeiro/contas': <ContasFinanceirasPage />,
+  '/financeiro/categorias': <CategoriasPage />,
   '/configuracoes/lojas': <LojasPage />,
 }
 

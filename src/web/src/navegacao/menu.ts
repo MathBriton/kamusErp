@@ -56,10 +56,11 @@ export const MENU: GrupoMenu[] = [
     icone: 'wallet',
     perfis: [...GESTAO, 'Financeiro'],
     itens: [
-      { titulo: 'Contas a pagar', rota: '/financeiro/contas-a-pagar', previstoPara: 'v0.13.0', descricao: 'Títulos, parcelas, baixas, juros e multa.' },
-      { titulo: 'Contas a receber', rota: '/financeiro/contas-a-receber', previstoPara: 'v0.13.0', descricao: 'Recebíveis de cartão (com taxa e prazo), crediário e outros.' },
-      { titulo: 'Fluxo de caixa', rota: '/financeiro/fluxo-de-caixa', previstoPara: 'v0.13.0', descricao: 'Previsto × realizado por período.' },
-      { titulo: 'Contas financeiras', rota: '/financeiro/contas', previstoPara: 'v0.13.0', descricao: 'Caixa da loja, contas bancárias e carteiras.' },
+      { titulo: 'Contas a pagar', rota: '/financeiro/contas-a-pagar', descricao: 'Fornecedores e despesas: parcelas, pagamentos parciais, juros, multa e desconto.' },
+      { titulo: 'Contas a receber', rota: '/financeiro/contas-a-receber', descricao: 'Valores a receber de clientes e outras receitas.' },
+      { titulo: 'Fluxo de caixa', rota: '/financeiro/fluxo-de-caixa', descricao: 'Realizado até hoje e previsto daqui em diante.' },
+      { titulo: 'Contas financeiras', rota: '/financeiro/contas', descricao: 'Caixa da loja, contas bancárias e carteiras: saldo, extrato e transferências.' },
+      { titulo: 'Categorias', rota: '/financeiro/categorias', descricao: 'Plano de contas: grupos e categorias de receitas e despesas.' },
     ],
   },
   {
