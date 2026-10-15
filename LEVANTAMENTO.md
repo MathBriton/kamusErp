@@ -672,8 +672,8 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.10.0 | 1 | Importação por planilha | ✅ lançada |
 | v0.11.0 | 2 | Estoque: lojas, saldo por SKU, entrada/ajuste/transferência, custo médio, kardex, posição em matriz, estoque inicial por planilha | ✅ lançada |
 | v0.12.0 | 2 | Estoque: importação de XML da NF-e, inventário, etiquetas | ✅ lançada |
-| v0.13.0 | 3 | Financeiro | ⏳ |
-| v0.14.0 | 4 | Vendas (registro, troca e vale-troca, comissão) | ⏳ |
+| v0.13.0 | 3 | Financeiro: contas financeiras, categorias, contas a pagar/receber com baixas, contas a pagar da NF-e, extrato, transferências, fluxo de caixa | ✅ pronta |
+| v0.14.0 | 4 | Vendas (registro, formas de pagamento com taxa/prazo, troca e vale-troca, comissão) | ⏳ |
 | v0.15.0 | 5 | Crediário e condicional | ⏳ |
 | v0.16.0 | 6 | Dashboard real, app mobile, resumo diário | ⏳ |
 | v1.0.0 | 7 | Produção e primeira loja piloto | ⏳ depende de servidor |
@@ -829,3 +829,8 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | 2026-10-15 | Entrada por XML da NF-e (modelo 55): destinatário precisa ser a empresa ativa; chave única (nota descartada pode ser reimportada); itens vinculados pelo de-para do fornecedor, depois pelo EAN; distribuição na grade com fator de conversão (ex.: caixa com 12); itens podem ser ignorados | Aceita |
 | 2026-10-15 | De-para memorizado no lançamento: item com um SKU guarda código → SKU e fator; item distribuído na grade guarda só o produto e o fator (a grade muda a cada nota) | Aceita |
 | 2026-10-15 | Fornecedor da NF-e cadastrado automaticamente pelo CNPJ no lançamento (cliente PJ existente ganha o papel de fornecedor) | Aceita |
+| 2026-10-15 | Financeiro (v0.13.0): contas financeiras por empresa; categorias por cliente (grupo › categoria, padrões prontos); títulos a pagar/receber com parcelas, baixas parciais com juros, multa e desconto; estorno gera movimento contrário (nada é apagado); cancelamento só sem baixas | Aceita |
+| 2026-10-15 | Formas de pagamento (taxa e prazo de cartão) saem do financeiro e vão para a v0.14.0 (vendas), onde geram os recebíveis | Aceita |
+| 2026-10-15 | NF-e lançada no estoque gera a conta a pagar: uma parcela por duplicata (sem duplicatas: à vista na emissão), categoria "Compra de mercadorias", sem duplicar se lançada de novo | Aceita |
+| 2026-10-15 | Fluxo de caixa: realizado (movimentos) até hoje e previsto (saldo das parcelas abertas) de hoje em diante; vencidas ficam à parte; transferências só aparecem filtrando uma conta; acima de 62 dias agrupa por mês | Aceita |
+| 2026-10-15 | Despesa/receita fixa: "repetir todo mês" cria um título por mês (até 24) | Aceita (provisória; recorrência automática sem prazo fica para depois) |

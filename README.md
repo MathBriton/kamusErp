@@ -164,6 +164,10 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 37 | Etiquetas: formatos de papel da loja piloto (modelo da folha A4 e da impressora térmica) | Provisório: A4 3 × 10 (~63 × 26 mm) e térmica 40 × 25 mm; confirmar com a loja |
 | 38 | Custo de aquisição da NF-e: o ICMS é recuperável para a loja (Lucro Real)? | Provisório: custo = valor + frete + seguro + outras − desconto + IPI + ICMS-ST (Simples Nacional, ICMS não recuperável); validar com o contador |
 | 39 | XML de NF-e sem protocolo de autorização: aceitar? | Provisório: **aceita com aviso** na tela; protocolo de rejeição/denegação é recusado |
+| 40 | Formas de pagamento com taxa e prazo da maquininha (crédito, débito, PIX) | Provisório: ficam para a v0.14.0 (vendas), onde a venda gera os recebíveis |
+| 41 | Fluxo de caixa: contas vencidas e não pagas entram na projeção? | Provisório: **não** — aparecem à parte ("em atraso") até serem pagas ou renegociadas |
+| 42 | Quem acessa o financeiro? | Provisório: Dono, Gerente e Financeiro |
+| 43 | Avisos de contas vencendo (sininho) e resumo diário | Previsto com o resumo diário (v0.16.0) |
 
 ### Débitos técnicos
 
@@ -202,6 +206,10 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Duplicatas da NF-e só ficam guardadas | Contas a pagar ainda não existem | v0.13.0 (financeiro): gerar títulos a partir das duplicatas |
 | Etiquetas não têm layout configurável (tamanhos e campos fixos) | Lojas com outras etiquetas não conseguem imprimir no papel delas | Configuração de modelos de etiqueta |
 | Leitor de código no inventário faz uma requisição por leitura | Lento com internet ruim e contagens grandes | Fila local no navegador / app mobile |
+| Financeiro: listagens e fluxo de caixa calculados **em memória** (carregam todos os títulos da empresa) | Lento com dezenas de milhares de parcelas | Consultas agregadas no PostgreSQL / paginação |
+| Conta a pagar da NF-e é criada depois da gravação da entrada (outro contexto) | Se falhar, a entrada fica sem a conta a pagar (relançar não duplica, mas a nota já está lançada) | Transação única / outbox quando houver PostgreSQL em produção |
+| Sem DRE, conciliação bancária (OFX) nem centro de custo | Relatórios financeiros básicos | DRE na central de relatórios (v0.16.0); OFX pós-MVP |
+| Pessoa do título é guardada pelo nome (o vínculo com o cadastro é opcional) | Renomear o fornecedor no cadastro não muda títulos antigos | Mostrar o nome atual quando houver vínculo |
 
 ## Multi-tenancy em uma frase
 

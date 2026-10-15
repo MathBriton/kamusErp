@@ -382,3 +382,54 @@ X-Empresa-Id: {{login.response.body.empresas[0].id}}
 Content-Type: application/json
 
 { "lojaId": "{{lojas.response.body.$[0].id}}" }
+
+### ---------- Financeiro ----------
+
+### Categorias padrão
+POST {{api}}/api/financeiro/categorias/padrao
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Nova conta financeira
+# @name conta
+POST {{api}}/api/financeiro/contas
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "nome": "Caixa da loja", "tipo": "Caixa", "saldoInicial": 500, "saldoInicialEm": "2026-10-01" }
+
+### Conta a pagar em 2 parcelas
+# @name titulo
+POST {{api}}/api/financeiro/titulos
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{
+  "tipo": "Pagar", "descricao": "Reforma da vitrine", "pessoaNome": "Marcenaria Silva", "competencia": "2026-10-15",
+  "parcelas": [{ "vencimento": "2026-10-25", "valor": 200 }, { "vencimento": "2026-11-25", "valor": 100 }]
+}
+
+### Contas a pagar em aberto (situacao: abertas, vencidas, pagas, canceladas, todas)
+GET {{api}}/api/financeiro/titulos?tipo=pagar&situacao=abertas
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Pagar a 1ª parcela (parcial, com juros)
+POST {{api}}/api/financeiro/parcelas/{{titulo.response.body.parcelas[0].id}}/baixas
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "data": "2026-10-15", "contaId": "{{conta.response.body.id}}", "valor": 80, "juros": 5, "multa": 0, "desconto": 0 }
+
+### Extrato da conta
+GET {{api}}/api/financeiro/contas/{{conta.response.body.id}}/extrato?de=2026-10-01&ate=2026-10-31
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Fluxo de caixa (próximos 30 dias por padrão)
+GET {{api}}/api/financeiro/fluxo
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
