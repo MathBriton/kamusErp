@@ -672,7 +672,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.10.0 | 1 | Importação por planilha | ✅ lançada |
 | v0.11.0 | 2 | Estoque: lojas, saldo por SKU, entrada/ajuste/transferência, custo médio, kardex, posição em matriz, estoque inicial por planilha | ✅ lançada |
 | v0.12.0 | 2 | Estoque: importação de XML da NF-e, inventário, etiquetas | ✅ lançada |
-| v0.13.0 | 3 | Financeiro: contas financeiras, categorias, contas a pagar/receber com baixas, contas a pagar da NF-e, extrato, transferências, fluxo de caixa | ✅ pronta |
+| v0.13.0 | 3 | Financeiro: contas financeiras, categorias, contas a pagar/receber com baixas, contas a pagar da NF-e, extrato, transferências, fluxo de caixa | ✅ lançada |
 | v0.14.0 | 4 | Vendas (registro, formas de pagamento com taxa/prazo, troca e vale-troca, comissão) | ⏳ |
 | v0.15.0 | 5 | Crediário e condicional | ⏳ |
 | v0.16.0 | 6 | Dashboard real, app mobile, resumo diário | ⏳ |

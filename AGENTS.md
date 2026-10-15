@@ -188,7 +188,7 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 
 **Última atualização:** 2026-10-15
 
-**Releases:** v0.1.0 → v0.12.0 lançadas; **v0.13.0 (financeiro)** pronta para lançar. Próxima: **v0.14.0** (vendas).
+**Releases:** v0.1.0 → **v0.13.0** lançadas (a v0.13.0 trouxe o financeiro). Próxima: **v0.14.0** (vendas).
 Plano de releases em `LEVANTAMENTO.md` → Plano de releases (crediário/condicional v0.15.0, dashboard/mobile v0.16.0, v1.0.0 produção).
 
 **O que existe hoje:**
