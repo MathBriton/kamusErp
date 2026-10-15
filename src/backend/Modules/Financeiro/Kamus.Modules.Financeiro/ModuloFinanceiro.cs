@@ -1,5 +1,8 @@
 using Kamus.Infrastructure.Persistence;
+using Kamus.Modules.Financeiro.Endpoints;
 using Kamus.Modules.Financeiro.Persistencia;
+using Kamus.Modules.Financeiro.Relatorios;
+using Kamus.SharedKernel.Relatorios;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,8 +17,10 @@ public static class ModuloFinanceiro
     {
         services.AddKamusDbContext<FinanceiroDbContext>(configuration, FinanceiroDbContext.Schema);
         services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<IRelatorio, RelatorioDeTitulos>();
+        services.AddScoped<IRelatorio, RelatorioDeFluxo>();
         return services;
     }
 
-    public static IEndpointRouteBuilder MapModuloFinanceiro(this IEndpointRouteBuilder app) => app;
+    public static IEndpointRouteBuilder MapModuloFinanceiro(this IEndpointRouteBuilder app) => app.MapContas().MapCategorias().MapTitulos().MapFluxo();
 }
