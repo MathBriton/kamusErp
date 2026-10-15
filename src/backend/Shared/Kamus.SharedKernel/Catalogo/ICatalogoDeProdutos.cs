@@ -21,6 +21,9 @@ public interface ICatalogoDeProdutos
     /// <summary>SKUs pelos ids (os inexistentes são omitidos).</summary>
     Task<IReadOnlyList<SkuDoCatalogo>> SkusAsync(IReadOnlyCollection<Guid> skuIds, CancellationToken ct = default);
 
+    /// <summary>SKU pelo código de barras (leitor). Nulo se não existe.</summary>
+    Task<SkuDoCatalogo?> SkuPorCodigoAsync(string codigoDeBarras, CancellationToken ct = default);
+
     /// <summary>Todos os SKUs do cliente — para casar planilhas por referência/cor/tamanho ou código de barras.</summary>
     Task<IReadOnlyList<SkuDoCatalogo>> TodosOsSkusAsync(CancellationToken ct = default);
 }

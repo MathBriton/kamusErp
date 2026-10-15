@@ -11,6 +11,7 @@ public enum TipoDeMovimento
     TransferenciaSaida,
     TransferenciaEntrada,
     EstoqueInicial,
+    Inventario,
 }
 
 /// <summary>Dados comuns aos itens de uma mesma operação (uma entrada com vários SKUs, uma transferência...).</summary>

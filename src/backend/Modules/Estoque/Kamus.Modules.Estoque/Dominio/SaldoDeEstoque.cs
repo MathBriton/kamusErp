@@ -66,6 +66,17 @@ public sealed class SaldoDeEstoque : ITenantOwned
         return Registrar(TipoDeMovimento.EstoqueInicial, diferenca, CustoMedio, op);
     }
 
+    /// <summary>
+    /// Ajuste de inventário pela diferença contada. Sobra entra pelo custo médio (ou <paramref name="custoSeVazio"/> se o saldo
+    /// estiver zerado); falta baixa até zerar, nunca negativo. Nulo se nada muda.
+    /// </summary>
+    public MovimentoDeEstoque? Inventariar(int diferenca, decimal custoSeVazio, Operacao op)
+    {
+        if (diferenca > 0) return Entrar(TipoDeMovimento.Inventario, diferenca, Quantidade > 0 ? CustoMedio : custoSeVazio, op);
+        var baixa = Math.Min(-diferenca, Math.Max(Quantidade, 0));
+        return baixa == 0 ? null : Sair(TipoDeMovimento.Inventario, baixa, op);
+    }
+
     private MovimentoDeEstoque Registrar(TipoDeMovimento tipo, int quantidade, decimal custoUnitario, Operacao op)
     {
         AtualizadoEm = op.OcorridoEm;

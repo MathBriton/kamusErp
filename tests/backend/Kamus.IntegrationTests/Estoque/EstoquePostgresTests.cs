@@ -24,6 +24,7 @@ public sealed class EstoquePostgresTests(PostgresFixture db)
     private sealed record CelulaDto(Guid SkuId, int Quantidade, decimal? CustoMedio);
     private sealed record MatrizDto(List<CelulaDto> Celulas, int Total);
     private sealed record MovimentoDto(string Tipo, int Quantidade, int SaldoApos);
+    private sealed record InventarioDto(Guid Id);
 
     [Fact]
     public async Task Estoque_NoPostgres_EntradaTransferenciaKardexERls()
@@ -68,9 +69,17 @@ public sealed class EstoquePostgresTests(PostgresFixture db)
         var kardex = (await client.GetFromJsonAsync<List<MovimentoDto>>(U($"/api/estoque/kardex?skuId={m}"), Ct))!;
         kardex.ShouldBe([new("TransferenciaEntrada", 2, 2), new("TransferenciaSaida", -2, 4), new("Entrada", 6, 6)]);
 
+        var inventario = await client.PostAsJsonAsync(U("/api/estoque/inventarios"), new { lojaId = deposito.Id }, Ct);
+        inventario.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var inventarioId = (await inventario.Content.ReadFromJsonAsync<InventarioDto>(Ct))!.Id;
+        (await client.PutAsJsonAsync(U($"/api/estoque/inventarios/{inventarioId}/contagens"), new { itens = new[] { new { skuId = m, quantidade = 1 } } }, Ct))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await client.PostAsJsonAsync(U($"/api/estoque/inventarios/{inventarioId}/concluir"), new { zerarNaoContados = true }, Ct)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await client.GetFromJsonAsync<MatrizDto>(U($"/api/estoque/posicao/{produto.Id}?lojaId={deposito.Id}"), Ct))!.Celulas.Single(c => c.SkuId == m).Quantidade.ShouldBe(1);
+
         await using var conn = new NpgsqlConnection(db.AppConnectionString);
         await conn.OpenAsync(Ct);
-        foreach (var tabela in new[] { "lojas", "saldos", "movimentos" })
+        foreach (var tabela in new[] { "lojas", "saldos", "movimentos", "inventarios", "itens_de_inventario" })
         {
             await using var cmd = new NpgsqlCommand($"SELECT count(*) FROM estoque.{tabela}", conn);
             ((long)(await cmd.ExecuteScalarAsync(Ct))!).ShouldBe(0, $"RLS em estoque.{tabela}");

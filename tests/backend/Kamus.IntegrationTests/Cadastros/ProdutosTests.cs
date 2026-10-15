@@ -273,6 +273,8 @@ public sealed class ProdutosTests : IAsyncDisposable
         sku.ShouldBe(sku with { ProdutoId = camiseta.Id, Referencia = "CAM-001", Descricao = "Camiseta Básica Gola V", Cor = "Azul", Tamanho = "M", CodigoDeBarras = azulM.CodigoDeBarras, PrecoCusto = 24m, Ativo = true });
 
         (await catalogo.TodosOsSkusAsync(Ct)).ShouldContain(s => s.Id == azulM.Id);
+        (await catalogo.SkuPorCodigoAsync($" {azulM.CodigoDeBarras} ", Ct))!.Id.ShouldBe(azulM.Id);
+        (await catalogo.SkuPorCodigoAsync("7891234567895", Ct)).ShouldBeNull();
         (await catalogo.ProdutoAsync(Guid.NewGuid(), Ct)).ShouldBeNull();
     }
 

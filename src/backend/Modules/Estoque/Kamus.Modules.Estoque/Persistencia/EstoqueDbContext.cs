@@ -15,6 +15,8 @@ public sealed class EstoqueDbContext(DbContextOptions<EstoqueDbContext> options,
     public DbSet<Loja> Lojas => Set<Loja>();
     public DbSet<SaldoDeEstoque> Saldos => Set<SaldoDeEstoque>();
     public DbSet<MovimentoDeEstoque> Movimentos => Set<MovimentoDeEstoque>();
+    public DbSet<Inventario> Inventarios => Set<Inventario>();
+    public DbSet<ItemDeInventario> ItensDeInventario => Set<ItemDeInventario>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -52,6 +54,25 @@ public sealed class EstoqueDbContext(DbContextOptions<EstoqueDbContext> options,
             e.HasIndex(m => new { m.TenantId, m.ProdutoId, m.OcorridoEm });
             e.HasIndex(m => m.OperacaoId);
             e.HasOne<Loja>().WithMany().HasForeignKey(m => m.LojaId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Inventario>(e =>
+        {
+            e.ToTable("inventarios");
+            e.Property(i => i.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(i => i.Observacao).HasMaxLength(500);
+            e.Property(i => i.AbertoPor).HasMaxLength(150);
+            e.Property(i => i.ConcluidoPor).HasMaxLength(150);
+            e.HasIndex(i => new { i.TenantId, i.LojaId, i.AbertoEm });
+            e.HasOne<Loja>().WithMany().HasForeignKey(i => i.LojaId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(i => i.Itens).WithOne().HasForeignKey(i => i.InventarioId).OnDelete(DeleteBehavior.Cascade);
+            e.Navigation(i => i.Itens).HasField("_itens").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<ItemDeInventario>(e =>
+        {
+            e.ToTable("itens_de_inventario");
+            e.HasIndex(i => new { i.InventarioId, i.SkuId }).IsUnique();
         });
 
         base.OnModelCreating(modelBuilder);

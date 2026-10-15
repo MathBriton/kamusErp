@@ -23,6 +23,121 @@ namespace Kamus.Modules.Estoque.Persistencia.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.Inventario", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AbertoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("aberto_em");
+
+                    b.Property<string>("AbertoPor")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("aberto_por");
+
+                    b.Property<string>("ConcluidoPor")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("concluido_por");
+
+                    b.Property<DateTimeOffset?>("EncerradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("encerrado_em");
+
+                    b.Property<Guid>("LojaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("loja_id");
+
+                    b.Property<string>("Observacao")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("observacao");
+
+                    b.Property<Guid?>("OperacaoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operacao_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<bool>("ZerouNaoContados")
+                        .HasColumnType("boolean")
+                        .HasColumnName("zerou_nao_contados");
+
+                    b.HasKey("Id")
+                        .HasName("pk_inventarios");
+
+                    b.HasIndex("LojaId")
+                        .HasDatabaseName("ix_inventarios_loja_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_inventarios_tenant_id");
+
+                    b.HasIndex("TenantId", "LojaId", "AbertoEm")
+                        .HasDatabaseName("ix_inventarios_tenant_id_loja_id_aberto_em");
+
+                    b.ToTable("inventarios", "estoque");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.ItemDeInventario", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int?>("Contado")
+                        .HasColumnType("integer")
+                        .HasColumnName("contado");
+
+                    b.Property<DateTimeOffset?>("ContadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("contado_em");
+
+                    b.Property<Guid>("InventarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("inventario_id");
+
+                    b.Property<Guid>("ProdutoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("produto_id");
+
+                    b.Property<int>("SaldoNaAbertura")
+                        .HasColumnType("integer")
+                        .HasColumnName("saldo_na_abertura");
+
+                    b.Property<Guid>("SkuId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sku_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_itens_de_inventario");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_itens_de_inventario_tenant_id");
+
+                    b.HasIndex("InventarioId", "SkuId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_itens_de_inventario_inventario_id_sku_id");
+
+                    b.ToTable("itens_de_inventario", "estoque");
+                });
+
             modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.Loja", b =>
                 {
                     b.Property<Guid>("Id")
@@ -233,6 +348,26 @@ namespace Kamus.Modules.Estoque.Persistencia.Migrations
                     b.ToTable("saldos", "estoque");
                 });
 
+            modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.Inventario", b =>
+                {
+                    b.HasOne("Kamus.Modules.Estoque.Dominio.Loja", null)
+                        .WithMany()
+                        .HasForeignKey("LojaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_inventarios_lojas_loja_id");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.ItemDeInventario", b =>
+                {
+                    b.HasOne("Kamus.Modules.Estoque.Dominio.Inventario", null)
+                        .WithMany("Itens")
+                        .HasForeignKey("InventarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_itens_de_inventario_inventarios_inventario_id");
+                });
+
             modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.MovimentoDeEstoque", b =>
                 {
                     b.HasOne("Kamus.Modules.Estoque.Dominio.Loja", null)
@@ -251,6 +386,11 @@ namespace Kamus.Modules.Estoque.Persistencia.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_saldos_lojas_loja_id");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.Inventario", b =>
+                {
+                    b.Navigation("Itens");
                 });
 #pragma warning restore 612, 618
         }

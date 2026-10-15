@@ -27,6 +27,14 @@ internal sealed class CatalogoDeProdutos(CadastrosDbContext db) : ICatalogoDePro
         return (await MontarAsync(db.Produtos.Where(p => produtoIds.Contains(p.Id)), ct)).Where(s => skuIds.Contains(s.Id)).ToList();
     }
 
+    public async Task<SkuDoCatalogo?> SkuPorCodigoAsync(string codigoDeBarras, CancellationToken ct = default)
+    {
+        var codigo = Kamus.SharedKernel.Documentos.CodigoDeBarras.Normalizar(codigoDeBarras);
+        if (codigo is null) return null;
+        var skuId = await db.Skus.Where(s => s.CodigoDeBarras == codigo).Select(s => (Guid?)s.Id).SingleOrDefaultAsync(ct);
+        return skuId is null ? null : (await SkusAsync([skuId.Value], ct)).SingleOrDefault();
+    }
+
     public Task<IReadOnlyList<SkuDoCatalogo>> TodosOsSkusAsync(CancellationToken ct = default) => MontarAsync(db.Produtos, ct);
 
     private async Task<IReadOnlyList<SkuDoCatalogo>> MontarAsync(IQueryable<Produto> consulta, CancellationToken ct)

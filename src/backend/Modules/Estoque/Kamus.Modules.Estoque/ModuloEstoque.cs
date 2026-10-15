@@ -22,9 +22,10 @@ public static class ModuloEstoque
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<Lojas>();
         services.AddScoped<IRelatorio, RelatorioDePosicao>();
+        services.AddScoped<IRelatorio, RelatorioDeInventario>();
         services.AddScoped<IImportador, ImportadorDeEstoqueInicial>();
         return services;
     }
 
-    public static IEndpointRouteBuilder MapModuloEstoque(this IEndpointRouteBuilder app) => app.MapLojas().MapMovimentacoes().MapPosicao().MapEtiquetas();
+    public static IEndpointRouteBuilder MapModuloEstoque(this IEndpointRouteBuilder app) => app.MapLojas().MapMovimentacoes().MapPosicao().MapEtiquetas().MapInventarios();
 }
