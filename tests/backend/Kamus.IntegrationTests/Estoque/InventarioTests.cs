@@ -110,6 +110,8 @@ public sealed class InventarioTests : IAsyncDisposable
 
         (await Saldo(client, camiseta.Id, azulM.Id)).ShouldBe(6);
         (await Saldo(client, camiseta.Id, pretoG.Id)).ShouldBe(3);
+        var depois = (await client.GetFromJsonAsync<DivergenciasDto>(U($"/api/estoque/inventarios/{inventario.Id}/divergencias?zerarNaoContados=true"), Ct))!;
+        depois.Itens.Select(d => d.Diferenca).ShouldBe([1]); // concluído sem zerar: o filtro da tela não muda o que foi ajustado
     }
 
     [Fact]

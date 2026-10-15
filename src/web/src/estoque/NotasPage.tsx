@@ -65,6 +65,7 @@ interface ResumoDaNota {
 
 const data = (iso: string) => new Date(iso).toLocaleDateString('pt-BR')
 const dataCurta = (dia: string) => dia.split('-').reverse().join('/')
+const documento = (d: string) => (d.length === 14 ? d.replace(/^(..)(...)(...)(....)(..)$/, '$1.$2.$3/$4-$5') : d)
 const quantidade = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 4 })
 
 const SITUACAO: Record<ItemDaNota['situacao'], string> = {
@@ -247,7 +248,7 @@ function DetalheDaNota({ id, onVoltar }: { id: string; onVoltar: () => void }) {
         <div className="flex-1">
           <h1 className="text-2xl font-bold tracking-tight">{`NF ${nota.numero}/${nota.serie} — ${nota.fornecedorNome}`}</h1>
           <p className="mt-1 text-sm text-muted">
-            {`CNPJ ${nota.fornecedorDocumento} · emitida em ${data(nota.emitidaEm)} · ${moeda(nota.valorTotal)}`}
+            {`CNPJ ${documento(nota.fornecedorDocumento)} · emitida em ${data(nota.emitidaEm)} · ${moeda(nota.valorTotal)}`}
             {nota.status === 'Lancada' && ` · lançada em ${nota.loja}`}
             {nota.status === 'Descartada' && ' · descartada'}
           </p>

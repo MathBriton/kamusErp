@@ -199,7 +199,9 @@ internal static class InventariosEndpoints
         if (Barrar(empresa) is { } negado) return negado;
         var (inventario, _) = await CarregarAsync(db, lojas, id, ct);
         if (inventario is null) return Results.NotFound();
-        return Results.Ok(await CalcularAsync(inventario, zerarNaoContados ?? false, db, catalogo, Permissoes.PodeVerCusto(empresa.Perfil), ct));
+        // Concluído: mostra exatamente o que foi ajustado (com a opção usada na conclusão).
+        var zerar = inventario.Status == StatusDoInventario.Concluido ? inventario.ZerouNaoContados : zerarNaoContados ?? false;
+        return Results.Ok(await CalcularAsync(inventario, zerar, db, catalogo, Permissoes.PodeVerCusto(empresa.Perfil), ct));
     }
 
     private static async Task<IResult> Concluir(Guid id, ConcluirRequest r, Lojas lojas, EstoqueDbContext db, ICatalogoDeProdutos catalogo,

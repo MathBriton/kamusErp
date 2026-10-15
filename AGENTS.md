@@ -77,11 +77,12 @@ src/backend/Shared/Kamus.Infrastructure/Busca      Pesquisa global (/api/busca) 
 src/backend/Shared/Kamus.Infrastructure/Relatorios Exportação PDF/Excel/CSV (/api/relatorios/{codigo}.{formato}) + segundo plano
 src/backend/Shared/Kamus.Infrastructure/Planilhas  Leitura de .xlsx/.csv (LeitorDePlanilha, ValoresDaPlanilha) e modelos (ModeloDePlanilha)
 src/backend/Shared/Kamus.Infrastructure/Importacao Importação genérica (/api/importacoes): IImportador, sessões, confirmação e segundo plano
+src/backend/Shared/Kamus.Infrastructure/Etiquetas  Código de barras em SVG (EAN-13/8, ITF-14) e PDF de etiquetas (A4 3×10 e térmica 40×25)
 src/backend/Modules/Identidade/...            Módulo Identidade: Dominio/, Aplicacao/, Persistencia/, Endpoints/, Busca/, Seed/
 src/backend/Modules/Notificacoes/...          Módulo Notificacoes: notificações por usuário + SignalR (/hubs/notificacoes)
 src/backend/Modules/Licenciamento/...         Licença por cliente (/api/licenca, bloqueio 402, avisos) + API do Painel (Administracao/, /admin-api)
 src/backend/Modules/Cadastros/...             Clientes/fornecedores (/api/pessoas), vendedores, grades, cores e produtos com SKUs (/api/produtos); ICatalogoDeProdutos
-src/backend/Modules/Estoque/...               Lojas, saldos, movimentos/kardex, custo médio (/api/estoque/...), estoque inicial por planilha
+src/backend/Modules/Estoque/...               Lojas, saldos, movimentos/kardex, custo médio, inventário, etiquetas, NF-e (NotasFiscais/LeitorDeNfe) — /api/estoque/...
 src/web/src                                   auth/, api/, busca/, cadastros/, configuracoes/, empresa/, layout/, licenca/, navegacao/, notificacoes/, pages/, relatorios/, theme/, test/
 src/admin/src                                 Painel Administrativo (operador do SaaS): login SuperAdmin, clientes, pagamentos
 tests/backend/Kamus.UnitTests                 Unitários (domínio puro)
@@ -103,7 +104,7 @@ na tela — PDF, Excel, CSV, histórico e segundo plano vêm de graça. **Lembre
 
 **Módulos conversam só pelo SharedKernel** (há teste de arquitetura): `INotificador` (notificar usuários),
 `IRegistradorDeEventos` (eventos no histórico), `IProvedorDeBusca`, `IRelatorio`, `IEmpresaAtiva`
-(id, perfil, nome e CNPJ da empresa ativa), `IUsuarioAtual`, `ICatalogoDeProdutos` (produtos/SKUs, implementado pelo Cadastros), `IDiretorioDeClientes` (tenants e Donos) e
+(id, perfil, nome e CNPJ da empresa ativa), `IUsuarioAtual`, `ICatalogoDeProdutos` e `IDiretorioDeFornecedores` (produtos/SKUs e fornecedores pelo CNPJ, implementados pelo Cadastros), `IDiretorioDeClientes` (tenants e Donos) e
 `ICadastroDeClientes` (criar tenant + empresa + Dono) — esses dois implementados pela Identidade.
 Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e chame `TenantContext.Definir(tenantId)`.
 
@@ -184,34 +185,38 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 
 ## 10. Estado atual e próximo passo (ATUALIZE AO TERMINAR)
 
-**Última atualização:** 2026-10-14
+**Última atualização:** 2026-10-15
 
-**Releases:** v0.1.0 → **v0.11.0** lançadas (a v0.11.0 trouxe o estoque, parte 1). Próxima: **v0.12.0** (XML da NF-e, inventário, etiquetas).
-Plano de releases em `LEVANTAMENTO.md` → Plano de releases (renumerado: financeiro v0.13.0, vendas v0.14.0, crediário v0.15.0, dashboard v0.16.0).
+**Releases:** v0.1.0 → v0.11.0 lançadas; **v0.12.0 (estoque, parte 2)** pronta para lançar. Próxima: **v0.13.0** (financeiro).
+Plano de releases em `LEVANTAMENTO.md` → Plano de releases (vendas v0.14.0, crediário/condicional v0.15.0, dashboard/mobile v0.16.0).
 
 **O que existe hoje:**
 - Fundação: login (JWT + refresh rotativo), empresa ativa (`X-Empresa-Id`), histórico de alterações, notificações (SignalR),
   pesquisa global, exportação PDF/Excel/CSV, licenciamento + Painel Administrativo (`/admin-api`, `src/admin`).
-- v0.7.0–v0.10.0: empresas e usuários (Dono, limites do plano), pessoas, vendedores, grades/cores/produtos com SKUs,
-  importação por planilha (agora genérica em `Kamus.Infrastructure.Importacao`: tipos clientes, fornecedores, produtos, estoque-inicial).
-- **v0.11.0 — estoque (módulo `Kamus.Modules.Estoque`, schema `estoque`, RLS em lojas/saldos/movimentos):**
-  - `Loja` (por empresa; a 1ª nasce no primeiro acesso com o nome fantasia; Dono cria/renomeia/desativa; `LimiteDeLojas` → 409).
-  - `SaldoDeEstoque` (loja × SKU, custo médio ponderado 4 casas, `Versao` = concorrência) e `MovimentoDeEstoque` (kardex imutável,
-    `Sequencia` desempata dentro da operação). Movimentos manuais não deixam saldo negativo (409 `ESTOQUE_INSUFICIENTE`).
-  - Endpoints `/api/estoque/lojas`, `/entradas`, `/ajustes` (motivo; evento `ajuste_de_estoque` no histórico), `/transferencias`
-    (mesma empresa), `/posicao`, `/posicao/{produtoId}` (matriz + total por loja), `/kardex`. Custos só para Dono/Gerente/Estoquista/Financeiro.
-  - Relatório `posicao-de-estoque`; importador `estoque-inicial` (quantidade absoluta por SKU e loja).
-  - `ICatalogoDeProdutos` (SharedKernel) para outros módulos lerem produto/SKUs sem depender do Cadastros.
-  - Web: `estoque/` — PosicaoPage (matriz + kardex), MovimentacaoPage (entrada/ajuste/transferência digitando na grade, lista de itens),
-    LojasPage (Configurações → Lojas), MatrizDeEstoque (leitura e digitação), `?tipo=estoque-inicial` na importação.
-- Testes: 361 backend, 120 web, 10 admin. E2E em localhost (lojas, 2 entradas com custo médio, ajuste, transferência, erro de saldo,
-  posição/matriz/kardex, estoque inicial por CSV, modo escuro), 3 execuções seguidas.
+- Cadastros (v0.7–v0.10): empresas/usuários, pessoas, vendedores, grades/cores/produtos com SKUs, importação por planilha
+  (genérica em `Kamus.Infrastructure.Importacao`; tipos clientes, fornecedores, produtos, estoque-inicial).
+- Estoque parte 1 (v0.11.0): lojas (limite do plano), saldo por loja × SKU com custo médio, entradas, ajustes, transferências,
+  kardex imutável, posição em matriz, relatório `posicao-de-estoque`.
+- **Estoque parte 2 (v0.12.0):**
+  - **Etiquetas:** `Kamus.Infrastructure.Etiquetas` (`DesenhoDeCodigoDeBarras` SVG; `GeradorDeEtiquetas` QuestPDF). Endpoints
+    `POST /api/estoque/etiquetas` (SKUs e quantidades) e `GET /api/estoque/etiquetas/operacao/{id}?formato=` (uma por peça da entrada).
+  - **Inventário:** `Inventario` + `ItemDeInventario` (foto na abertura, contagem cega). `/api/estoque/inventarios` (abrir, contagens,
+    leituras por código, divergências, concluir — Dono/Gerente —, cancelar). Ajuste = contado − foto sobre o saldo atual (`TipoDeMovimento.Inventario`,
+    `SaldoDeEstoque.Inventariar`, nunca negativo). Relatório `inventario`. Evento `inventario_concluido` no histórico.
+  - **NF-e:** `NotasFiscais/LeitorDeNfe` (modelo 55, nfeProc ou NFe, XXE bloqueado, custo de aquisição por item, duplicatas).
+    `NotaDeEntrada`/`ItemDaNota`/`DistribuicaoDoItem`/`DuplicataDaNota`/`VinculoDeProduto` (de-para). `/api/estoque/notas`
+    (importar multipart, conferir item, lançar, descartar). Vinculação automática: de-para do fornecedor → EAN. Fornecedor via
+    `IDiretorioDeFornecedores` (SharedKernel, implementado no Cadastros). XML de exemplo em `docs/exemplos/nfe-entrada-exemplo.xml`.
+  - Web: `estoque/NotasPage` (importar, conferir com a grade e fator, lançar, etiquetas), `InventarioPage` (grade cega, leitor,
+    divergências, concluir), `MovimentacaoPage modo="etiquetas"`, `BotaoEtiquetas`, `BuscaDeProduto`; `useApi().baixar(caminho, corpo?)`.
+- Testes: 416 backend, 129 web, 10 admin. E2E em localhost com o XML de exemplo (vincular na grade + caixa × 12 + ignorar, lançar,
+  etiquetas, reimportação recusada, fornecedor criado, inventário com grade e leitor, conclusão, etiquetas térmicas, tema escuro), 3 execuções.
+  Código de barras do PDF conferido por um decodificador EAN-13.
 
-**Próximo passo — v0.12.0: estoque, parte 2** (ver `LEVANTAMENTO.md` 4.2 e 4.7.4 XML):
-1. Importação do XML da NF-e de entrada: fornecedor pelo CNPJ, de-para (código do fornecedor → SKU) memorizado, gera entrada
-   (contas a pagar ficam para o financeiro).
-2. Inventário: foto do saldo, contagem (digitação na matriz / leitor), comparação, aprovação, ajuste pela diferença.
-3. Etiquetas em PDF (código de barras, cor, tamanho, preço), quantidade = recebida na entrada.
+**Próximo passo — v0.13.0: financeiro** (ver `LEVANTAMENTO.md` 4.3):
+1. Contas financeiras (caixa da loja, banco, carteira) e títulos a pagar/receber com parcelas e baixas (parciais), juros/multa.
+2. Contas a pagar geradas a partir das duplicatas da NF-e lançada (`DuplicataDaNota`, já gravadas).
+3. Fluxo de caixa previsto × realizado; recebíveis de cartão com taxa e prazo.
 
 **Pendências conhecidas:** ver "Dúvidas em aberto e débitos técnicos" no `README.md` (lista viva — acrescente lá).
 Também: branch órfã `release-please--branches--main--components--kamus` no GitHub (pode ser apagada pela interface).

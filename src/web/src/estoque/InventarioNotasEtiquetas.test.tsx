@@ -217,6 +217,7 @@ describe('Estoque → Entrada por XML', () => {
     expect(await screen.findByRole('heading', { name: 'NF 4567/1 — Aurora Moda' })).toBeInTheDocument()
     expect((enviado as FormData | null)?.get('arquivo')).toBeInstanceOf(File)
     expect(screen.getByText('Fornecedor novo: será cadastrado ao lançar')).toBeInTheDocument()
+    expect(screen.getByText(/CNPJ 11\.222\.333\/0001-81/)).toBeInTheDocument()
     const itens = screen.getByRole('table', { name: 'Itens da nota' })
     expect(within(itens).getByText('pelo código de barras')).toBeInTheDocument()
     expect(within(itens).getByText('Preto P: 10')).toBeInTheDocument()

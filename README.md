@@ -159,6 +159,11 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 32 | Estoque negativo: movimentos manuais (ajuste, transferência) podem deixar negativo? | Provisório: **não** (409 com o saldo disponível); a regra "permitir com alerta" fica para a venda (v0.14.0) |
 | 33 | Quem vê custo médio e kardex? | Provisório: Dono, Gerente, Estoquista e Financeiro; Vendedor vê só quantidades |
 | 34 | Ajuste: motivos fixos (perda, avaria, furto, correção, outro) bastam? | Provisório: sim; "outro" exige observação |
+| 35 | Inventário: quem conclui (aplica os ajustes)? | Provisório: **Dono e Gerente**; Estoquista conta |
+| 36 | Inventário: bloquear vendas/movimentos da loja durante a contagem? | Provisório: **não bloqueia** — o ajuste usa a diferença (contado − foto) sobre o saldo do momento |
+| 37 | Etiquetas: formatos de papel da loja piloto (modelo da folha A4 e da impressora térmica) | Provisório: A4 3 × 10 (~63 × 26 mm) e térmica 40 × 25 mm; confirmar com a loja |
+| 38 | Custo de aquisição da NF-e: o ICMS é recuperável para a loja (Lucro Real)? | Provisório: custo = valor + frete + seguro + outras − desconto + IPI + ICMS-ST (Simples Nacional, ICMS não recuperável); validar com o contador |
+| 39 | XML de NF-e sem protocolo de autorização: aceitar? | Provisório: **aceita com aviso** na tela; protocolo de rejeição/denegação é recusado |
 
 ### Débitos técnicos
 
@@ -192,6 +197,11 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Movimentos e saldos de estoque ficam sem histórico de alterações (o kardex é o histórico) | Ajuste de estoque também vira evento; demais movimentos só no kardex | — (decisão consciente) |
 | Kardex devolve até 500 movimentos, sem paginação nem filtro por data | Produto muito movimentado mostra só os recentes | Paginação/período quando houver volume |
 | Desativar SKU no cadastro não olha o saldo | Pode sobrar estoque num SKU desativado (aparece na posição; ajuste e transferência ainda funcionam) | Avisar no cadastro de produtos |
+| NF-e: não valida a assinatura digital nem consulta a situação na SEFAZ | Um XML adulterado seria aceito (mitigado: destinatário precisa ser a empresa ativa e a chave não pode repetir) | Antes da produção: validar assinatura e/ou consultar a SEFAZ |
+| NF-e: o fornecedor é cadastrado no lançamento, num banco/contexto separado da entrada | Se a gravação da entrada falhar, o fornecedor fica cadastrado (sem dano: é reaproveitado na próxima tentativa) | Transação única quando houver PostgreSQL em produção |
+| Duplicatas da NF-e só ficam guardadas | Contas a pagar ainda não existem | v0.13.0 (financeiro): gerar títulos a partir das duplicatas |
+| Etiquetas não têm layout configurável (tamanhos e campos fixos) | Lojas com outras etiquetas não conseguem imprimir no papel delas | Configuração de modelos de etiqueta |
+| Leitor de código no inventário faz uma requisição por leitura | Lento com internet ruim e contagens grandes | Fila local no navegador / app mobile |
 
 ## Multi-tenancy em uma frase
 

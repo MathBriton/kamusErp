@@ -314,3 +314,71 @@ X-Empresa-Id: {{login.response.body.empresas[0].id}}
 GET {{api}}/api/importacoes/estoque-inicial/modelo.xlsx
 Authorization: Bearer {{login.response.body.accessToken}}
 X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Etiquetas em PDF (formato: a4 ou termica) — use "Send and save"
+POST {{api}}/api/estoque/etiquetas
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "formato": "termica", "itens": [{ "skuId": "COLE-O-ID-DO-SKU", "quantidade": 2 }] }
+
+### Inventário: abrir (tira a foto do saldo)
+# @name inventario
+POST {{api}}/api/estoque/inventarios
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "lojaId": "{{lojas.response.body.$[0].id}}", "observacao": "Balanço" }
+
+### Inventário: leitura de código de barras (soma 1)
+POST {{api}}/api/estoque/inventarios/{{inventario.response.body.id}}/leituras
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "codigo": "2000000000015" }
+
+### Inventário: divergências
+GET {{api}}/api/estoque/inventarios/{{inventario.response.body.id}}/divergencias?zerarNaoContados=false
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Inventário: concluir (Dono ou Gerente)
+POST {{api}}/api/estoque/inventarios/{{inventario.response.body.id}}/concluir
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "zerarNaoContados": false }
+
+### NF-e: importar o XML (exemplo em docs/exemplos/nfe-entrada-exemplo.xml, destinatário Kamus Moda Centro)
+# @name nota
+POST {{api}}/api/estoque/notas
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: multipart/form-data; boundary=kamus
+
+--kamus
+Content-Disposition: form-data; name="arquivo"; filename="nfe-entrada-exemplo.xml"
+Content-Type: text/xml
+
+< ../../../docs/exemplos/nfe-entrada-exemplo.xml
+--kamus--
+
+### NF-e: ignorar o item 3 (sacola)
+PUT {{api}}/api/estoque/notas/{{nota.response.body.id}}/itens/3
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "ignorado": true }
+
+### NF-e: lançar a entrada
+POST {{api}}/api/estoque/notas/{{nota.response.body.id}}/lancar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "lojaId": "{{lojas.response.body.$[0].id}}" }

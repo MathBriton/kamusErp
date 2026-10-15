@@ -671,7 +671,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.9.0 | 1 | Produtos com grade (cor × tamanho), SKUs, códigos de barras internos | ✅ lançada |
 | v0.10.0 | 1 | Importação por planilha | ✅ lançada |
 | v0.11.0 | 2 | Estoque: lojas, saldo por SKU, entrada/ajuste/transferência, custo médio, kardex, posição em matriz, estoque inicial por planilha | ✅ lançada |
-| v0.12.0 | 2 | Estoque: importação de XML da NF-e, inventário, etiquetas | ⏳ |
+| v0.12.0 | 2 | Estoque: importação de XML da NF-e, inventário, etiquetas | ✅ pronta |
 | v0.13.0 | 3 | Financeiro | ⏳ |
 | v0.14.0 | 4 | Vendas (registro, troca e vale-troca, comissão) | ⏳ |
 | v0.15.0 | 5 | Crediário e condicional | ⏳ |
@@ -824,3 +824,8 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | 2026-10-14 | Custo médio ponderado com 4 casas; ajuste positivo e transferência entram pelo custo médio vigente; entrada sem custo usa o custo do cadastro do produto | Aceita |
 | 2026-10-14 | Estoque inicial por planilha define a quantidade **absoluta** por SKU e loja (reimportar corrige, não soma) e gera movimento "Estoque inicial" pela diferença | Aceita |
 | 2026-10-14 | Custos (custo médio, valor em custo, kardex) só para Dono, Gerente, Estoquista e Financeiro; Vendedor vê quantidades | Aceita (provisória) |
+| 2026-10-15 | Etiquetas em PDF: A4 3 × 10 e térmica 40 × 25 mm, com EAN-13/EAN-8 (UPC-A como EAN-13) e ITF-14 para GTIN-14; por SKU/quantidade ou uma por peça da entrada | Aceita |
+| 2026-10-15 | Inventário: foto do saldo na abertura, contagem cega (grade ou leitor), um aberto por loja, conclusão por Dono/Gerente ajustando pela diferença contado − foto sobre o saldo do momento; opção de zerar não contados | Aceita |
+| 2026-10-15 | Entrada por XML da NF-e (modelo 55): destinatário precisa ser a empresa ativa; chave única (nota descartada pode ser reimportada); itens vinculados pelo de-para do fornecedor, depois pelo EAN; distribuição na grade com fator de conversão (ex.: caixa com 12); itens podem ser ignorados | Aceita |
+| 2026-10-15 | De-para memorizado no lançamento: item com um SKU guarda código → SKU e fator; item distribuído na grade guarda só o produto e o fator (a grade muda a cada nota) | Aceita |
+| 2026-10-15 | Fornecedor da NF-e cadastrado automaticamente pelo CNPJ no lançamento (cliente PJ existente ganha o papel de fornecedor) | Aceita |
