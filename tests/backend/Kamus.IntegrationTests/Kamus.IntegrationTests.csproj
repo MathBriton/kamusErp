@@ -11,4 +11,8 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
     <PackageReference Include="PdfPig" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Mesmo gerador de XML de NF-e de exemplo dos testes unitários. -->
+    <Compile Include="..\Kamus.UnitTests\Estoque\ExemploDeNfe.cs" Link="Estoque\ExemploDeNfe.cs" />
+  </ItemGroup>
 </Project>

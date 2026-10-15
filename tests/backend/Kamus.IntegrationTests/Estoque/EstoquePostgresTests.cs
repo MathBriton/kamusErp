@@ -14,7 +14,7 @@ public sealed class EstoquePostgresTests(PostgresFixture db)
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
     private static Uri U(string caminho) => new(caminho, UriKind.Relative);
 
-    private sealed record EmpresaDto(Guid Id);
+    private sealed record EmpresaDto(Guid Id, string Cnpj);
     private sealed record SessaoDto(string AccessToken, List<EmpresaDto> Empresas);
     private sealed record GradeDto(Guid Id, string Nome);
     private sealed record CorDto(Guid Id, string Nome);
@@ -77,9 +77,22 @@ public sealed class EstoquePostgresTests(PostgresFixture db)
         (await client.PostAsJsonAsync(U($"/api/estoque/inventarios/{inventarioId}/concluir"), new { zerarNaoContados = true }, Ct)).StatusCode.ShouldBe(HttpStatusCode.OK);
         (await client.GetFromJsonAsync<MatrizDto>(U($"/api/estoque/posicao/{produto.Id}?lojaId={deposito.Id}"), Ct))!.Celulas.Single(c => c.SkuId == m).Quantidade.ShouldBe(1);
 
+        // Nota de entrada por XML (chave aleatória: o banco é compartilhado entre os testes).
+        var chave = "3526101122233300018155001" + Random.Shared.NextInt64(1_000_000_000_000_000_000, long.MaxValue).ToString(System.Globalization.CultureInfo.InvariantCulture)[..19];
+        var xml = Kamus.UnitTests.Estoque.ExemploDeNfe.Xml([new("PG-1", "SEM GTIN", "BLUSA", "UN", 2, 40m)],
+            destinatario: new string(sessao.Empresas[0].Cnpj.Where(char.IsAsciiLetterOrDigit).ToArray()), chave: chave);
+        using var form = new MultipartFormDataContent { { new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(xml)), "arquivo", "nota.xml" } };
+        var importada = await client.PostAsync(U("/api/estoque/notas"), form, Ct);
+        importada.StatusCode.ShouldBe(HttpStatusCode.Created, await importada.Content.ReadAsStringAsync(Ct));
+        var notaId = (await importada.Content.ReadFromJsonAsync<InventarioDto>(Ct))!.Id;
+        (await client.PutAsJsonAsync(U($"/api/estoque/notas/{notaId}/itens/1"), new { produtoId = produto.Id, fator = 1, distribuicao = new[] { new { skuId = m, quantidade = 2 } } }, Ct))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await client.PostAsJsonAsync(U($"/api/estoque/notas/{notaId}/lancar"), new { lojaId = deposito.Id }, Ct)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await client.GetFromJsonAsync<MatrizDto>(U($"/api/estoque/posicao/{produto.Id}?lojaId={deposito.Id}"), Ct))!.Celulas.Single(c => c.SkuId == m).Quantidade.ShouldBe(3);
+
         await using var conn = new NpgsqlConnection(db.AppConnectionString);
         await conn.OpenAsync(Ct);
-        foreach (var tabela in new[] { "lojas", "saldos", "movimentos", "inventarios", "itens_de_inventario" })
+        foreach (var tabela in new[] { "lojas", "saldos", "movimentos", "inventarios", "itens_de_inventario", "notas", "itens_de_nota", "distribuicoes_de_item", "duplicatas_de_nota", "vinculos_de_produto" })
         {
             await using var cmd = new NpgsqlCommand($"SELECT count(*) FROM estoque.{tabela}", conn);
             ((long)(await cmd.ExecuteScalarAsync(Ct))!).ShouldBe(0, $"RLS em estoque.{tabela}");

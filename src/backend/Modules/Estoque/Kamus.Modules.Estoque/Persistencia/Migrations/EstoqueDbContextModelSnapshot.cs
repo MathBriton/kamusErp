@@ -23,6 +23,83 @@ namespace Kamus.Modules.Estoque.Persistencia.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.DistribuicaoDoItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("item_id");
+
+                    b.Property<int>("Quantidade")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantidade");
+
+                    b.Property<Guid>("SkuId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sku_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_distribuicoes_de_item");
+
+                    b.HasIndex("ItemId")
+                        .HasDatabaseName("ix_distribuicoes_de_item_item_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_distribuicoes_de_item_tenant_id");
+
+                    b.ToTable("distribuicoes_de_item", "estoque");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.DuplicataDaNota", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("NotaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("nota_id");
+
+                    b.Property<string>("Numero")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("numero");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("Valor")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("valor");
+
+                    b.Property<DateOnly>("Vencimento")
+                        .HasColumnType("date")
+                        .HasColumnName("vencimento");
+
+                    b.HasKey("Id")
+                        .HasName("pk_duplicatas_de_nota");
+
+                    b.HasIndex("NotaId")
+                        .HasDatabaseName("ix_duplicatas_de_nota_nota_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_duplicatas_de_nota_tenant_id");
+
+                    b.ToTable("duplicatas_de_nota", "estoque");
+                });
+
             modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.Inventario", b =>
                 {
                     b.Property<Guid>("Id")
@@ -88,6 +165,98 @@ namespace Kamus.Modules.Estoque.Persistencia.Migrations
                         .HasDatabaseName("ix_inventarios_tenant_id_loja_id_aberto_em");
 
                     b.ToTable("inventarios", "estoque");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.ItemDaNota", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("codigo");
+
+                    b.Property<decimal>("CustoTotal")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("custo_total");
+
+                    b.Property<string>("Descricao")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("descricao");
+
+                    b.Property<string>("Ean")
+                        .HasMaxLength(14)
+                        .HasColumnType("character varying(14)")
+                        .HasColumnName("ean");
+
+                    b.Property<int>("Fator")
+                        .HasColumnType("integer")
+                        .HasColumnName("fator");
+
+                    b.Property<bool>("Ignorado")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ignorado");
+
+                    b.Property<string>("Ncm")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("ncm");
+
+                    b.Property<Guid>("NotaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("nota_id");
+
+                    b.Property<int>("Numero")
+                        .HasColumnType("integer")
+                        .HasColumnName("numero");
+
+                    b.Property<string>("OrigemDoVinculo")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("origem_do_vinculo");
+
+                    b.Property<Guid?>("ProdutoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("produto_id");
+
+                    b.Property<decimal>("Quantidade")
+                        .HasPrecision(15, 4)
+                        .HasColumnType("numeric(15,4)")
+                        .HasColumnName("quantidade");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Unidade")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)")
+                        .HasColumnName("unidade");
+
+                    b.Property<decimal>("ValorTotal")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("valor_total");
+
+                    b.HasKey("Id")
+                        .HasName("pk_itens_de_nota");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_itens_de_nota_tenant_id");
+
+                    b.HasIndex("NotaId", "Numero")
+                        .IsUnique()
+                        .HasDatabaseName("ix_itens_de_nota_nota_id_numero");
+
+                    b.ToTable("itens_de_nota", "estoque");
                 });
 
             modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.ItemDeInventario", b =>
@@ -288,6 +457,120 @@ namespace Kamus.Modules.Estoque.Persistencia.Migrations
                     b.ToTable("movimentos", "estoque");
                 });
 
+            modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.NotaDeEntrada", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Autorizada")
+                        .HasColumnType("boolean")
+                        .HasColumnName("autorizada");
+
+                    b.Property<string>("Chave")
+                        .IsRequired()
+                        .HasMaxLength(44)
+                        .HasColumnType("character varying(44)")
+                        .HasColumnName("chave");
+
+                    b.Property<DateTimeOffset>("EmitidaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("emitida_em");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("empresa_id");
+
+                    b.Property<string>("FornecedorDocumento")
+                        .IsRequired()
+                        .HasMaxLength(14)
+                        .HasColumnType("character varying(14)")
+                        .HasColumnName("fornecedor_documento");
+
+                    b.Property<Guid?>("FornecedorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fornecedor_id");
+
+                    b.Property<string>("FornecedorNome")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("fornecedor_nome");
+
+                    b.Property<DateTimeOffset>("ImportadaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("importada_em");
+
+                    b.Property<string>("ImportadaPor")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("importada_por");
+
+                    b.Property<DateTimeOffset?>("LancadaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lancada_em");
+
+                    b.Property<string>("LancadaPor")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("lancada_por");
+
+                    b.Property<Guid?>("LojaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("loja_id");
+
+                    b.Property<string>("Numero")
+                        .IsRequired()
+                        .HasMaxLength(9)
+                        .HasColumnType("character varying(9)")
+                        .HasColumnName("numero");
+
+                    b.Property<Guid?>("OperacaoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operacao_id");
+
+                    b.Property<string>("Serie")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("serie");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("ValorTotal")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("valor_total");
+
+                    b.Property<string>("Xml")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("xml");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notas");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_notas_tenant_id");
+
+                    b.HasIndex("TenantId", "Chave")
+                        .HasDatabaseName("ix_notas_tenant_id_chave");
+
+                    b.HasIndex("TenantId", "EmpresaId", "ImportadaEm")
+                        .HasDatabaseName("ix_notas_tenant_id_empresa_id_importada_em");
+
+                    b.ToTable("notas", "estoque");
+                });
+
             modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.SaldoDeEstoque", b =>
                 {
                     b.Property<Guid>("Id")
@@ -348,6 +631,78 @@ namespace Kamus.Modules.Estoque.Persistencia.Migrations
                     b.ToTable("saldos", "estoque");
                 });
 
+            modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.VinculoDeProduto", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AtualizadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("atualizado_em");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("codigo");
+
+                    b.Property<int>("Fator")
+                        .HasColumnType("integer")
+                        .HasColumnName("fator");
+
+                    b.Property<string>("FornecedorDocumento")
+                        .IsRequired()
+                        .HasMaxLength(14)
+                        .HasColumnType("character varying(14)")
+                        .HasColumnName("fornecedor_documento");
+
+                    b.Property<Guid>("ProdutoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("produto_id");
+
+                    b.Property<Guid?>("SkuId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sku_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_vinculos_de_produto");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_vinculos_de_produto_tenant_id");
+
+                    b.HasIndex("TenantId", "FornecedorDocumento", "Codigo")
+                        .IsUnique()
+                        .HasDatabaseName("ix_vinculos_de_produto_tenant_id_fornecedor_documento_codigo");
+
+                    b.ToTable("vinculos_de_produto", "estoque");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.DistribuicaoDoItem", b =>
+                {
+                    b.HasOne("Kamus.Modules.Estoque.Dominio.ItemDaNota", null)
+                        .WithMany("Distribuicao")
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_distribuicoes_de_item_itens_de_nota_item_id");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.DuplicataDaNota", b =>
+                {
+                    b.HasOne("Kamus.Modules.Estoque.Dominio.NotaDeEntrada", null)
+                        .WithMany("Duplicatas")
+                        .HasForeignKey("NotaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_duplicatas_de_nota_notas_nota_id");
+                });
+
             modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.Inventario", b =>
                 {
                     b.HasOne("Kamus.Modules.Estoque.Dominio.Loja", null)
@@ -356,6 +711,16 @@ namespace Kamus.Modules.Estoque.Persistencia.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_inventarios_lojas_loja_id");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.ItemDaNota", b =>
+                {
+                    b.HasOne("Kamus.Modules.Estoque.Dominio.NotaDeEntrada", null)
+                        .WithMany("Itens")
+                        .HasForeignKey("NotaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_itens_de_nota_notas_nota_id");
                 });
 
             modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.ItemDeInventario", b =>
@@ -390,6 +755,18 @@ namespace Kamus.Modules.Estoque.Persistencia.Migrations
 
             modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.Inventario", b =>
                 {
+                    b.Navigation("Itens");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.ItemDaNota", b =>
+                {
+                    b.Navigation("Distribuicao");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Estoque.Dominio.NotaDeEntrada", b =>
+                {
+                    b.Navigation("Duplicatas");
+
                     b.Navigation("Itens");
                 });
 #pragma warning restore 612, 618

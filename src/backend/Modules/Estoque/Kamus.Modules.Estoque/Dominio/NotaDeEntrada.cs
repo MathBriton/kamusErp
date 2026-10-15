@@ -73,7 +73,7 @@ public sealed class NotaDeEntrada : ITenantOwned
             Chave = nfe.Chave,
             Numero = nfe.Numero,
             Serie = nfe.Serie,
-            EmitidaEm = nfe.EmitidaEm,
+            EmitidaEm = nfe.EmitidaEm.ToUniversalTime(), // o PostgreSQL guarda timestamptz só em UTC
             FornecedorDocumento = nfe.Emitente.Documento,
             FornecedorNome = nfe.Emitente.NomeFantasia ?? nfe.Emitente.RazaoSocial,
             ValorTotal = nfe.ValorTotal,
@@ -98,6 +98,12 @@ public sealed class NotaDeEntrada : ITenantOwned
     {
         GarantirPendente();
         Status = StatusDaNota.Descartada;
+    }
+
+    /// <summary>Religa os itens à nota depois de carregar do banco (para as regras de "só pendente").</summary>
+    internal void Reconectar()
+    {
+        foreach (var item in _itens) item.Vincular(this);
     }
 
     internal void GarantirPendente()

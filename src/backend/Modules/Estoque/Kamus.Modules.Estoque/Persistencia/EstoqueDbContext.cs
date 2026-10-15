@@ -17,6 +17,10 @@ public sealed class EstoqueDbContext(DbContextOptions<EstoqueDbContext> options,
     public DbSet<MovimentoDeEstoque> Movimentos => Set<MovimentoDeEstoque>();
     public DbSet<Inventario> Inventarios => Set<Inventario>();
     public DbSet<ItemDeInventario> ItensDeInventario => Set<ItemDeInventario>();
+    public DbSet<NotaDeEntrada> Notas => Set<NotaDeEntrada>();
+    public DbSet<ItemDaNota> ItensDeNota => Set<ItemDaNota>();
+    public DbSet<DistribuicaoDoItem> Distribuicoes => Set<DistribuicaoDoItem>();
+    public DbSet<VinculoDeProduto> Vinculos => Set<VinculoDeProduto>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -73,6 +77,64 @@ public sealed class EstoqueDbContext(DbContextOptions<EstoqueDbContext> options,
         {
             e.ToTable("itens_de_inventario");
             e.HasIndex(i => new { i.InventarioId, i.SkuId }).IsUnique();
+        });
+
+        modelBuilder.Entity<NotaDeEntrada>(e =>
+        {
+            e.ToTable("notas");
+            e.Property(n => n.Chave).HasMaxLength(44);
+            e.Property(n => n.Numero).HasMaxLength(9);
+            e.Property(n => n.Serie).HasMaxLength(3);
+            e.Property(n => n.FornecedorDocumento).HasMaxLength(14);
+            e.Property(n => n.FornecedorNome).HasMaxLength(150);
+            e.Property(n => n.ValorTotal).HasPrecision(14, 2);
+            e.Property(n => n.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(n => n.ImportadaPor).HasMaxLength(150);
+            e.Property(n => n.LancadaPor).HasMaxLength(150);
+            e.Ignore(n => n.ProntaParaLancar);
+            e.HasIndex(n => new { n.TenantId, n.Chave });
+            e.HasIndex(n => new { n.TenantId, n.EmpresaId, n.ImportadaEm });
+            e.HasMany(n => n.Itens).WithOne().HasForeignKey(i => i.NotaId).OnDelete(DeleteBehavior.Cascade);
+            e.Navigation(n => n.Itens).HasField("_itens").UsePropertyAccessMode(PropertyAccessMode.Field);
+            e.HasMany(n => n.Duplicatas).WithOne().HasForeignKey(d => d.NotaId).OnDelete(DeleteBehavior.Cascade);
+            e.Navigation(n => n.Duplicatas).HasField("_duplicatas").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<ItemDaNota>(e =>
+        {
+            e.ToTable("itens_de_nota");
+            e.Property(i => i.Codigo).HasMaxLength(60);
+            e.Property(i => i.Ean).HasMaxLength(14);
+            e.Property(i => i.Descricao).HasMaxLength(120);
+            e.Property(i => i.Ncm).HasMaxLength(8);
+            e.Property(i => i.Unidade).HasMaxLength(6);
+            e.Property(i => i.Quantidade).HasPrecision(15, 4);
+            e.Property(i => i.ValorTotal).HasPrecision(14, 2);
+            e.Property(i => i.CustoTotal).HasPrecision(14, 2);
+            e.Property(i => i.OrigemDoVinculo).HasMaxLength(20);
+            e.Ignore(i => i.PecasEsperadas);
+            e.Ignore(i => i.Situacao);
+            e.Ignore(i => i.CustoPorPeca);
+            e.HasIndex(i => new { i.NotaId, i.Numero }).IsUnique();
+            e.HasMany(i => i.Distribuicao).WithOne().HasForeignKey(d => d.ItemId).OnDelete(DeleteBehavior.Cascade);
+            e.Navigation(i => i.Distribuicao).HasField("_distribuicao").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<DistribuicaoDoItem>(e => e.ToTable("distribuicoes_de_item"));
+
+        modelBuilder.Entity<DuplicataDaNota>(e =>
+        {
+            e.ToTable("duplicatas_de_nota");
+            e.Property(d => d.Numero).HasMaxLength(60);
+            e.Property(d => d.Valor).HasPrecision(14, 2);
+        });
+
+        modelBuilder.Entity<VinculoDeProduto>(e =>
+        {
+            e.ToTable("vinculos_de_produto");
+            e.Property(v => v.FornecedorDocumento).HasMaxLength(14);
+            e.Property(v => v.Codigo).HasMaxLength(60);
+            e.HasIndex(v => new { v.TenantId, v.FornecedorDocumento, v.Codigo }).IsUnique();
         });
 
         base.OnModelCreating(modelBuilder);

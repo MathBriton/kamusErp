@@ -33,6 +33,7 @@ public class NotaDeEntradaTests
             () => nota.FornecedorDocumento.ShouldBe("11222333000181"),
             () => nota.FornecedorNome.ShouldBe("Aurora Moda"),
             () => nota.ImportadaPor.ShouldBe("Ana"),
+            () => nota.EmitidaEm.Offset.ShouldBe(TimeSpan.Zero),
             () => nota.Itens.Select(i => (i.Numero, i.Codigo, i.Situacao)).ShouldBe([(1, "AUR-100", SituacaoDoItem.Pendente), (2, "AUR-900", SituacaoDoItem.Pendente)]),
             () => nota.Duplicatas.Count.ShouldBe(2),
             () => nota.ProntaParaLancar.ShouldBeFalse());

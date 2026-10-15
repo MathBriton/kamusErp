@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- NF-e de EXEMPLO (fictícia, sem assinatura) para testar a entrada por XML em localhost.
+     Destinatário: Kamus Moda Centro (CNPJ 12.345.678/0001-95, empresa de demonstração).
+     Para testar: cadastre um produto com grade (ex.: camiseta PP ao GG) e uma meia, depois importe este arquivo em
+     Estoque → Entrada por XML da NF-e. -->
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+  <NFe>
+    <infNFe Id="NFe35261011222333000181550010000045671000045671" versao="4.00">
+      <ide><cUF>35</cUF><natOp>VENDA DE MERCADORIA</natOp><mod>55</mod><serie>1</serie><nNF>4567</nNF><dhEmi>2026-10-14T09:15:00-03:00</dhEmi><tpNF>1</tpNF></ide>
+      <emit>
+        <CNPJ>11222333000181</CNPJ><xNome>Confecções Aurora LTDA</xNome><xFant>Aurora Moda</xFant>
+        <enderEmit><xLgr>Rua Oriente</xLgr><nro>100</nro><xBairro>Brás</xBairro><xMun>São Paulo</xMun><UF>SP</UF><CEP>03016000</CEP><fone>1133334444</fone></enderEmit>
+        <CRT>1</CRT>
+      </emit>
+      <dest><CNPJ>12345678000195</CNPJ><xNome>Kamus Moda Centro LTDA</xNome></dest>
+      <det nItem="1">
+        <prod><cProd>AUR-100</cProd><cEAN>SEM GTIN</cEAN><xProd>CAMISETA BASICA GOLA V (GRADE SORTIDA)</xProd><NCM>61091000</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>12.0000</qCom><vUnCom>25.0000</vUnCom><vProd>300.00</vProd><cEANTrib>SEM GTIN</cEANTrib><uTrib>UN</uTrib><qTrib>12.0000</qTrib><vUnTrib>25.0000</vUnTrib><vFrete>12.00</vFrete><indTot>1</indTot></prod>
+        <imposto><ICMS><ICMSSN102><orig>0</orig><CSOSN>102</CSOSN></ICMSSN102></ICMS></imposto>
+      </det>
+      <det nItem="2">
+        <prod><cProd>AUR-900</cProd><cEAN>SEM GTIN</cEAN><xProd>MEIA SOQUETE CX C/ 12</xProd><NCM>61091000</NCM><CFOP>5102</CFOP><uCom>CX</uCom><qCom>2.0000</qCom><vUnCom>96.0000</vUnCom><vProd>192.00</vProd><cEANTrib>SEM GTIN</cEANTrib><uTrib>CX</uTrib><qTrib>2.0000</qTrib><vUnTrib>96.0000</vUnTrib><indTot>1</indTot></prod>
+        <imposto><ICMS><ICMSSN102><orig>0</orig><CSOSN>102</CSOSN></ICMSSN102></ICMS></imposto>
+      </det>
+      <det nItem="3">
+        <prod><cProd>EMB-01</cProd><cEAN>SEM GTIN</cEAN><xProd>SACOLA PERSONALIZADA</xProd><NCM>61091000</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>50.0000</qCom><vUnCom>0.5000</vUnCom><vProd>25.00</vProd><cEANTrib>SEM GTIN</cEANTrib><uTrib>UN</uTrib><qTrib>50.0000</qTrib><vUnTrib>0.5000</vUnTrib><indTot>1</indTot></prod>
+        <imposto><ICMS><ICMSSN102><orig>0</orig><CSOSN>102</CSOSN></ICMSSN102></ICMS></imposto>
+      </det>
+      <total><ICMSTot><vNF>529.00</vNF></ICMSTot></total>
+      <cobr><dup><nDup>001</nDup><dVenc>2026-11-13</dVenc><vDup>264.50</vDup></dup><dup><nDup>002</nDup><dVenc>2026-12-13</dVenc><vDup>264.50</vDup></dup></cobr>
+    </infNFe>
+  </NFe>
+  <protNFe versao="4.00"><infProt><chNFe>35261011222333000181550010000045671000045671</chNFe><cStat>100</cStat><xMotivo>Autorizado o uso da NF-e</xMotivo></infProt></protNFe>
+</nfeProc>

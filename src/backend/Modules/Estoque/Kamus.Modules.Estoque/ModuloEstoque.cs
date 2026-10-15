@@ -27,5 +27,5 @@ public static class ModuloEstoque
         return services;
     }
 
-    public static IEndpointRouteBuilder MapModuloEstoque(this IEndpointRouteBuilder app) => app.MapLojas().MapMovimentacoes().MapPosicao().MapEtiquetas().MapInventarios();
+    public static IEndpointRouteBuilder MapModuloEstoque(this IEndpointRouteBuilder app) => app.MapLojas().MapMovimentacoes().MapPosicao().MapEtiquetas().MapInventarios().MapNotas();
 }
