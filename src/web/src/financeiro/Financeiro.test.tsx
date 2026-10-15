@@ -167,7 +167,8 @@ describe('Financeiro → Contas financeiras, fluxo e categorias', () => {
     await userEvent.type(within(dialogo).getByLabelText('Valor (R$)'), '300')
     await userEvent.click(within(dialogo).getByRole('button', { name: 'Transferir' }))
 
-    await vi.waitFor(() => expect(enviado).toMatchObject({ origemId: 'c1', destinoId: 'c2', valor: 300 }))
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument()) // 200 sem corpo fecha o diálogo
+    expect(enviado).toMatchObject({ origemId: 'c1', destinoId: 'c2', valor: 300 })
   })
 
   it('extrato com saldo linha a linha', async () => {

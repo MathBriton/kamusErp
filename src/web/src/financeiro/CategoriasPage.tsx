@@ -49,11 +49,9 @@ export function CategoriasPage() {
           <h1 className="text-2xl font-bold tracking-tight">Categorias</h1>
           <p className="mt-1 text-sm text-muted">Organize receitas e despesas em grupos (ex.: Ocupação › Aluguel). Valem para todas as empresas.</p>
         </div>
-        {categorias?.length === 0 && (
-          <button type="button" onClick={() => void post('/api/financeiro/categorias/padrao').then(recarregar)} className={estilos.botao}>
-            Adicionar categorias padrão
-          </button>
-        )}
+        <button type="button" onClick={() => void post('/api/financeiro/categorias/padrao').then(recarregar)} className={estilos.botao}>
+          Adicionar categorias padrão
+        </button>
         <button type="button" onClick={() => setEdicao('nova')} className={estilos.botaoPrimario}>Nova categoria</button>
       </div>
       {erro && <p role="alert" className={`mt-4 ${estilos.erro}`}>{erro}</p>}

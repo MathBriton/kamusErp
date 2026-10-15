@@ -52,7 +52,9 @@ export function useApi() {
         },
         body: corpo === undefined ? undefined : JSON.stringify(corpo),
       })
-      return (resposta.status === 204 ? null : await resposta.json()) as T
+      // 204 ou 200 sem corpo (ex.: transferência, descartar nota) → null.
+      const texto = resposta.status === 204 ? '' : await resposta.text()
+      return (texto ? JSON.parse(texto) : null) as T
     },
     [token, selecao],
   )
