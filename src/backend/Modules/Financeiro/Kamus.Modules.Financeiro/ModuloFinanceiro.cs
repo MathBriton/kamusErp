@@ -20,6 +20,7 @@ public static class ModuloFinanceiro
         services.AddKamusDbContext<FinanceiroDbContext>(configuration, FinanceiroDbContext.Schema);
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IContasAPagar, ContasAPagar>();
+        services.AddScoped<IContasAReceber, ContasAReceber>();
         services.AddScoped<IRelatorio, RelatorioDeTitulos>();
         services.AddScoped<IRelatorio, RelatorioDeFluxo>();
         return services;

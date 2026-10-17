@@ -54,6 +54,15 @@ public sealed class SaldoDeEstoque : ITenantOwned
         return Registrar(tipo, -quantidade, CustoMedio, op);
     }
 
+    /// <summary>Saída por venda: pelo custo médio; pode deixar o saldo negativo se a empresa permitir (venda não trava por erro de contagem).</summary>
+    public MovimentoDeEstoque Vender(int quantidade, Operacao op, bool permitirNegativo)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantidade);
+        if (!permitirNegativo && quantidade > Quantidade) throw new EstoqueInsuficienteException(Math.Max(Quantidade, 0), quantidade);
+        Quantidade -= quantidade;
+        return Registrar(TipoDeMovimento.Venda, -quantidade, CustoMedio, op);
+    }
+
     /// <summary>Estoque inicial (implantação): define a quantidade absoluta e, se informado, o custo. Nulo se nada muda.</summary>
     public MovimentoDeEstoque? DefinirInicial(int quantidade, decimal? custo, Operacao op)
     {

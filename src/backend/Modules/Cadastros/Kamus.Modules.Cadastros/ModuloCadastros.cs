@@ -25,6 +25,7 @@ public static class ModuloCadastros
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<ICatalogoDeProdutos, CatalogoDeProdutos>();
         services.AddScoped<IDiretorioDeFornecedores, DiretorioDeFornecedores>();
+        services.AddScoped<IDiretorioDeVendedores, DiretorioDeVendedores>();
         services.AddScoped<IProvedorDeBusca, ProvedorDeBuscaCadastros>();
         services.AddScoped<IRelatorio, RelatorioDeClientes>();
         services.AddScoped<IRelatorio, RelatorioDeFornecedores>();

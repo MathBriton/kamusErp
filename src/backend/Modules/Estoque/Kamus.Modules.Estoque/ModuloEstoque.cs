@@ -5,6 +5,7 @@ using Kamus.Modules.Estoque.Endpoints;
 using Kamus.Modules.Estoque.Importacao;
 using Kamus.Modules.Estoque.Persistencia;
 using Kamus.Modules.Estoque.Relatorios;
+using Kamus.SharedKernel.Estoque;
 using Kamus.SharedKernel.Relatorios;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
@@ -21,6 +22,7 @@ public static class ModuloEstoque
         services.AddKamusDbContext<EstoqueDbContext>(configuration, EstoqueDbContext.Schema);
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<Lojas>();
+        services.AddScoped<IMovimentacaoDeEstoque, MovimentacaoDeEstoque>();
         services.AddScoped<IRelatorio, RelatorioDePosicao>();
         services.AddScoped<IRelatorio, RelatorioDeInventario>();
         services.AddScoped<IImportador, ImportadorDeEstoqueInicial>();

@@ -148,3 +148,20 @@ public class SaldoDeEstoqueTests
         saldo.ValorEmCusto.ShouldBe(31.50m);
     }
 }
+
+public class VendaNoSaldoTests
+{
+    private static Operacao Op() => new(Guid.NewGuid(), DateTimeOffset.UtcNow, null, "Ana", null, "Venda 1", null, null);
+
+    [Fact]
+    public void Vender_PermitindoNegativo_FicaNegativoPeloCustoMedio()
+    {
+        var saldo = SaldoDeEstoque.Novo(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        saldo.Entrar(TipoDeMovimento.Entrada, 1, 30m, Op());
+
+        var movimento = saldo.Vender(2, Op(), permitirNegativo: true);
+
+        (saldo.Quantidade, movimento.Tipo, movimento.Quantidade, movimento.CustoUnitario).ShouldBe((-1, TipoDeMovimento.Venda, -2, 30m));
+        Should.Throw<EstoqueInsuficienteException>(() => saldo.Vender(1, Op(), permitirNegativo: false));
+    }
+}
