@@ -21,6 +21,8 @@ export interface Celula {
   quantidade: number
   /** Nulo para quem não vê custos (ou SKU sem movimento). */
   custoMedio: number | null
+  /** Preço de venda efetivo do SKU (o próprio ou o do produto). */
+  preco?: number
 }
 
 export interface Matriz {
@@ -52,7 +54,7 @@ export interface Posicao {
   valorEmVenda: number
 }
 
-export type TipoDeMovimento = 'Entrada' | 'Ajuste' | 'TransferenciaSaida' | 'TransferenciaEntrada' | 'EstoqueInicial'
+export type TipoDeMovimento = 'Entrada' | 'Ajuste' | 'TransferenciaSaida' | 'TransferenciaEntrada' | 'EstoqueInicial' | 'Inventario' | 'Venda' | 'EstornoDeVenda'
 
 export interface Movimento {
   id: string
@@ -83,6 +85,9 @@ export const ROTULO_DO_TIPO: Record<TipoDeMovimento, string> = {
   TransferenciaSaida: 'Transferência (saída)',
   TransferenciaEntrada: 'Transferência (entrada)',
   EstoqueInicial: 'Estoque inicial',
+  Inventario: 'Inventário',
+  Venda: 'Venda',
+  EstornoDeVenda: 'Cancelamento de venda',
 }
 
 export const MOTIVOS_DE_AJUSTE = [

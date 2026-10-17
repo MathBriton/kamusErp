@@ -18,7 +18,7 @@ internal static class PosicaoEndpoints
 
     public sealed record ItemDaPosicaoDto(Guid ProdutoId, string Referencia, string Descricao, int Quantidade, decimal? ValorEmCusto, decimal ValorEmVenda);
     public sealed record PosicaoDto(IReadOnlyList<ItemDaPosicaoDto> Itens, int TotalDePecas, decimal? ValorEmCusto, decimal ValorEmVenda);
-    public sealed record CelulaDto(Guid SkuId, Guid CorId, string Tamanho, string CodigoDeBarras, bool Ativo, int Quantidade, decimal? CustoMedio);
+    public sealed record CelulaDto(Guid SkuId, Guid CorId, string Tamanho, string CodigoDeBarras, bool Ativo, int Quantidade, decimal? CustoMedio, decimal Preco);
     public sealed record LojaDoProdutoDto(Guid LojaId, string Nome, int Quantidade);
     public sealed record MatrizDto(Guid ProdutoId, string Referencia, string Descricao, decimal PrecoVenda, decimal? PrecoCusto, IReadOnlyList<string> Tamanhos,
         IReadOnlyList<CorDoCatalogo> Cores, IReadOnlyList<CelulaDto> Celulas, IReadOnlyList<LojaDoProdutoDto> Lojas, int Total);
@@ -91,7 +91,7 @@ internal static class PosicaoEndpoints
         var custo = Permissoes.PodeVerCusto(empresa.Perfil);
 
         var celulas = produto.Skus.Select(sku => new CelulaDto(sku.Id, sku.CorId, sku.Tamanho, sku.CodigoDeBarras, sku.Ativo,
-            doFiltro[sku.Id].Sum(s => s.Quantidade), custo ? CustoMedioDe(doFiltro[sku.Id].ToList()) : null)).ToList();
+            doFiltro[sku.Id].Sum(s => s.Quantidade), custo ? CustoMedioDe(doFiltro[sku.Id].ToList()) : null, sku.PrecoVenda)).ToList();
         var porLoja = saldos.GroupBy(s => s.LojaId).ToDictionary(g => g.Key, g => g.Sum(s => s.Quantidade));
         var lojasDoProduto = visiveis.Where(l => l.Ativa || porLoja.GetValueOrDefault(l.Id) != 0)
             .Select(l => new LojaDoProdutoDto(l.Id, l.Nome, porLoja.GetValueOrDefault(l.Id))).ToList();

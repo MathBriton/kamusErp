@@ -25,7 +25,7 @@ public sealed class VendasTests : IAsyncDisposable
     private sealed record ComissaoDto(Guid? VendedorId, string Vendedor, int Vendas, decimal Total, decimal Comissao);
     private sealed record ContaDto(Guid Id, string Nome, decimal Saldo);
     private sealed record VendedorDto(Guid Id, string Nome);
-    private sealed record CelulaDto(Guid SkuId, int Quantidade);
+    private sealed record CelulaDto(Guid SkuId, int Quantidade, decimal Preco);
     private sealed record MatrizDto(List<CelulaDto> Celulas);
     private sealed record LinhaReceberDto(string Descricao, DateOnly Vencimento, decimal Valor, decimal Saldo, string Situacao);
     private sealed record ListaReceberDto(List<LinhaReceberDto> Itens);
@@ -127,6 +127,7 @@ public sealed class VendasTests : IAsyncDisposable
         venda.Avisos.ShouldBeEmpty();
 
         (await Saldo(c.Client, c.Camiseta.Id, c.AzulM)).ShouldBe(3);
+        (await c.Client.GetFromJsonAsync<MatrizDto>(U($"/api/estoque/posicao/{c.Camiseta.Id}"), Ct))!.Celulas.ShouldAllBe(x => x.Preco == 59.90m);
         (await SaldoDaConta(c.Client, c.Caixa.Id)).ShouldBe(150m);
         var receber = (await c.Client.GetFromJsonAsync<ListaReceberDto>(U("/api/financeiro/titulos?tipo=receber&situacao=abertas"), Ct))!.Itens;
         receber.Select(l => (l.Vencimento, l.Valor)).ShouldBe([(Hoje.AddDays(30), 28.35m), (Hoje.AddDays(60), 28.35m)]);

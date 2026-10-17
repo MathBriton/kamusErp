@@ -26,6 +26,10 @@ import { ContasFinanceirasPage } from './financeiro/ContasFinanceirasPage'
 import { FluxoDeCaixaPage } from './financeiro/FluxoDeCaixaPage'
 import { CategoriasPage } from './financeiro/CategoriasPage'
 import { HistoricoPage } from './pages/HistoricoPage'
+import { RegistroDeVendaPage } from './vendas/RegistroDeVendaPage'
+import { VendasPage } from './vendas/VendasPage'
+import { ComissoesPage } from './vendas/ComissoesPage'
+import { FormasDePagamentoPage } from './vendas/FormasDePagamentoPage'
 import { LoginPage } from './pages/LoginPage'
 import { NaoEncontradaPage } from './pages/NaoEncontradaPage'
 
@@ -54,6 +58,10 @@ const PAGINAS_IMPLEMENTADAS: Record<string, ReactNode> = {
   '/financeiro/contas': <ContasFinanceirasPage />,
   '/financeiro/categorias': <CategoriasPage />,
   '/configuracoes/lojas': <LojasPage />,
+  '/vendas/registro': <RegistroDeVendaPage />,
+  '/vendas/realizadas': <VendasPage />,
+  '/vendas/comissoes': <ComissoesPage />,
+  '/vendas/formas-de-pagamento': <FormasDePagamentoPage />,
 }
 
 const ROTAS_DO_MENU = todasAsRotas(MENU).filter((item) => item.rota !== '/')

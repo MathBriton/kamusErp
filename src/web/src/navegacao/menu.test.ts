@@ -17,6 +17,14 @@ describe('menu', () => {
     expect(estoque?.itens?.map((i) => i.titulo)).toEqual(['Posição de estoque'])
   })
 
+  it('Vendedor registra e consulta vendas, sem comissões nem formas de pagamento', () => {
+    const vendas = filtrarMenu(MENU, 'Vendedor').find((g) => g.titulo === 'Vendas')?.itens?.map((i) => i.titulo)
+    expect(vendas).toContain('Registrar venda')
+    expect(vendas).toContain('Vendas realizadas')
+    expect(vendas).not.toContain('Comissões')
+    expect(vendas).not.toContain('Formas de pagamento')
+  })
+
   it('Gerente vê o histórico de alterações, mas não usuários e licença', () => {
     const config = filtrarMenu(MENU, 'Gerente').find((g) => g.titulo === 'Configurações')
     expect(config?.itens?.map((i) => i.titulo)).toEqual(['Histórico de alterações'])
