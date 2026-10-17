@@ -320,6 +320,10 @@ namespace Kamus.Modules.Vendas.Persistencia.Migrations
                         .HasColumnType("character varying(150)")
                         .HasColumnName("registrada_por");
 
+                    b.Property<Guid?>("RegistradaPorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("registrada_por_id");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)

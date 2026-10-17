@@ -12,7 +12,7 @@ public enum StatusDaVenda
 }
 
 public sealed record DadosDaVenda(Guid EmpresaId, Guid LojaId, int Numero, DateOnly Data, Guid? ClienteId, string? ClienteNome, Guid? VendedorId, string? VendedorNome,
-    decimal ComissaoPercentual, string? NotaExterna, string? Observacao);
+    decimal ComissaoPercentual, string? NotaExterna, string? Observacao, Guid? RegistradaPorId = null);
 
 /// <param name="Desconto">Desconto em reais na linha.</param>
 public sealed record ItemNovo(Guid SkuId, Guid ProdutoId, string Descricao, int Quantidade, decimal PrecoUnitario, decimal Desconto);
@@ -46,6 +46,7 @@ public sealed class Venda : ITenantOwned
     public string? NotaExterna { get; private set; }
     public string? Observacao { get; private set; }
     public StatusDaVenda Status { get; private set; }
+    public Guid? RegistradaPorId { get; private set; }
     public string? RegistradaPor { get; private set; }
     public DateTimeOffset RegistradaEm { get; private set; }
     public Guid? OperacaoDeEstoqueId { get; private set; }
@@ -66,7 +67,7 @@ public sealed class Venda : ITenantOwned
 
     private Venda() { }
 
-    private static string Moeda(decimal v) => v.ToString("N2", PtBr);
+    public static string Moeda(decimal v) => v.ToString("N2", PtBr);
 
     public static Venda Criar(DadosDaVenda dados, IReadOnlyList<ItemNovo> itens, decimal descontoGeral, IReadOnlyList<PagamentoNovo> pagamentos, string? usuario, DateTimeOffset agora)
     {
@@ -91,6 +92,7 @@ public sealed class Venda : ITenantOwned
             NotaExterna = Limitar(dados.NotaExterna, 60),
             Observacao = Limitar(dados.Observacao, 500),
             Status = StatusDaVenda.Concluida,
+            RegistradaPorId = dados.RegistradaPorId,
             RegistradaPor = usuario,
             RegistradaEm = agora,
         };

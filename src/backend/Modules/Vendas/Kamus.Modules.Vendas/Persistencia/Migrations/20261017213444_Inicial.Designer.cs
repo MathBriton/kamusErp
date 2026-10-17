@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Kamus.Modules.Vendas.Persistencia.Migrations
 {
     [DbContext(typeof(VendasDbContext))]
-    [Migration("20261017212959_Inicial")]
+    [Migration("20261017213444_Inicial")]
     partial class Inicial
     {
         /// <inheritdoc />
@@ -322,6 +322,10 @@ namespace Kamus.Modules.Vendas.Persistencia.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)")
                         .HasColumnName("registrada_por");
+
+                    b.Property<Guid?>("RegistradaPorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("registrada_por_id");
 
                     b.Property<string>("Status")
                         .IsRequired()

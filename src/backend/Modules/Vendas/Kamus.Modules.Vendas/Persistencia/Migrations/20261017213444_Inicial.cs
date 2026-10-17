@@ -73,6 +73,7 @@ namespace Kamus.Modules.Vendas.Persistencia.Migrations
                     nota_externa = table.Column<string>(type: "character varying(60)", maxLength: 60, nullable: true),
                     observacao = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    registrada_por_id = table.Column<Guid>(type: "uuid", nullable: true),
                     registrada_por = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
                     registrada_em = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     operacao_de_estoque_id = table.Column<Guid>(type: "uuid", nullable: true),

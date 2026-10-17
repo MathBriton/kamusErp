@@ -1,5 +1,8 @@
 using Kamus.Infrastructure.Persistence;
+using Kamus.Modules.Vendas.Endpoints;
 using Kamus.Modules.Vendas.Persistencia;
+using Kamus.Modules.Vendas.Relatorios;
+using Kamus.SharedKernel.Relatorios;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,8 +17,10 @@ public static class ModuloVendas
     {
         services.AddKamusDbContext<VendasDbContext>(configuration, VendasDbContext.Schema);
         services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<IRelatorio, RelatorioDeVendas>();
+        services.AddScoped<IRelatorio, RelatorioDeComissoes>();
         return services;
     }
 
-    public static IEndpointRouteBuilder MapModuloVendas(this IEndpointRouteBuilder app) => app;
+    public static IEndpointRouteBuilder MapModuloVendas(this IEndpointRouteBuilder app) => app.MapFormas().MapVendas();
 }
