@@ -8,7 +8,7 @@ import { estilos } from '../components/estilos'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { dataBr, hojeIso } from '../financeiro/tipos'
 import { BotaoExportar } from '../relatorios/BotaoExportar'
-import { inicioDoMes, PERFIS_DE_GESTAO, PERFIS_QUE_CONSULTAM, PERFIS_QUE_VENDEM, type ListaDeVendas, type Venda } from './tipos'
+import { inicioDoMes, PERFIS_DE_GESTAO, porcentagem, PERFIS_QUE_CONSULTAM, PERFIS_QUE_VENDEM, type ListaDeVendas, type Venda } from './tipos'
 import { useVendedores } from './useVendas'
 
 function SeloDaVenda({ status }: { status: Venda['status'] }) {
@@ -241,7 +241,7 @@ function DetalheDaVenda({ id, onFechar, onMudou }: { id: string; onFechar: () =>
             {venda.descontoGeral > 0 && (<><dt className="text-muted">Desconto na venda</dt><dd className="text-right tabular-nums">{`− ${moeda(venda.descontoGeral)}`}</dd></>)}
             <dt className="font-bold">Total</dt><dd className="text-right font-bold tabular-nums">{moeda(venda.total)}</dd>
             {venda.troco > 0 && (<><dt className="text-muted">Troco</dt><dd className="text-right tabular-nums">{moeda(venda.troco)}</dd></>)}
-            <dt className="text-muted">{`Comissão (${venda.comissaoPercentual}%)`}</dt><dd className="text-right tabular-nums">{moeda(venda.comissao)}</dd>
+            <dt className="text-muted">{`Comissão (${porcentagem(venda.comissaoPercentual)})`}</dt><dd className="text-right tabular-nums">{moeda(venda.comissao)}</dd>
             {venda.taxaTotal > 0 && (<><dt className="text-muted">Taxas de cartão</dt><dd className="text-right tabular-nums">{moeda(venda.taxaTotal)}</dd></>)}
             {venda.lucroBruto !== null && (<><dt className="text-muted">Custo das peças</dt><dd className="text-right tabular-nums">{moeda(venda.custoTotal ?? 0)}</dd></>)}
             {venda.lucroBruto !== null && (<><dt className="text-muted">Lucro bruto</dt><dd className="text-right tabular-nums">{moeda(venda.lucroBruto)}</dd></>)}
@@ -251,7 +251,7 @@ function DetalheDaVenda({ id, onFechar, onMudou }: { id: string; onFechar: () =>
             <ul className="space-y-0.5">
               {venda.pagamentos.map((p, n) => (
                 <li key={n} className="flex justify-between">
-                  <span>{`${p.formaNome}${p.parcelas > 1 ? ` em ${p.parcelas}x` : ''}${p.taxaPercentual ? ` (taxa ${p.taxaPercentual}%)` : ''}`}</span>
+                  <span>{`${p.formaNome}${p.parcelas > 1 ? ` em ${p.parcelas}x` : ''}${p.taxaPercentual ? ` (taxa ${porcentagem(p.taxaPercentual)})` : ''}`}</span>
                   <span className="tabular-nums">{moeda(p.valor)}</span>
                 </li>
               ))}

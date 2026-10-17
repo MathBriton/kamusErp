@@ -120,6 +120,9 @@ export const ROTULO_DO_TIPO: Record<TipoDePagamento, string> = {
 /** Dinheiro e PIX entram na hora numa conta; os demais viram contas a receber. */
 export const entraNaHora = (tipo: TipoDePagamento) => tipo === 'Dinheiro' || tipo === 'Pix'
 
+/** 5 → "5%", 1.5 → "1,5%". */
+export const porcentagem = (n: number) => `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(n)}%`
+
 /** Arredonda para centavos (evita 0,1 + 0,2). */
 export const centavos = (valor: number) => Math.round(valor * 100) / 100
 

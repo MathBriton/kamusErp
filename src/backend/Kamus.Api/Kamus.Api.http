@@ -433,3 +433,58 @@ X-Empresa-Id: {{login.response.body.empresas[0].id}}
 GET {{api}}/api/financeiro/fluxo
 Authorization: Bearer {{login.response.body.accessToken}}
 X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### --- Vendas ---
+
+### Formas de pagamento padrão (dinheiro, PIX, débito e crédito)
+POST {{api}}/api/vendas/formas/padrao
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Formas de pagamento (defina a conta de Dinheiro e PIX com PUT /api/vendas/formas/{id})
+# @name formas
+GET {{api}}/api/vendas/formas
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Regra de estoque negativo na venda
+PUT {{api}}/api/vendas/configuracao
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "permitirEstoqueNegativo": true }
+
+### Registrar venda (troque lojaId, skuId e formaId pelos seus)
+# @name venda
+POST {{api}}/api/vendas
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{
+  "lojaId": "00000000-0000-0000-0000-000000000000",
+  "clienteNome": "Maria Souza",
+  "itens": [{ "skuId": "00000000-0000-0000-0000-000000000000", "quantidade": 2, "desconto": 0 }],
+  "descontoGeral": 0,
+  "pagamentos": [{ "formaId": "{{formas.response.body[0].id}}", "valor": 120, "parcelas": 1 }],
+  "notaExterna": "NFC-e 991"
+}
+
+### Vendas do mês (status: concluidas, canceladas, todas)
+GET {{api}}/api/vendas?status=todas
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Cancelar a venda (devolve o estoque e estorna o financeiro)
+POST {{api}}/api/vendas/{{venda.response.body.id}}/cancelar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "motivo": "Cliente desistiu" }
+
+### Comissões do mês por vendedor
+GET {{api}}/api/vendas/comissoes
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}

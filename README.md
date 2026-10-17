@@ -125,10 +125,10 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 
 | # | Dúvida | Situação |
 |---|---|---|
-| 1 | Vendas sem PDV: registro de venda simples no sistema web (opção A)? | Assumido **A**, falta confirmar |
+| 1 | Vendas sem PDV: registro de venda simples no sistema web (opção A)? | Implementado (v0.14.0): **A** — registro no backoffice com "nº da nota externa"; falta confirmar com a loja |
 | 2 | Loja piloto: loja única ou várias lojas? Que sistema usa hoje? | Em aberto |
 | 3 | Compras: precisa de pedido de compra ou só a entrada de mercadoria? | Em aberto |
-| 4 | Comissão sobre venda **faturada** ou **recebida** como padrão? | Em aberto |
+| 4 | Comissão sobre venda **faturada** ou **recebida** como padrão? | Provisório e implementado (v0.14.0): **faturada** (total da venda concluída, depois dos descontos); cancelada não conta |
 | 5 | Crediário: multa/juros padrão e dias de atraso para bloquear novas compras | Em aberto |
 | 6 | Modelo de cobrança do SaaS (por loja, usuário ou plano) | Provisório e implementado (v0.6.0): **plano único "Piloto"**, valor e limites por cliente |
 | 7 | Licença: dias de carência e uso durante a carência | Provisório e implementado: **5 dias, uso normal com banner** (ajustável por cliente) |
@@ -156,7 +156,7 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 29 | Importação: estoque inicial, contas a pagar/receber e saldos de crediário também por planilha | Estoque inicial feito (v0.11.0); os demais nas releases de financeiro e crediário |
 | 30 | Importação: casar cliente pelo **nome** quando não há CPF nem telefone pode juntar homônimos | Provisório: casa pelo nome exato (sem acento); revisar com a loja piloto |
 | 31 | Transferência entre lojas de **CNPJs diferentes** (exige nota fiscal de transferência)? | Provisório: só entre lojas da **mesma empresa** |
-| 32 | Estoque negativo: movimentos manuais (ajuste, transferência) podem deixar negativo? | Provisório: **não** (409 com o saldo disponível); a regra "permitir com alerta" fica para a venda (v0.14.0) |
+| 32 | Estoque negativo: movimentos manuais (ajuste, transferência) podem deixar negativo? | Provisório: **não** (409 com o saldo disponível); na venda vale a configuração da empresa (padrão: permitir com aviso — v0.14.0) |
 | 33 | Quem vê custo médio e kardex? | Provisório: Dono, Gerente, Estoquista e Financeiro; Vendedor vê só quantidades |
 | 34 | Ajuste: motivos fixos (perda, avaria, furto, correção, outro) bastam? | Provisório: sim; "outro" exige observação |
 | 35 | Inventário: quem conclui (aplica os ajustes)? | Provisório: **Dono e Gerente**; Estoquista conta |
@@ -164,10 +164,16 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 37 | Etiquetas: formatos de papel da loja piloto (modelo da folha A4 e da impressora térmica) | Provisório: A4 3 × 10 (~63 × 26 mm) e térmica 40 × 25 mm; confirmar com a loja |
 | 38 | Custo de aquisição da NF-e: o ICMS é recuperável para a loja (Lucro Real)? | Provisório: custo = valor + frete + seguro + outras − desconto + IPI + ICMS-ST (Simples Nacional, ICMS não recuperável); validar com o contador |
 | 39 | XML de NF-e sem protocolo de autorização: aceitar? | Provisório: **aceita com aviso** na tela; protocolo de rejeição/denegação é recusado |
-| 40 | Formas de pagamento com taxa e prazo da maquininha (crédito, débito, PIX) | Provisório: ficam para a v0.14.0 (vendas), onde a venda gera os recebíveis |
+| 40 | Formas de pagamento com taxa e prazo da maquininha (crédito, débito, PIX) | Implementado (v0.14.0): por empresa; dinheiro/PIX entram na hora numa conta; cartões viram contas a receber **líquidas da taxa** (1ª parcela no prazo, demais a cada 30 dias) |
 | 41 | Fluxo de caixa: contas vencidas e não pagas entram na projeção? | Provisório: **não** — aparecem à parte ("em atraso") até serem pagas ou renegociadas |
 | 42 | Quem acessa o financeiro? | Provisório: Dono, Gerente e Financeiro |
-| 43 | Avisos de contas vencendo (sininho) e resumo diário | Previsto com o resumo diário (v0.16.0) |
+| 43 | Avisos de contas vencendo (sininho) e resumo diário | Previsto com o resumo diário (v0.17.0) |
+| 44 | Venda pode ter data retroativa? | Provisório: **sim** (lançar vendas de dias anteriores); data futura é recusada |
+| 45 | Preço na venda: o vendedor pode alterar o preço do item? | Provisório: **não** — o preço vem do cadastro; ajustes só por desconto (no item ou na venda) |
+| 46 | Desconto máximo por perfil (ex.: vendedor até 10%) e motivo do desconto | Em aberto (hoje qualquer desconto até o valor do item/venda) |
+| 47 | Cancelamento de venda: prazo limite e quem pode | Provisório: **Dono e Gerente**, sem prazo, motivo obrigatório |
+| 48 | Vendedor vê só as próprias vendas? | Provisório: **sim** (as que ele registrou); Dono, Gerente e Financeiro veem todas |
+| 49 | Antecipação de recebíveis de cartão e taxa por bandeira | Em aberto (hoje uma taxa à vista e uma parcelado por forma) |
 
 ### Débitos técnicos
 
@@ -190,13 +196,16 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Sem "esqueci minha senha" por e-mail | Quem esquece depende do Dono redefinir | Quando houver envio de e-mail |
 | Busca e aniversariantes de clientes filtram **em memória** | Lento com dezenas de milhares de clientes | Com PostgreSQL em produção: `unaccent`/`pg_trgm` e consulta por mês/dia |
 | Modelos de mensagem do WhatsApp fixos no código | A loja não personaliza o texto | Configurações de mensagens (junto com o resumo diário) |
-| Ficha do cliente ainda sem histórico de compras, vale-troca e crediário | Visão 360° incompleta | Conforme vendas (v0.14.0) e crediário (v0.15.0) |
+| Ficha do cliente ainda sem histórico de compras, vale-troca e crediário | Visão 360° incompleta | Junto com trocas/vale-troca (v0.15.0) e crediário (v0.16.0) |
 | Sem busca de endereço por CEP | Digitação manual | Integração com serviço de CEP (ViaCEP) |
 | Busca de produtos em memória | Lenta com catálogos grandes | `pg_trgm` e índice por código de barras no PostgreSQL |
 | Grade em uso não pode ganhar tamanho novo | Para um tamanho novo é preciso criar outra grade | Permitir acrescentar tamanhos ao produto |
 | Planilha validada fica **em memória** por 30 min aguardando confirmação | Some se a API reiniciar (basta enviar de novo) | Com servidor: guardar em disco/armazenamento de objetos |
 | Importação em segundo plano grava como "Sistema" no histórico | O histórico não mostra quem importou (o aviso vai para quem enviou) | Propagar o usuário para tarefas em segundo plano |
 | Sequência do código interno calculada pelo maior existente | Duas criações simultâneas podem colidir (o índice único recusa uma) | Sequência no banco quando houver PostgreSQL em produção |
+| Venda grava estoque, financeiro e vendas em **contextos separados** (sem transação única); se uma etapa falha, as anteriores são desfeitas por compensação | Uma falha no meio da compensação deixaria estoque/financeiro sem a venda | Com PostgreSQL em produção: transação compartilhada ou outbox |
+| Número da venda calculado pelo maior existente da empresa | Duas vendas simultâneas podem colidir (o índice único recusa uma; basta registrar de novo) | Sequência no banco quando houver PostgreSQL em produção |
+| Lista de vendas e comissões carregam itens e pagamentos **em memória** | Lento com muitos milhares de vendas no período | Projeções/consultas agregadas no PostgreSQL |
 | Posição de estoque e estoque inicial carregam o catálogo **em memória** (`ICatalogoDeProdutos.TodosOsSkusAsync`) | Lento com dezenas de milhares de SKUs | Consulta paginada/projeção no PostgreSQL |
 | Movimentos e saldos de estoque ficam sem histórico de alterações (o kardex é o histórico) | Ajuste de estoque também vira evento; demais movimentos só no kardex | — (decisão consciente) |
 | Kardex devolve até 500 movimentos, sem paginação nem filtro por data | Produto muito movimentado mostra só os recentes | Paginação/período quando houver volume |
@@ -208,7 +217,7 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Leitor de código no inventário faz uma requisição por leitura | Lento com internet ruim e contagens grandes | Fila local no navegador / app mobile |
 | Financeiro: listagens e fluxo de caixa calculados **em memória** (carregam todos os títulos da empresa) | Lento com dezenas de milhares de parcelas | Consultas agregadas no PostgreSQL / paginação |
 | Conta a pagar da NF-e é criada depois da gravação da entrada (outro contexto) | Se falhar, a entrada fica sem a conta a pagar (relançar não duplica, mas a nota já está lançada) | Transação única / outbox quando houver PostgreSQL em produção |
-| Sem DRE, conciliação bancária (OFX) nem centro de custo | Relatórios financeiros básicos | DRE na central de relatórios (v0.16.0); OFX pós-MVP |
+| Sem DRE, conciliação bancária (OFX) nem centro de custo | Relatórios financeiros básicos | DRE na central de relatórios (v0.17.0); OFX pós-MVP |
 | Pessoa do título é guardada pelo nome (o vínculo com o cadastro é opcional) | Renomear o fornecedor no cadastro não muda títulos antigos | Mostrar o nome atual quando houver vínculo |
 
 ## Multi-tenancy em uma frase

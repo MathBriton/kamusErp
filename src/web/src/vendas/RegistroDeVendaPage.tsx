@@ -13,7 +13,7 @@ import { MatrizDeEstoque } from '../estoque/MatrizDeEstoque'
 import type { Matriz } from '../estoque/tipos'
 import { useLojas } from '../estoque/useLojas'
 import { hojeIso } from '../financeiro/tipos'
-import { centavos, PERFIS_QUE_VENDEM, type FormaDePagamento, type Venda } from './tipos'
+import { centavos, PERFIS_QUE_VENDEM, porcentagem, type FormaDePagamento, type Venda } from './tipos'
 import { useFormas, useVendedores } from './useVendas'
 
 interface Item {
@@ -252,7 +252,7 @@ export function RegistroDeVendaPage() {
             <select value={vendedorEscolhido} onChange={(e) => setVendedorId(e.target.value)} className={estilos.campo}>
               <option value="">Sem vendedor</option>
               {vendedores.map((v) => (
-                <option key={v.id} value={v.id}>{`${v.nome} (${decimal(v.comissaoPercentual).replace(',00', '')}%)`}</option>
+                <option key={v.id} value={v.id}>{`${v.nome} (${porcentagem(v.comissaoPercentual)})`}</option>
               ))}
             </select>
           </Campo>
@@ -390,12 +390,12 @@ export function RegistroDeVendaPage() {
               {linhasDePagamento.map((p, i) => {
                 const f = forma(p.formaId)
                 return (
-                  <div key={i} className="flex flex-wrap items-end gap-2">
+                  <div key={i} className="grid grid-cols-[minmax(0,1fr)_7rem_4.5rem_4rem] items-center gap-2">
                     <select
                       aria-label={`Forma do pagamento ${i + 1}`}
                       value={p.formaId}
                       onChange={(e) => mudarPagamento(i, { formaId: e.target.value, parcelas: 1 })}
-                      className={`${estilos.campo} min-w-40 flex-1`}
+                      className={estilos.campo}
                     >
                       {formas.map((x) => (
                         <option key={x.id} value={x.id}>{x.nome}</option>
@@ -406,24 +406,28 @@ export function RegistroDeVendaPage() {
                       value={p.valor ?? decimal(valores[i] ?? 0)}
                       onChange={(e) => mudarPagamento(i, { valor: e.target.value })}
                       inputMode="decimal"
-                      className={`${estilos.campo} w-28 text-right`}
+                      className={`${estilos.campo} text-right`}
                     />
-                    {f && f.maxParcelas > 1 && (
+                    {f && f.maxParcelas > 1 ? (
                       <select
                         aria-label={`Parcelas do pagamento ${i + 1}`}
                         value={p.parcelas}
                         onChange={(e) => mudarPagamento(i, { parcelas: Number(e.target.value) })}
-                        className={`${estilos.campo} w-20`}
+                        className={estilos.campo}
                       >
                         {Array.from({ length: f.maxParcelas }, (_, n) => n + 1).map((n) => (
                           <option key={n} value={n}>{`${n}x`}</option>
                         ))}
                       </select>
+                    ) : (
+                      <span className="text-center text-xs text-muted">1x</span>
                     )}
-                    {linhasDePagamento.length > 1 && (
-                      <button type="button" onClick={() => setPagamentos(linhasDePagamento.filter((_, x) => x !== i))} className="h-10 text-xs text-danger hover:underline">
+                    {linhasDePagamento.length > 1 ? (
+                      <button type="button" onClick={() => setPagamentos(linhasDePagamento.filter((_, x) => x !== i))} className="text-xs text-danger hover:underline">
                         Remover
                       </button>
+                    ) : (
+                      <span />
                     )}
                   </div>
                 )

@@ -673,9 +673,10 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.11.0 | 2 | Estoque: lojas, saldo por SKU, entrada/ajuste/transferência, custo médio, kardex, posição em matriz, estoque inicial por planilha | ✅ lançada |
 | v0.12.0 | 2 | Estoque: importação de XML da NF-e, inventário, etiquetas | ✅ lançada |
 | v0.13.0 | 3 | Financeiro: contas financeiras, categorias, contas a pagar/receber com baixas, contas a pagar da NF-e, extrato, transferências, fluxo de caixa | ✅ lançada |
-| v0.14.0 | 4 | Vendas (registro, formas de pagamento com taxa/prazo, troca e vale-troca, comissão) | ⏳ |
-| v0.15.0 | 5 | Crediário e condicional | ⏳ |
-| v0.16.0 | 6 | Dashboard real, app mobile, resumo diário | ⏳ |
+| v0.14.0 | 4 | Vendas: registro no backoffice (leitor ou grade, descontos, vários pagamentos, troco), formas de pagamento com taxa/prazo, baixa de estoque, caixa e recebíveis, cancelamento, comissão por venda e relatório de comissões | ⏳ |
+| v0.15.0 | 4 | Trocas vinculadas à venda, vale-troca como crédito do cliente, fechamento de comissões | ⏳ |
+| v0.16.0 | 5 | Crediário e condicional | ⏳ |
+| v0.17.0 | 6 | Dashboard real, app mobile, resumo diário | ⏳ |
 | v1.0.0 | 7 | Produção e primeira loja piloto | ⏳ depende de servidor |
 
 ---
@@ -834,3 +835,10 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | 2026-10-15 | NF-e lançada no estoque gera a conta a pagar: uma parcela por duplicata (sem duplicatas: à vista na emissão), categoria "Compra de mercadorias", sem duplicar se lançada de novo | Aceita |
 | 2026-10-15 | Fluxo de caixa: realizado (movimentos) até hoje e previsto (saldo das parcelas abertas) de hoje em diante; vencidas ficam à parte; transferências só aparecem filtrando uma conta; acima de 62 dias agrupa por mês | Aceita |
 | 2026-10-15 | Despesa/receita fixa: "repetir todo mês" cria um título por mês (até 24) | Aceita (provisória; recorrência automática sem prazo fica para depois) |
+| 2026-10-17 | Vendas divididas: v0.14.0 (registro, formas de pagamento, estoque, caixa/recebíveis, cancelamento, comissão por venda) e v0.15.0 (troca, vale-troca, fechamento de comissões). Crediário/condicional passam a v0.16.0 e dashboard/mobile a v0.17.0 | Aceita |
+| 2026-10-17 | Venda no backoffice sem emissão fiscal (opção A): o nº da nota emitida no sistema atual fica em "nota externa"; preço vem do cadastro e ajustes são descontos (por item e na venda) | Aceita (provisória) |
+| 2026-10-17 | Formas de pagamento por empresa: dinheiro/PIX entram baixados na conta da forma; débito/crédito/outros viram contas a receber (categoria "Vendas") pelo valor **líquido da taxa**, 1ª parcela no prazo da forma e as demais a cada 30 dias; só dinheiro pode ter troco | Aceita |
+| 2026-10-17 | Estoque negativo na venda: configurável por empresa, padrão **permitir com aviso**; desligado, a venda é recusada mostrando o saldo | Aceita |
+| 2026-10-17 | Cancelamento de venda (Dono/Gerente, motivo obrigatório) devolve o estoque (movimento "Cancelamento de venda") e estorna o financeiro (baixas estornadas e títulos cancelados); nada é apagado | Aceita |
+| 2026-10-17 | Comissão = % do vendedor (do cadastro, gravado na venda) sobre o total da venda concluída; vendas sem vendedor aparecem como "Sem vendedor" | Aceita (provisória — ver dúvida 4 do README) |
+| 2026-10-17 | Vendas conversam com os outros módulos só pelo SharedKernel: `IMovimentacaoDeEstoque` (Estoque), `IContasAReceber` (Financeiro), `IDiretorioDeVendedores` e `ICatalogoDeProdutos` (Cadastros) | Aceita |

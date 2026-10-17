@@ -7,10 +7,8 @@ import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { useContas } from '../financeiro/useFinanceiro'
-import { entraNaHora, PERFIS_DE_GESTAO, ROTULO_DO_TIPO, type FormaDePagamento, type TipoDePagamento } from './tipos'
+import { entraNaHora, PERFIS_DE_GESTAO, porcentagem, ROTULO_DO_TIPO, type FormaDePagamento, type TipoDePagamento } from './tipos'
 import { useFormas } from './useVendas'
-
-const porcentagem = (n: number) => `${decimal(n).replace(',00', '')}%`
 
 /** Formas de pagamento (taxa, prazo, parcelas e conta onde o dinheiro entra) e a regra de estoque negativo. */
 export function FormasDePagamentoPage() {
@@ -87,14 +85,14 @@ export function FormasDePagamentoPage() {
                   <tr key={f.id} className={f.ativa ? '' : 'text-muted'}>
                     <td className="px-4 py-2">
                       <span className={`font-semibold ${f.ativa ? '' : 'line-through'}`}>{f.nome}</span>
-                      <span className="block text-xs text-muted">{ROTULO_DO_TIPO[f.tipo]}</span>
+                      {f.nome !== ROTULO_DO_TIPO[f.tipo] && <span className="block text-xs text-muted">{ROTULO_DO_TIPO[f.tipo]}</span>}
                     </td>
                     <td className="px-4 py-2">{nomeDaConta(f.contaId)}</td>
                     <td className="px-4 py-2 text-right tabular-nums">
                       {f.maxParcelas > 1 ? `${porcentagem(f.taxaAVista)} à vista · ${porcentagem(f.taxaParcelado)} parcelado` : porcentagem(f.taxaAVista)}
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums">{f.maxParcelas > 1 ? `até ${f.maxParcelas}x` : '1x'}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{f.prazoDias === 0 ? 'na hora' : `${f.prazoDias} dias`}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{f.prazoDias === 0 ? 'na hora' : `${f.prazoDias} ${f.prazoDias === 1 ? 'dia' : 'dias'}`}</td>
                     <td className="px-4 py-2">
                       <div className="flex justify-end gap-2">
                         <button type="button" onClick={() => setEditando(f)} className={estilos.botao} aria-label={`Editar ${f.nome}`}>Editar</button>
