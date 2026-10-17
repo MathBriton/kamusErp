@@ -22,6 +22,9 @@
   <Folder Name="/src/backend/Modules/Notificacoes/">
     <Project Path="src/backend/Modules/Notificacoes/Kamus.Modules.Notificacoes/Kamus.Modules.Notificacoes.csproj" />
   </Folder>
+  <Folder Name="/src/backend/Modules/Vendas/">
+    <Project Path="src/backend/Modules/Vendas/Kamus.Modules.Vendas/Kamus.Modules.Vendas.csproj" />
+  </Folder>
   <Folder Name="/src/backend/Shared/">
     <Project Path="src/backend/Shared/Kamus.Infrastructure/Kamus.Infrastructure.csproj" />
     <Project Path="src/backend/Shared/Kamus.SharedKernel/Kamus.SharedKernel.csproj" />

@@ -10,6 +10,7 @@
     <ProjectReference Include="..\Modules\Cadastros\Kamus.Modules.Cadastros\Kamus.Modules.Cadastros.csproj" />
     <ProjectReference Include="..\Modules\Estoque\Kamus.Modules.Estoque\Kamus.Modules.Estoque.csproj" />
     <ProjectReference Include="..\Modules\Financeiro\Kamus.Modules.Financeiro\Kamus.Modules.Financeiro.csproj" />
+    <ProjectReference Include="..\Modules\Vendas\Kamus.Modules.Vendas\Kamus.Modules.Vendas.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />

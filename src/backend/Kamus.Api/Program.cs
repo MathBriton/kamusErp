@@ -11,6 +11,7 @@ using Kamus.Modules.Financeiro;
 using Kamus.Modules.Identidade;
 using Kamus.Modules.Licenciamento;
 using Kamus.Modules.Notificacoes;
+using Kamus.Modules.Vendas;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +28,7 @@ builder.Services.AddModuloLicenciamento(builder.Configuration);
 builder.Services.AddModuloCadastros(builder.Configuration);
 builder.Services.AddModuloEstoque(builder.Configuration);
 builder.Services.AddModuloFinanceiro(builder.Configuration);
+builder.Services.AddModuloVendas(builder.Configuration);
 
 var app = builder.Build();
 
@@ -50,6 +52,7 @@ app.MapModuloLicenciamento();
 app.MapModuloCadastros();
 app.MapModuloEstoque();
 app.MapModuloFinanceiro();
+app.MapModuloVendas();
 
 await app.AplicarMigracoesKamusAsync();
 await app.InicializarModuloIdentidadeAsync();
