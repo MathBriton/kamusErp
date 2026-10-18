@@ -15,7 +15,7 @@ internal static class FormasEndpoints
 {
     public sealed record FormaRequest(string? Nome, string? Tipo, Guid? ContaId, decimal TaxaAVista, decimal TaxaParcelado, int MaxParcelas, int PrazoDias);
     public sealed record FormaDto(Guid Id, string Nome, string Tipo, Guid? ContaId, decimal TaxaAVista, decimal TaxaParcelado, int MaxParcelas, int PrazoDias, bool Ativa);
-    public sealed record ConfiguracaoDto(bool PermitirEstoqueNegativo);
+    public sealed record ConfiguracaoDto(bool PermitirEstoqueNegativo, int? PrazoDeTrocaDias = null, int? ValidadeDoValeDias = null);
 
     private const string SoGestao = "Só Dono e Gerente configuram as vendas.";
 
@@ -68,7 +68,7 @@ internal static class FormasEndpoints
     private static async Task<IResult> Criar(FormaRequest r, VendasDbContext db, IEmpresaAtiva empresa, IContasAReceber financeiro, CancellationToken ct)
     {
         if (Permissoes.Exigir(empresa, Permissoes.Gestao, SoGestao) is { } negado) return negado;
-        if (!TentarTipo(r.Tipo, out var tipo)) return Permissoes.Erro("Tipo inválido: Dinheiro, Pix, Debito, Credito ou Outro.");
+        if (!TentarTipo(r.Tipo, out var tipo)) return Permissoes.Erro("Tipo inválido: Dinheiro, Pix, Debito, Credito, Outro ou ValeTroca.");
         var empresaId = empresa.EmpresaId!.Value;
         if (await ValidarAsync(r, empresaId, null, db, financeiro, ct) is { } invalida) return invalida;
         try
@@ -89,7 +89,7 @@ internal static class FormasEndpoints
         if (Permissoes.Exigir(empresa, Permissoes.Gestao, SoGestao) is { } negado) return negado;
         var forma = await db.Formas.SingleOrDefaultAsync(f => f.Id == id && f.EmpresaId == empresa.EmpresaId, ct);
         if (forma is null) return Results.NotFound();
-        if (!TentarTipo(r.Tipo, out var tipo)) return Permissoes.Erro("Tipo inválido: Dinheiro, Pix, Debito, Credito ou Outro.");
+        if (!TentarTipo(r.Tipo, out var tipo)) return Permissoes.Erro("Tipo inválido: Dinheiro, Pix, Debito, Credito, Outro ou ValeTroca.");
         if (await ValidarAsync(r, forma.EmpresaId, id, db, financeiro, ct) is { } invalida) return invalida;
         try
         {
@@ -120,7 +120,8 @@ internal static class FormasEndpoints
     private static async Task<IResult> ObterConfiguracao(VendasDbContext db, IEmpresaAtiva empresa, CancellationToken ct)
     {
         if (empresa.EmpresaId is not { } empresaId) return Permissoes.Erro("Escolha uma empresa.");
-        return Results.Ok(new ConfiguracaoDto((await ConfiguracaoAsync(db, empresaId, ct)).PermitirEstoqueNegativo));
+        var c = await ConfiguracaoAsync(db, empresaId, ct);
+        return Results.Ok(new ConfiguracaoDto(c.PermitirEstoqueNegativo, c.PrazoDeTrocaDias, c.ValidadeDoValeDias));
     }
 
     private static async Task<IResult> DefinirConfiguracao(ConfiguracaoDto r, VendasDbContext db, IEmpresaAtiva empresa, CancellationToken ct)
@@ -133,8 +134,15 @@ internal static class FormasEndpoints
             configuracao = ConfiguracaoDeVendas.Padrao(empresaId);
             db.Configuracoes.Add(configuracao);
         }
-        configuracao.Definir(r.PermitirEstoqueNegativo);
+        try
+        {
+            configuracao.Definir(r.PermitirEstoqueNegativo, r.PrazoDeTrocaDias, r.ValidadeDoValeDias);
+        }
+        catch (ArgumentException ex)
+        {
+            return Permissoes.Erro(Permissoes.Mensagem(ex));
+        }
         await db.SaveChangesAsync(ct);
-        return Results.Ok(new ConfiguracaoDto(configuracao.PermitirEstoqueNegativo));
+        return Results.Ok(new ConfiguracaoDto(configuracao.PermitirEstoqueNegativo, configuracao.PrazoDeTrocaDias, configuracao.ValidadeDoValeDias));
     }
 }

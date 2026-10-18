@@ -76,3 +76,31 @@ internal sealed class RelatorioDeComissoes(VendasDbContext db, IEmpresaAtiva emp
         [new("Período", $"{de:dd/MM/yyyy} a {ate:dd/MM/yyyy}")]);
     }
 }
+
+/// <summary>Vales-troca com saldo e situação (os vencidos com saldo são crédito que o cliente perdeu).</summary>
+internal sealed class RelatorioDeVales(VendasDbContext db, IEmpresaAtiva empresa, TimeProvider relogio) : IRelatorio
+{
+    public string Codigo => "vales-troca";
+    public string Titulo => "Vales-troca";
+    public IReadOnlyCollection<string> Perfis => [.. Permissoes.Registrar, .. Permissoes.Consultar];
+
+    public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
+    {
+        var situacao = parametros.GetValueOrDefault("situacao")?.ToLowerInvariant() is { } s && ValesEndpoints.Situacoes.Contains(s) ? s : "ativos";
+        var lista = await ValesEndpoints.ListaAsync(db, empresa, situacao, parametros.GetValueOrDefault("busca"), null, CalendarioBrasilia.Hoje(relogio), ct);
+        return new DadosDoRelatorio(Titulo,
+        [
+            new ColunaRelatorio("Código", Largura: 0.8f),
+            new ColunaRelatorio("Cliente", Largura: 1.6f),
+            new ColunaRelatorio("Emitido em", TipoColuna.Data, Largura: 0.8f),
+            new ColunaRelatorio("Válido até", TipoColuna.Data, Largura: 0.8f),
+            new ColunaRelatorio("Valor", TipoColuna.Moeda, Totalizar: true, Largura: 0.8f),
+            new ColunaRelatorio("Saldo", TipoColuna.Moeda, Totalizar: true, Largura: 0.8f),
+            new ColunaRelatorio("Situação", Largura: 0.7f),
+        ], lista.Itens.Select(v => (IReadOnlyList<object?>)[v.Codigo, v.ClienteNome, v.EmitidoEm, v.ValidoAte, v.Valor, v.Saldo, v.Situacao]).ToList(),
+        [
+            new("Situação", situacao),
+            new("Saldos", $"ativos R$ {Dominio.Dinheiro.Formatar(lista.SaldoAtivo)} · vencidos R$ {Dominio.Dinheiro.Formatar(lista.SaldoVencido)}"),
+        ]);
+    }
+}

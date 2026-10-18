@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Kamus.Modules.Vendas.Aplicacao;
 
 /// <param name="Status">concluidas, canceladas ou todas.</param>
-public sealed record FiltroDeVendas(DateOnly? De, DateOnly? Ate, Guid? VendedorId, string Status, string? Busca);
+public sealed record FiltroDeVendas(DateOnly? De, DateOnly? Ate, Guid? VendedorId, string Status, string? Busca, Guid? ClienteId = null);
 
 public sealed record LinhaDeVenda(Guid Id, Guid EmpresaId, int Numero, DateOnly Data, string? ClienteNome, Guid? VendedorId, string? VendedorNome, int Pecas,
     decimal Total, string Formas, string Status, string? NotaExterna);
@@ -16,7 +16,9 @@ public sealed record LinhaDeVenda(Guid Id, Guid EmpresaId, int Numero, DateOnly 
 /// <summary>Totais só das vendas concluídas.</summary>
 public sealed record ListaDeVendas(IReadOnlyList<LinhaDeVenda> Itens, int Quantidade, int Pecas, decimal Total, decimal TicketMedio);
 
-public sealed record ComissaoDoVendedor(Guid? VendedorId, string Vendedor, int Vendas, decimal Total, decimal Comissao);
+/// <param name="Total">Total das vendas mais a diferença das trocas (base da comissão).</param>
+/// <param name="ComissaoPendente">Parte ainda não incluída em fechamento.</param>
+public sealed record ComissaoDoVendedor(Guid? VendedorId, string Vendedor, int Vendas, decimal Total, decimal Comissao, decimal ComissaoPendente);
 
 /// <summary>Consultas compartilhadas pela tela e pelos relatórios.</summary>
 internal static class Consultas
@@ -37,6 +39,7 @@ internal static class Consultas
         if (f.De is { } de) q = q.Where(v => v.Data >= de);
         if (f.Ate is { } ate) q = q.Where(v => v.Data <= ate);
         if (f.VendedorId is { } vendedor) q = q.Where(v => v.VendedorId == vendedor);
+        if (f.ClienteId is { } cliente) q = q.Where(v => v.ClienteId == cliente);
         if (f.Status == "concluidas") q = q.Where(v => v.Status == StatusDaVenda.Concluida);
         if (f.Status == "canceladas") q = q.Where(v => v.Status == StatusDaVenda.Cancelada);
         var vendas = await q.ToListAsync(ct);
@@ -63,13 +66,27 @@ internal static class Consultas
             concluidas.Count, concluidas.Sum(v => v.Pecas), total, concluidas.Count == 0 ? 0 : Math.Round(total / concluidas.Count, 2));
     }
 
-    /// <summary>Comissão por vendedor sobre o total das vendas concluídas no período.</summary>
+    /// <summary>Comissão por vendedor sobre o total das vendas concluídas no período, ajustada pelas trocas (data da troca).</summary>
     public static async Task<List<ComissaoDoVendedor>> ComissoesAsync(VendasDbContext db, IEmpresaAtiva empresa, DateOnly de, DateOnly ate, CancellationToken ct)
     {
         var vendas = await FiltrarAsync(db, empresa, null, new FiltroDeVendas(de, ate, null, "concluidas", null), ct);
-        return vendas.GroupBy(v => v.VendedorId)
-            .Select(g => new ComissaoDoVendedor(g.Key, g.Key is null ? "Sem vendedor" : g.OrderByDescending(v => v.Numero).First().VendedorNome ?? "?",
-                g.Count(), g.Sum(v => v.Total), g.Sum(v => v.Comissao)))
+        var trocas = await TrocasDoPeriodoAsync(db, empresa.EmpresaIds, de, ate, ct);
+        var nomes = vendas.Where(v => v.VendedorId is not null).OrderBy(v => v.Numero).GroupBy(v => v.VendedorId!.Value).ToDictionary(g => g.Key, g => g.Last().VendedorNome);
+        foreach (var t in trocas.Where(t => t.VendedorId is not null)) nomes.TryAdd(t.VendedorId!.Value, t.VendedorNome);
+        return vendas.Select(v => v.VendedorId).Concat(trocas.Select(t => t.VendedorId)).Distinct()
+            .Select(id =>
+            {
+                var dele = vendas.Where(v => v.VendedorId == id).ToList();
+                var trocasDele = trocas.Where(t => t.VendedorId == id).ToList();
+                return new ComissaoDoVendedor(id, id is null ? "Sem vendedor" : nomes.GetValueOrDefault(id.Value) ?? "?", dele.Count,
+                    dele.Sum(v => v.Total) + trocasDele.Sum(t => t.Diferenca),
+                    dele.Sum(v => v.Comissao) + trocasDele.Sum(t => t.Comissao),
+                    dele.Where(v => v.FechamentoId is null).Sum(v => v.Comissao) + trocasDele.Where(t => t.FechamentoId is null).Sum(t => t.Comissao));
+            })
             .OrderBy(c => c.VendedorId is null).ThenBy(c => c.Vendedor, StringComparer.CurrentCulture).ToList();
     }
+
+    public static Task<List<Troca>> TrocasDoPeriodoAsync(VendasDbContext db, IReadOnlyList<Guid> empresaIds, DateOnly de, DateOnly ate, CancellationToken ct) =>
+        db.Trocas.Include(t => t.Devolvidos).Include(t => t.Levados).Include(t => t.Pagamentos)
+            .Where(t => empresaIds.Contains(t.EmpresaId) && t.Data >= de && t.Data <= ate).ToListAsync(ct);
 }

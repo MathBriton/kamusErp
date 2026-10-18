@@ -18,16 +18,14 @@ namespace Kamus.Modules.Vendas.Endpoints;
 internal static class VendasEndpoints
 {
     public const string Origem = "Venda";
-    private static readonly System.Globalization.CultureInfo PtBr = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
 
     public sealed record ItemRequest(Guid SkuId, int Quantidade, decimal Desconto);
-    public sealed record PagamentoRequest(Guid FormaId, decimal Valor, int Parcelas);
     public sealed record VendaRequest(Guid LojaId, DateOnly? Data, Guid? ClienteId, string? ClienteNome, Guid? VendedorId, IReadOnlyList<ItemRequest>? Itens,
-        decimal DescontoGeral, IReadOnlyList<PagamentoRequest>? Pagamentos, string? NotaExterna, string? Observacao);
+        decimal DescontoGeral, IReadOnlyList<PagamentoPedido>? Pagamentos, string? NotaExterna, string? Observacao);
     public sealed record CancelarRequest(string? Motivo);
 
     public sealed record ItemDto(Guid SkuId, Guid ProdutoId, string Descricao, int Quantidade, decimal PrecoUnitario, decimal Desconto, decimal Total, decimal? CustoUnitario);
-    public sealed record PagamentoDto(Guid FormaId, string FormaNome, string Tipo, decimal Valor, int Parcelas, decimal TaxaPercentual, decimal ValorTaxa);
+    public sealed record PagamentoDto(Guid FormaId, string FormaNome, string Tipo, decimal Valor, int Parcelas, decimal TaxaPercentual, decimal ValorTaxa, Guid? ValeId);
 
     /// <param name="CustoTotal">Custo e lucro só para quem vê custos (Dono, Gerente e Financeiro).</param>
     /// <param name="Avisos">Itens que ficaram com estoque negativo.</param>
@@ -40,7 +38,7 @@ internal static class VendasEndpoints
     public static IEndpointRouteBuilder MapVendas(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/vendas").RequireAuthorization().WithTags("Vendas");
-        g.MapGet("/", Listar).WithSummary("Vendas com totais. Filtros: de, ate, vendedorId, status (concluidas, canceladas, todas), busca (nº, cliente, nota)");
+        g.MapGet("/", Listar).WithSummary("Vendas com totais. Filtros: de, ate, vendedorId, status (concluidas, canceladas, todas), busca (nº, cliente, nota), clienteId");
         g.MapGet("/comissoes", Comissoes).WithSummary("Comissão por vendedor sobre as vendas concluídas no período");
         g.MapGet("/{id:guid}", Obter).WithSummary("Venda com itens e pagamentos");
         g.MapPost("/", Registrar).WithSummary("Registra a venda: baixa o estoque, lança dinheiro/PIX no caixa e gera os recebíveis de cartão")
@@ -54,20 +52,20 @@ internal static class VendasEndpoints
         verCusto ? v.CustoTotal : null, verCusto ? v.LucroBruto : null, v.Status.ToString(), v.NotaExterna, v.Observacao, v.RegistradaPor, v.RegistradaEm,
         v.MotivoDoCancelamento, v.CanceladaPor, v.CanceladaEm,
         v.Itens.Select(i => new ItemDto(i.SkuId, i.ProdutoId, i.Descricao, i.Quantidade, i.PrecoUnitario, i.Desconto, i.Total, verCusto ? i.CustoUnitario : null)).ToList(),
-        v.Pagamentos.Select(p => new PagamentoDto(p.FormaId, p.FormaNome, p.Tipo.ToString(), p.Valor, p.Parcelas, p.TaxaPercentual, p.ValorTaxa)).ToList(),
+        v.Pagamentos.Select(p => new PagamentoDto(p.FormaId, p.FormaNome, p.Tipo.ToString(), p.Valor, p.Parcelas, p.TaxaPercentual, p.ValorTaxa, p.ValeId)).ToList(),
         avisos ?? []);
 
-    private static FiltroDeVendas? Filtro(DateOnly? de, DateOnly? ate, Guid? vendedorId, string? status, string? busca)
+    private static FiltroDeVendas? Filtro(DateOnly? de, DateOnly? ate, Guid? vendedorId, string? status, string? busca, Guid? clienteId)
     {
         var s = status?.ToLowerInvariant() ?? "todas";
-        return Consultas.Status.Contains(s) ? new FiltroDeVendas(de, ate, vendedorId, s, busca) : null;
+        return Consultas.Status.Contains(s) ? new FiltroDeVendas(de, ate, vendedorId, s, busca, clienteId) : null;
     }
 
-    private static async Task<IResult> Listar(DateOnly? de, DateOnly? ate, Guid? vendedorId, string? status, string? busca, VendasDbContext db, IEmpresaAtiva empresa,
+    private static async Task<IResult> Listar(DateOnly? de, DateOnly? ate, Guid? vendedorId, string? status, string? busca, Guid? clienteId, VendasDbContext db, IEmpresaAtiva empresa,
         IUsuarioAtual usuario, CancellationToken ct)
     {
         if (Permissoes.Exigir(empresa, [.. Permissoes.Registrar, .. Permissoes.Consultar], "Seu perfil não acessa as vendas.") is { } negado) return negado;
-        if (Filtro(de, ate, vendedorId, status, busca) is not { } filtro) return Permissoes.Erro("Status inválido: concluidas, canceladas ou todas.");
+        if (Filtro(de, ate, vendedorId, status, busca, clienteId) is not { } filtro) return Permissoes.Erro("Status inválido: concluidas, canceladas ou todas.");
         return Results.Ok(await Consultas.ListarAsync(db, empresa, usuario.Id, filtro, ct));
     }
 
@@ -109,19 +107,8 @@ internal static class VendasEndpoints
         if (itens.Any(i => !skus.ContainsKey(i.SkuId))) return Permissoes.Erro("Há itens que não existem no catálogo.");
         if (itens.FirstOrDefault(i => !skus[i.SkuId].Ativo) is { } inativo) return Permissoes.Erro($"{Nome(skus[inativo.SkuId])} está inativo no catálogo.");
 
-        var formaIds = pedidos.Select(p => p.FormaId).Distinct().ToList();
-        var formas = await db.Formas.AsNoTracking().Where(f => formaIds.Contains(f.Id) && f.EmpresaId == empresaId).ToDictionaryAsync(f => f.Id, ct);
-        var pagamentos = new List<(PagamentoNovo Pagamento, FormaDePagamento Forma)>();
-        foreach (var p in pedidos)
-        {
-            if (!formas.TryGetValue(p.FormaId, out var forma)) return Permissoes.Erro("Forma de pagamento não encontrada.");
-            if (!forma.Ativa) return Permissoes.Erro($"{forma.Nome} está desativada.");
-            if (p.Parcelas > forma.MaxParcelas)
-                return Permissoes.Erro(forma.MaxParcelas == 1 ? $"{forma.Nome} não parcela." : $"{forma.Nome} aceita até {forma.MaxParcelas} parcelas.");
-            if (forma.EntraNaHora && (forma.ContaId is not { } conta || !await financeiro.ContaValidaAsync(empresaId, conta, ct)))
-                return Permissoes.Erro($"Configure a conta financeira de {forma.Nome} em Formas de pagamento.");
-            pagamentos.Add((new PagamentoNovo(forma.Id, forma.Nome, forma.Tipo, p.Valor, p.Parcelas, forma.Taxa(p.Parcelas)), forma));
-        }
+        var (pagamentos, formas, erro) = await Pagamentos.ResolverAsync(db, financeiro, empresaId, pedidos, hoje, ct);
+        if (erro is not null) return Permissoes.Erro(erro);
 
         var numero = (await db.Vendas.Where(v => v.EmpresaId == empresaId).MaxAsync(v => (int?)v.Numero, ct) ?? 0) + 1;
         Venda venda;
@@ -131,7 +118,7 @@ internal static class VendasEndpoints
                 new DadosDaVenda(empresaId, r.LojaId, numero, data, r.ClienteId, r.ClienteNome, vendedor?.Id, vendedor?.Nome, vendedor?.ComissaoPercentual ?? 0,
                     r.NotaExterna, r.Observacao, usuario.Id),
                 itens.Select(i => new ItemNovo(i.SkuId, skus[i.SkuId].ProdutoId, Nome(skus[i.SkuId]), i.Quantidade, skus[i.SkuId].PrecoVenda, i.Desconto)).ToList(),
-                r.DescontoGeral, pagamentos.Select(p => p.Pagamento).ToList(), usuario.Nome, relogio.GetUtcNow());
+                r.DescontoGeral, pagamentos, usuario.Nome, relogio.GetUtcNow());
         }
         catch (ArgumentException ex)
         {
@@ -154,7 +141,8 @@ internal static class VendasEndpoints
 
         try
         {
-            await financeiro.RegistrarVendaAsync(Recebiveis(venda, documento, formas), ct);
+            await financeiro.RegistrarVendaAsync(Pagamentos.Recebiveis(venda.EmpresaId, Origem, venda.Id, documento, venda.ClienteId, venda.ClienteNome, venda.Data,
+                venda.Pagamentos.Select(Gravado), formas), ct);
             db.Vendas.Add(venda);
             await db.SaveChangesAsync(ct);
         }
@@ -173,17 +161,7 @@ internal static class VendasEndpoints
 
     private static string Nome(SkuDoCatalogo sku) => $"{sku.Descricao} {sku.Cor} {sku.Tamanho}";
 
-    private static ContasAReceberDeVenda Recebiveis(Venda venda, string documento, Dictionary<Guid, FormaDePagamento> formas) =>
-        new(venda.EmpresaId, Origem, venda.Id.ToString(), venda.ClienteId, venda.ClienteNome, venda.Data,
-            venda.Pagamentos.Select(p =>
-            {
-                var forma = formas[p.FormaId];
-                var descricao = $"{documento} — {p.FormaNome}{(p.Parcelas > 1 ? $" {p.Parcelas}x" : "")}";
-                return forma.EntraNaHora
-                    ? new RecebimentoDeVenda(descricao, [new ParcelaAReceber(venda.Data, p.Valor)], forma.ContaId, JaRecebido: true, null)
-                    : new RecebimentoDeVenda(descricao, forma.Recebimentos(p.Valor, p.Parcelas, venda.Data), forma.ContaId, JaRecebido: false,
-                        p.ValorTaxa > 0 ? $"Valor bruto R$ {Venda.Moeda(p.Valor)}, taxa {p.TaxaPercentual.ToString("0.##", PtBr)}% (R$ {Venda.Moeda(p.ValorTaxa)})." : null);
-            }).ToList());
+    internal static PagamentoGravado Gravado(PagamentoDaVenda p) => new(p.FormaId, p.FormaNome, p.Tipo, p.Valor, p.Parcelas, p.TaxaPercentual, p.ValorTaxa);
 
     private static async Task<IResult> Cancelar(Guid id, CancelarRequest r, VendasDbContext db, IEmpresaAtiva empresa, IUsuarioAtual usuario,
         IMovimentacaoDeEstoque estoque, IContasAReceber financeiro, IRegistradorDeEventos eventos, TimeProvider relogio, CancellationToken ct)
@@ -191,6 +169,8 @@ internal static class VendasEndpoints
         if (Permissoes.Exigir(empresa, Permissoes.Gestao, "Só Dono e Gerente cancelam vendas.") is { } negado) return negado;
         var venda = await db.Vendas.Include(v => v.Itens).Include(v => v.Pagamentos).SingleOrDefaultAsync(v => v.Id == id && v.EmpresaId == empresa.EmpresaId, ct);
         if (venda is null) return Results.NotFound();
+        if (await db.Trocas.AnyAsync(t => t.VendaId == venda.Id, ct))
+            return Permissoes.Problema(StatusCodes.Status409Conflict, $"A venda nº {venda.Numero} tem troca registrada: não pode mais ser cancelada.");
         try
         {
             venda.Cancelar(r.Motivo ?? "", usuario.Nome, relogio.GetUtcNow());
@@ -206,6 +186,13 @@ internal static class VendasEndpoints
 
         if (venda.OperacaoDeEstoqueId is { } operacao) await estoque.EstornarVendaAsync(operacao, $"Cancelamento da venda nº {venda.Numero}", ct);
         await financeiro.CancelarOrigemAsync(Origem, venda.Id.ToString(), usuario.Nome, ct);
+        var valesUsados = venda.Pagamentos.Where(p => p.ValeId is not null).ToList();
+        if (valesUsados.Count > 0)
+        {
+            var ids = valesUsados.Select(p => p.ValeId!.Value).ToList();
+            var vales = await db.Vales.Where(v => ids.Contains(v.Id)).ToDictionaryAsync(v => v.Id, ct);
+            foreach (var p in valesUsados.Where(p => vales.ContainsKey(p.ValeId!.Value))) vales[p.ValeId!.Value].Devolver(p.Valor);
+        }
         await db.SaveChangesAsync(ct);
         await eventos.RegistrarAsync("venda_cancelada", $"Venda nº {venda.Numero} (R$ {Venda.Moeda(venda.Total)}) cancelada: {venda.MotivoDoCancelamento}", ct: ct);
         return Results.Ok(Dto(venda, Permissoes.VeTudo(empresa)));

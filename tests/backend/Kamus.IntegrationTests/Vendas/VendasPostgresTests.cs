@@ -68,9 +68,31 @@ public sealed class VendasPostgresTests(PostgresFixture db)
         c.StatusCode.ShouldBe(HttpStatusCode.OK, await c.Content.ReadAsStringAsync(Ct));
         ((await Saldo()), (await Caixa())).ShouldBe((3, 0m));
 
+        // Troca sem levar nada: a peça volta ao estoque e o crédito vira vale-troca
+        var outra = (await (await client.PostAsJsonAsync(U("/api/vendas"), new
+        {
+            lojaId = loja.Id,
+            itens = new[] { new { skuId = azulM, quantidade = 1, desconto = 0m } },
+            descontoGeral = 0m,
+            pagamentos = new object[] { new { formaId = dinheiro.Id, valor = 59.90m, parcelas = 1 } },
+        }, Ct)).Content.ReadFromJsonAsync<VendaDto>(Ct))!;
+        var troca = await client.PostAsJsonAsync(U("/api/vendas/trocas"), new
+        {
+            vendaId = outra.Id,
+            motivo = "Defeito",
+            devolvidos = new[] { new { skuId = azulM, quantidade = 1, destino = "Estoque" } },
+            levados = Array.Empty<object>(),
+            pagamentos = Array.Empty<object>(),
+        }, Ct);
+        troca.StatusCode.ShouldBe(HttpStatusCode.Created, await troca.Content.ReadAsStringAsync(Ct));
+        var vale = (await troca.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(Ct)).GetProperty("vale");
+        vale.GetProperty("saldo").GetDecimal().ShouldBe(59.90m);
+        (await Saldo()).ShouldBe(3);
+
         await using var conn = new NpgsqlConnection(db.AppConnectionString);
         await conn.OpenAsync(Ct);
-        foreach (var tabela in new[] { "formas_de_pagamento", "configuracoes", "vendas", "itens_da_venda", "pagamentos_da_venda" })
+        foreach (var tabela in new[] { "formas_de_pagamento", "configuracoes", "vendas", "itens_da_venda", "pagamentos_da_venda", "trocas", "itens_devolvidos",
+            "itens_levados", "pagamentos_da_troca", "vales_troca", "fechamentos_de_comissao" })
         {
             await using var cmd = new NpgsqlCommand($"SELECT count(*) FROM vendas.{tabela}", conn);
             ((long)(await cmd.ExecuteScalarAsync(Ct))!).ShouldBe(0, $"RLS em vendas.{tabela}");

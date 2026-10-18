@@ -19,8 +19,9 @@ public static class ModuloVendas
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IRelatorio, RelatorioDeVendas>();
         services.AddScoped<IRelatorio, RelatorioDeComissoes>();
+        services.AddScoped<IRelatorio, RelatorioDeVales>();
         return services;
     }
 
-    public static IEndpointRouteBuilder MapModuloVendas(this IEndpointRouteBuilder app) => app.MapFormas().MapVendas();
+    public static IEndpointRouteBuilder MapModuloVendas(this IEndpointRouteBuilder app) => app.MapFormas().MapVendas().MapTrocas().MapVales().MapFechamentos();
 }
