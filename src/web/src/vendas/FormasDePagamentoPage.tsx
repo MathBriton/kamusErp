@@ -130,42 +130,79 @@ export function FormasDePagamentoPage() {
   )
 }
 
+interface Regras {
+  permitirEstoqueNegativo: boolean
+  prazoDeTrocaDias: number
+  validadeDoValeDias: number
+}
+
 function RegraDeEstoque() {
   const { getJson, enviar } = useApi()
-  const [permitir, setPermitir] = useState<boolean | null>(null)
+  const [regras, setRegras] = useState<Regras | null>(null)
+  const [prazo, setPrazo] = useState('')
+  const [validade, setValidade] = useState('')
   const [erro, setErro] = useState<string | null>(null)
+  const [salvo, setSalvo] = useState(false)
 
   useEffect(() => {
     const controle = new AbortController()
-    getJson<{ permitirEstoqueNegativo: boolean }>('/api/vendas/configuracao', controle.signal)
-      .then((c) => setPermitir(c.permitirEstoqueNegativo))
+    getJson<Regras>('/api/vendas/configuracao', controle.signal)
+      .then((c) => {
+        setRegras(c)
+        setPrazo(String(c.prazoDeTrocaDias))
+        setValidade(String(c.validadeDoValeDias))
+      })
       .catch(() => {})
     return () => controle.abort()
   }, [getJson])
 
-  if (permitir === null) return null
+  if (regras === null) return null
 
-  const mudar = async (valor: boolean) => {
+  const salvar = async (novas: Regras) => {
     setErro(null)
-    setPermitir(valor)
+    setSalvo(false)
+    const anteriores = regras
+    setRegras(novas)
     try {
-      await enviar('PUT', '/api/vendas/configuracao', { permitirEstoqueNegativo: valor })
+      await enviar('PUT', '/api/vendas/configuracao', novas)
+      setSalvo(true)
     } catch (ex) {
-      setPermitir(!valor)
+      setRegras(anteriores)
       setErro(ex instanceof ErroDeApi ? ex.message : 'Não foi possível salvar.')
     }
+  }
+
+  const salvarPrazos = (e: FormEvent) => {
+    e.preventDefault()
+    void salvar({ ...regras, prazoDeTrocaDias: Number.parseInt(prazo, 10) || 0, validadeDoValeDias: Number.parseInt(validade, 10) || 0 })
   }
 
   return (
     <section className="mt-6 rounded-2xl border border-border bg-surface p-5 shadow-sm">
       <h2 className="font-semibold">Regras da venda</h2>
       <label className="mt-3 flex items-start gap-3 text-sm">
-        <input type="checkbox" checked={permitir} onChange={(e) => void mudar(e.target.checked)} className="mt-1 h-4 w-4" />
+        <input
+          type="checkbox"
+          checked={regras.permitirEstoqueNegativo}
+          onChange={(e) => void salvar({ ...regras, permitirEstoqueNegativo: e.target.checked })}
+          className="mt-1 h-4 w-4"
+        />
         <span>
           <span className="font-semibold">Permitir vender sem saldo</span>
           <span className="block text-muted">O estoque fica negativo e a venda mostra um aviso. Desligado, a venda é recusada quando falta peça.</span>
         </span>
       </label>
+      <form onSubmit={salvarPrazos} className="mt-4 flex flex-wrap items-end gap-3">
+        <Campo rotulo="Prazo de troca (dias)" className="w-44">
+          <input value={prazo} onChange={(e) => setPrazo(e.target.value.replace(/\D/g, ''))} inputMode="numeric" className={estilos.campo} />
+        </Campo>
+        <Campo rotulo="Validade do vale-troca (dias)" className="w-56">
+          <input value={validade} onChange={(e) => setValidade(e.target.value.replace(/\D/g, ''))} inputMode="numeric" className={estilos.campo} />
+        </Campo>
+        <button type="submit" className={estilos.botao}>Salvar regras</button>
+        {salvo && <span className="text-sm text-success">Salvo.</span>}
+      </form>
+      <p className="mt-2 text-xs text-muted">Depois do prazo, só Dono ou Gerente aceitam a troca.</p>
       {erro && <p role="alert" className={`mt-3 ${estilos.erro}`}>{erro}</p>}
     </section>
   )

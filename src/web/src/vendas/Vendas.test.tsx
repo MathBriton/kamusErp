@@ -209,7 +209,7 @@ describe('Vendas → Formas de pagamento', () => {
     let forma: Record<string, unknown> | null = null
     let regra: Record<string, unknown> | null = null
     api({
-      'GET /api/vendas/configuracao': () => json({ permitirEstoqueNegativo: true }),
+      'GET /api/vendas/configuracao': () => json({ permitirEstoqueNegativo: true, prazoDeTrocaDias: 30, validadeDoValeDias: 90 }),
       'PUT /api/vendas/formas/f2': (init) => {
         forma = corpo(init)
         return json({ ...formas[1], contaId: 'c1' })
@@ -234,7 +234,13 @@ describe('Vendas → Formas de pagamento', () => {
     const caixa = await screen.findByRole('checkbox', { name: /Permitir vender sem saldo/ })
     expect(caixa).toBeChecked()
     await userEvent.click(caixa)
-    expect(regra).toEqual({ permitirEstoqueNegativo: false })
+    expect(regra).toEqual({ permitirEstoqueNegativo: false, prazoDeTrocaDias: 30, validadeDoValeDias: 90 })
+
+    const prazo = screen.getByLabelText('Prazo de troca (dias)')
+    await userEvent.clear(prazo)
+    await userEvent.type(prazo, '15')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar regras' }))
+    await waitFor(() => expect(regra).toEqual({ permitirEstoqueNegativo: false, prazoDeTrocaDias: 15, validadeDoValeDias: 90 }))
   })
 })
 
@@ -242,7 +248,7 @@ describe('Vendas → Comissões', () => {
   it('mostra a comissão por vendedor no período com total', async () => {
     api({
       [`GET /api/vendas/comissoes?de=${inicioDoMes(hojeIso())}&ate=${hojeIso()}`]: () =>
-        json([{ vendedorId: 'b1', vendedor: 'Bia', vendas: 2, total: 159.9, comissao: 8 }, { vendedorId: null, vendedor: 'Sem vendedor', vendas: 1, total: 59.9, comissao: 0 }]),
+        json([{ vendedorId: 'b1', vendedor: 'Bia', vendas: 2, total: 159.9, comissao: 8, comissaoPendente: 0 }, { vendedorId: null, vendedor: 'Sem vendedor', vendas: 1, total: 59.9, comissao: 0, comissaoPendente: 0 }]),
     })
     renderApp('/vendas/comissoes')
     const tabela = await screen.findByRole('table', { name: 'Comissões' })

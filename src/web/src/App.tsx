@@ -30,6 +30,8 @@ import { RegistroDeVendaPage } from './vendas/RegistroDeVendaPage'
 import { VendasPage } from './vendas/VendasPage'
 import { ComissoesPage } from './vendas/ComissoesPage'
 import { FormasDePagamentoPage } from './vendas/FormasDePagamentoPage'
+import { TrocasPage } from './vendas/TrocasPage'
+import { ValesPage } from './vendas/ValesPage'
 import { LoginPage } from './pages/LoginPage'
 import { NaoEncontradaPage } from './pages/NaoEncontradaPage'
 
@@ -62,6 +64,8 @@ const PAGINAS_IMPLEMENTADAS: Record<string, ReactNode> = {
   '/vendas/realizadas': <VendasPage />,
   '/vendas/comissoes': <ComissoesPage />,
   '/vendas/formas-de-pagamento': <FormasDePagamentoPage />,
+  '/vendas/trocas': <TrocasPage />,
+  '/vendas/vales-troca': <ValesPage />,
 }
 
 const ROTAS_DO_MENU = todasAsRotas(MENU).filter((item) => item.rota !== '/')

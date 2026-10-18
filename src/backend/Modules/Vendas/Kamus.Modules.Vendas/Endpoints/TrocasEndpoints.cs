@@ -24,7 +24,7 @@ internal static class TrocasEndpoints
         IReadOnlyList<VendasEndpoints.ItemRequest>? Levados, IReadOnlyList<PagamentoPedido>? Pagamentos);
 
     public sealed record DevolvivelDto(Guid SkuId, string Descricao, int Vendidas, int JaDevolvidas, int Disponiveis, decimal ValorPorPeca);
-    public sealed record DevolviveisDto(Guid VendaId, int Numero, DateOnly Data, string? ClienteNome, string? VendedorNome, int DiasDesdeAVenda, int PrazoDeTrocaDias,
+    public sealed record DevolviveisDto(Guid VendaId, Guid LojaId, int Numero, DateOnly Data, string? ClienteNome, string? VendedorNome, int DiasDesdeAVenda, int PrazoDeTrocaDias,
         bool DentroDoPrazo, IReadOnlyList<DevolvivelDto> Itens);
 
     public sealed record ItemDevolvidoDto(Guid SkuId, string Descricao, int Quantidade, decimal Valor, string Destino);
@@ -68,7 +68,7 @@ internal static class TrocasEndpoints
             var jaDevolvidas = ja.GetValueOrDefault(x.Key);
             return new DevolvivelDto(x.Key, item.Descricao, x.Value.Quantidade, jaDevolvidas, x.Value.Quantidade - jaDevolvidas, Dinheiro.Arredondar(x.Value.ValorPago / x.Value.Quantidade));
         }).OrderBy(i => i.Descricao, StringComparer.CurrentCulture).ToList();
-        return Results.Ok(new DevolviveisDto(venda.Id, venda.Numero, venda.Data, venda.ClienteNome, venda.VendedorNome, dias, prazo,
+        return Results.Ok(new DevolviveisDto(venda.Id, venda.LojaId, venda.Numero, venda.Data, venda.ClienteNome, venda.VendedorNome, dias, prazo,
             venda.Status == StatusDaVenda.Concluida && dias <= prazo, itens));
     }
 

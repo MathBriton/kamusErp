@@ -70,9 +70,10 @@ export const MENU: GrupoMenu[] = [
     itens: [
       { titulo: 'Registrar venda', rota: '/vendas/registro', descricao: 'Venda no backoffice (sem emissão fiscal) com baixa de estoque e lançamento financeiro.', perfis: [...GESTAO, 'Vendedor'] },
       { titulo: 'Vendas realizadas', rota: '/vendas/realizadas', descricao: 'Vendas do período com totais, detalhe e cancelamento.' },
-      { titulo: 'Comissões', rota: '/vendas/comissoes', descricao: 'Comissão por vendedor no período.', perfis: [...GESTAO, 'Financeiro'] },
+      { titulo: 'Comissões', rota: '/vendas/comissoes', descricao: 'Comissão por vendedor no período, fechamento e conta a pagar.', perfis: [...GESTAO, 'Financeiro'] },
       { titulo: 'Formas de pagamento', rota: '/vendas/formas-de-pagamento', descricao: 'Dinheiro, PIX e cartões: taxas, prazos, parcelas e conta de entrada.', perfis: GESTAO },
-      { titulo: 'Trocas e vale-troca', rota: '/vendas/trocas', previstoPara: 'v0.15.0', descricao: 'Trocas vinculadas à venda e vale-troca como crédito do cliente.', perfis: [...GESTAO, 'Vendedor'] },
+      { titulo: 'Trocas', rota: '/vendas/trocas', descricao: 'Troca vinculada à venda: devolve, leva outra peça e acerta a diferença ou emite vale-troca.', perfis: [...GESTAO, 'Vendedor'] },
+      { titulo: 'Vales-troca', rota: '/vendas/vales-troca', descricao: 'Crédito do cliente gerado nas trocas: saldo, validade e cancelamento.' },
       { titulo: 'Condicional', rota: '/vendas/condicional', previstoPara: 'v0.16.0', descricao: 'Peças que o cliente leva para provar, com prazo de devolução.', perfis: [...GESTAO, 'Vendedor'] },
       { titulo: 'Crediário', rota: '/vendas/crediario', previstoPara: 'v0.16.0', descricao: 'Limite por cliente, carnê, recebimento de parcelas e inadimplência.' },
     ],

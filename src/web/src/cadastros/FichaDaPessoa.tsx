@@ -6,6 +6,7 @@ import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { formatarTelefone, type Papel, type Pessoa } from './tipos'
+import { HistoricoDoCliente } from '../vendas/HistoricoDoCliente'
 
 const vazio = (papel: Papel) => ({
   tipo: (papel === 'cliente' ? 'Fisica' : 'Juridica') as Pessoa['tipo'],
@@ -32,6 +33,8 @@ function Secao({ titulo, children }: { titulo: string; children: ReactNode }) {
     </fieldset>
   )
 }
+
+const PERFIS_COM_VENDAS = ['Dono', 'Gerente', 'Vendedor', 'Financeiro']
 
 /** Ficha de cliente/fornecedor (nova ou existente), com as ações de inativar e anonimizar conforme o perfil. */
 export function FichaDaPessoa({ papel, pessoa, onFechar, onSalvo }: {
@@ -80,6 +83,7 @@ export function FichaDaPessoa({ papel, pessoa, onFechar, onSalvo }: {
   return (
     <Dialogo titulo={titulo} onFechar={onFechar} largo>
       <form onSubmit={salvar} className="space-y-4">
+        {pessoa && papel === 'cliente' && PERFIS_COM_VENDAS.includes(perfilAtual) && <HistoricoDoCliente clienteId={pessoa.id} />}
         <fieldset disabled={anonimizado} className="space-y-4">
           <Secao titulo="Dados">
             <Campo rotulo="Tipo">
