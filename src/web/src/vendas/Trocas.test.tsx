@@ -39,8 +39,7 @@ function api(extras: Parameters<typeof mockApi>[0] = {}, sessao = sessaoDemo) {
     'GET /api/vendedores': () => json([{ id: 'b1', nome: 'Bia', comissaoPercentual: 5, usuarioId: null, ativo: true }]),
     'GET /api/vendas/formas': () => json(formas),
     [`GET /api/vendas/trocas?${periodo}`]: () => json([]),
-    'GET /api/vendas?status=concluidas&busca=7': () => json(listaDaVenda),
-    'GET /api/vendas/v7/devolviveis': () => json(devolviveis()),
+    'GET /api/vendas/devolviveis?numero=7': () => json(devolviveis()),
     ...extras,
   })
 }
@@ -106,7 +105,7 @@ describe('Vendas → Trocas', () => {
   })
 
   it('fora do prazo: Dono aceita marcando; vendedor não pode', async () => {
-    api({ 'GET /api/vendas/v7/devolviveis': () => json(devolviveis({ diasDesdeAVenda: 40, dentroDoPrazo: false })) })
+    api({ 'GET /api/vendas/devolviveis?numero=7': () => json(devolviveis({ diasDesdeAVenda: 40, dentroDoPrazo: false })) })
     renderApp('/vendas/trocas')
     await abrirVenda()
     await userEvent.type(screen.getByLabelText('Devolver Camiseta básica Azul M'), '1')
@@ -117,7 +116,7 @@ describe('Vendas → Trocas', () => {
   })
 
   it('vendedor não vê a opção de aceitar fora do prazo', async () => {
-    api({ 'GET /api/vendas/v7/devolviveis': () => json(devolviveis({ diasDesdeAVenda: 40, dentroDoPrazo: false })) }, sessaoVendedor)
+    api({ 'GET /api/vendas/devolviveis?numero=7': () => json(devolviveis({ diasDesdeAVenda: 40, dentroDoPrazo: false })) }, sessaoVendedor)
     renderApp('/vendas/trocas')
     await abrirVenda()
     expect(screen.getByText(/Fora do prazo/)).toBeInTheDocument()

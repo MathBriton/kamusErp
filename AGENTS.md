@@ -84,7 +84,7 @@ src/backend/Modules/Licenciamento/...         Licença por cliente (/api/licenca
 src/backend/Modules/Cadastros/...             Clientes/fornecedores (/api/pessoas), vendedores, grades, cores e produtos com SKUs (/api/produtos); ICatalogoDeProdutos
 src/backend/Modules/Estoque/...               Lojas, saldos, movimentos/kardex, custo médio, inventário, etiquetas, NF-e (NotasFiscais/LeitorDeNfe) — /api/estoque/...
 src/backend/Modules/Financeiro/...            Contas financeiras, categorias, títulos/parcelas/baixas, movimentos, fluxo de caixa — /api/financeiro/...
-src/backend/Modules/Vendas/...                Formas de pagamento, configuração, vendas (itens/pagamentos), cancelamento, comissões — /api/vendas/...
+src/backend/Modules/Vendas/...                Formas de pagamento, vendas, trocas, vales-troca, comissões e fechamentos — /api/vendas/...
 src/web/src                                   auth/, api/, busca/, cadastros/, configuracoes/, empresa/, estoque/, financeiro/, layout/, licenca/, navegacao/, notificacoes/, pages/, relatorios/, theme/, vendas/, test/
 src/admin/src                                 Painel Administrativo (operador do SaaS): login SuperAdmin, clientes, pagamentos
 tests/backend/Kamus.UnitTests                 Unitários (domínio puro)
@@ -106,7 +106,7 @@ na tela — PDF, Excel, CSV, histórico e segundo plano vêm de graça. **Lembre
 
 **Módulos conversam só pelo SharedKernel** (há teste de arquitetura): `INotificador` (notificar usuários),
 `IRegistradorDeEventos` (eventos no histórico), `IProvedorDeBusca`, `IRelatorio`, `IEmpresaAtiva`
-(id, perfil, nome e CNPJ da empresa ativa), `IUsuarioAtual`, `ICatalogoDeProdutos` e `IDiretorioDeFornecedores` (produtos/SKUs e fornecedores pelo CNPJ, implementados pelo Cadastros), `IDiretorioDeVendedores` (Cadastros), `IContasAPagar` e `IContasAReceber` (contas a pagar e recebíveis de venda, implementados pelo Financeiro), `IMovimentacaoDeEstoque` (baixa/estorno de venda, implementado pelo Estoque), `IDiretorioDeClientes` (tenants e Donos) e
+(id, perfil, nome e CNPJ da empresa ativa), `IUsuarioAtual`, `ICatalogoDeProdutos` e `IDiretorioDeFornecedores` (produtos/SKUs e fornecedores pelo CNPJ, implementados pelo Cadastros), `IDiretorioDeVendedores` (Cadastros), `IContasAPagar` (compras, contas avulsas e cancelamento pela origem) e `IContasAReceber` (recebíveis de venda/troca), implementados pelo Financeiro, `IMovimentacaoDeEstoque` (baixa/estorno de venda e devolução de troca, implementado pelo Estoque), `IDiretorioDeClientes` (tenants e Donos) e
 `ICadastroDeClientes` (criar tenant + empresa + Dono) — esses dois implementados pela Identidade.
 Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e chame `TenantContext.Definir(tenantId)`.
 
@@ -183,47 +183,47 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
   SuperAdmin). Rodar só alguns testes: `dotnet run --project tests/backend/Kamus.IntegrationTests -- -method "*Nome*"`.
 - Testes web: chamadas não mapeadas no `mockApi` dão 404; `GET /api/licenca` com 404 = "sem licença" (nenhum banner).
 - Registro de venda (web): leitor e busca ficam desabilitados até as lojas carregarem — nos testes, espere o campo habilitar (`campoLiberado`).
+- Datas "de hoje" no web: `hojeIso()` (financeiro/tipos.ts) usa Brasília (UTC−3), como a API; não use `new Date()` local para datas de negócio.
 - Vendas: estoque, financeiro e venda gravam em DbContexts diferentes (sem transação); o endpoint compensa (estorna estoque e cancela a origem no financeiro) se algo falhar depois da baixa.
 
 ---
 
 ## 10. Estado atual e próximo passo (ATUALIZE AO TERMINAR)
 
-**Última atualização:** 2026-10-17
+**Última atualização:** 2026-10-18
 
-**Releases:** v0.1.0 → **v0.14.0** lançadas (a v0.14.0 trouxe as vendas). Próxima: **v0.15.0** (trocas, vale-troca e fechamento de comissões).
-Plano de releases em `LEVANTAMENTO.md` → Plano de releases (crediário/condicional v0.16.0, dashboard/mobile v0.17.0, v1.0.0 produção).
+**Releases:** v0.1.0 → v0.14.0 lançadas; **v0.15.0** (trocas, vale-troca e fechamento de comissões) pronta para lançar. Próxima: **v0.16.0** (crediário e condicional).
+Plano de releases em `LEVANTAMENTO.md` → Plano de releases (dashboard/mobile v0.17.0, v1.0.0 produção).
 
 **O que existe hoje:**
 - Fundação: login (JWT + refresh rotativo), empresa ativa (`X-Empresa-Id`), histórico de alterações, notificações (SignalR),
   pesquisa global, exportação PDF/Excel/CSV, licenciamento + Painel Administrativo (`/admin-api`, `src/admin`).
 - Cadastros (v0.7–v0.10): empresas/usuários, pessoas, vendedores, grades/cores/produtos com SKUs, importação por planilha.
 - Estoque (v0.11–v0.12): lojas, saldo × SKU com custo médio, entradas/ajustes/transferências, kardex, posição em matriz (célula traz `preco`),
-  estoque inicial por planilha, etiquetas (PDF), inventário (contagem cega), entrada por XML da NF-e (de-para, grade, fator).
-- Financeiro (v0.13): contas financeiras, categorias, títulos → parcelas → baixas (estorno com movimento contrário), transferências, extrato,
-  fluxo de caixa; NF-e lançada gera contas a pagar (`IContasAPagar`).
-- **Vendas (v0.14.0)** — módulo `Kamus.Modules.Vendas`, schema `vendas`, RLS em formas_de_pagamento/configuracoes/vendas/itens_da_venda/pagamentos_da_venda:
-  - `FormaDePagamento` (por empresa; Dinheiro/Pix/Debito/Credito/Outro, conta, taxa à vista/parcelado, máx. parcelas só no crédito, prazo;
-    `Padroes`; `Recebimentos(valor, parcelas, data)` = líquido da taxa, centavos na 1ª, prazo + 30·i). `ConfiguracaoDeVendas.PermitirEstoqueNegativo` (padrão sim).
-  - `Venda.Criar` valida itens/descontos/pagamentos, calcula troco (só dinheiro; o pagamento em dinheiro é gravado já sem o troco), comissão,
-    taxas, custo e lucro bruto; número sequencial por empresa; `RegistradaPorId` (o Vendedor vê só as suas). `ItemDaVenda`/`PagamentoDaVenda` [NaoAuditar].
-  - `POST /api/vendas`: preço do catálogo (`ICatalogoDeProdutos`), vendedor e % (`IDiretorioDeVendedores`), baixa (`IMovimentacaoDeEstoque`,
-    avisos de saldo negativo), recebíveis (`IContasAReceber`: dinheiro/PIX baixados na conta da forma; cartão a receber). Falha depois do estoque
-    desfaz por compensação. `POST /{id}/cancelar` (Dono/Gerente, motivo) estorna estoque e financeiro + evento `venda_cancelada`.
-    `GET /api/vendas` (de, ate, vendedorId, status, busca; totais só das concluídas), `/comissoes`, `/formas` (+ `/padrao`), `/configuracao`.
-    Relatórios `vendas` e `comissoes`. Perfis: registrar Dono/Gerente/Vendedor; consultar tudo Dono/Gerente/Financeiro; configurar/cancelar Dono/Gerente.
-  - Web `vendas/`: `RegistroDeVendaPage` (leitor de código de barras soma 1 por leitura, busca + grade, desconto por item e na venda, vários
-    pagamentos — o último sem valor digitado cobre o que falta —, parcelas, troco, vendedor pré-escolhido pelo usuário vinculado),
-    `VendasPage` (lista, totais, detalhe com lucro, cancelamento), `FormasDePagamentoPage` (+ regra de estoque negativo), `ComissoesPage`.
-- Testes: 465 backend, 148 web, 10 admin. E2E em localhost (formas padrão + conta, venda com leitor e grade, desconto, dinheiro + crédito 3x,
-  aviso de estoque negativo, recebíveis líquidos, venda da vendedora com PIX e visão restrita, cancelamento devolvendo estoque e caixa,
-  comissões, kardex, tema escuro), 3 execuções.
+  estoque inicial por planilha, etiquetas (PDF), inventário (contagem cega), entrada por XML da NF-e. Movimentos `Venda`, `EstornoDeVenda`, `Devolucao`.
+- Financeiro (v0.13): contas financeiras, categorias, títulos → parcelas → baixas, transferências, extrato, fluxo de caixa; NF-e gera contas a pagar.
+- Vendas (v0.14): formas de pagamento (taxa/prazo/conta), registro de venda (leitor/grade, descontos, vários pagamentos, troco), baixa de estoque,
+  caixa/recebíveis, cancelamento, comissão por venda, relatórios `vendas`/`comissoes`. Ver `Kamus.Modules.Vendas` (schema `vendas`).
+- **Trocas, vale-troca e fechamento (v0.15.0)** — tabelas novas com RLS: trocas, itens_devolvidos, itens_levados, pagamentos_da_troca, vales_troca, fechamentos_de_comissao:
+  - Domínio: `Dinheiro` (arredondamento meio-para-cima, `Distribuir` pagamentos/troco — usado por venda e troca); `Venda.ValoresPagosPorSku()` (rateio do
+    desconto; a soma fecha o total); `Troca.Criar` (valida quantidades contra vendidas − já devolvidas, diferença paga ou vale, comissão = diferença × %);
+    `ValeTroca` (código `VT`+6, `Situacao(hoje)`, `Usar`, `Devolver`, `Cancelar`); `FechamentoDeComissao.Fechar/Reabrir` (marca `FechamentoId` em vendas/trocas);
+    `ConfiguracaoDeVendas` ganhou `PrazoDeTrocaDias` (30) e `ValidadeDoValeDias` (90); `TipoDePagamento.ValeTroca` (forma padrão "Vale-troca").
+  - API: `GET /api/vendas/devolviveis?numero=` e `/{id}/devolviveis` (prazo, valor pago por peça), `POST/GET /api/vendas/trocas` (estoque: saída dos
+    levados + `RegistrarDevolucaoAsync`; financeiro: diferença como recebível origem "Troca"; vale emitido), `GET /api/vendas/vales` (+ `/por-codigo/{codigo}`,
+    `/{id}/cancelar`), pagamento com `valeCodigo` em venda/troca (`Aplicacao/Pagamentos.ResolverAsync` e `.Recebiveis`), `GET /api/vendas/comissoes`
+    (com trocas e `ComissaoPendente`), `/api/vendas/comissoes/fechamentos` (POST fecha + conta a pagar via `IContasAPagar.RegistrarContaAsync`; reabrir cancela
+    a conta via `CancelarOrigemAsync`, 409 se já paga). Venda com troca ou fechada não cancela (409). Relatório `vales-troca`. Filtro `clienteId` em vendas e vales.
+  - Web: componentes `EntradaDeItens` e `EditorDePagamentos` (+ `itens.ts`) compartilhados por `RegistroDeVendaPage` e `TrocasPage`; `ValesPage`;
+    `ComissoesPage` com fechar/reabrir; regras (prazo/validade) em `FormasDePagamentoPage`; `HistoricoDoCliente` na ficha do cliente.
+- Testes: 479 backend, 157 web, 10 admin. E2E em localhost (troca com defeito → vale, venda paga com vale + dinheiro, troca levando peça mais cara com troco,
+  fora do prazo só com Dono, vales, fechamento com conta a pagar e reabertura, ficha do cliente, kardex, tema escuro), 3 execuções.
 
-**Próximo passo — v0.15.0: trocas, vale-troca e fechamento de comissões** (ver `LEVANTAMENTO.md` 4.7.6 e 4.7.9):
-1. Troca vinculada à venda (itens devolvidos voltam ao estoque; itens levados saem), diferença paga ou vale-troca.
-2. Vale-troca como crédito do cliente (saldo, validade, uso como forma de pagamento na venda).
-3. Fechamento de comissões por período (marca as vendas fechadas, gera conta a pagar ao vendedor via `IContasAPagar` ou similar) e metas.
-4. Ficha do cliente com histórico de compras e vale-troca.
+**Próximo passo — v0.16.0: crediário e condicional** (ver `LEVANTAMENTO.md` 4.7.7 e 4.7.8):
+1. Crediário: limite por cliente (Dono/Gerente), forma de pagamento "Crediário" gerando parcelas a receber vinculadas ao cliente, carnê/recibo em PDF,
+   recebimento com multa/juros configuráveis, bloqueio por atraso, aging de inadimplência; comissão sobre recebido como opção (dúvida 4).
+2. Condicional: saída para local virtual "em condicional" com prazo e limite por cliente, termo em PDF, retorno (devolve ou vira venda), alertas e bloqueio.
+3. Ficha do cliente com crediário e condicionais abertas.
 
 **Pendências conhecidas:** ver "Dúvidas em aberto e débitos técnicos" no `README.md` (lista viva — acrescente lá).
 Também: branch órfã `release-please--branches--main--components--kamus` no GitHub (pode ser apagada pela interface).

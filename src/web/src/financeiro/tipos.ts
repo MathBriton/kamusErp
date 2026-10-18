@@ -102,10 +102,9 @@ export const SITUACAO: Record<Situacao, { rotulo: string; classe: string }> = {
 /** "2026-10-15" → "15/10/2026" (sem passar por fuso horário). */
 export const dataBr = (dia: string) => dia.split('-').reverse().join('/')
 
-/** Hoje no formato aaaa-mm-dd (data local do navegador). */
+/** Hoje (aaaa-mm-dd) pelo calendário de Brasília (UTC−3), o mesmo da API — independe do fuso do navegador. */
 export function hojeIso() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
 export function somarDias(dia: string, dias: number) {

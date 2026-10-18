@@ -674,7 +674,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.12.0 | 2 | Estoque: importação de XML da NF-e, inventário, etiquetas | ✅ lançada |
 | v0.13.0 | 3 | Financeiro: contas financeiras, categorias, contas a pagar/receber com baixas, contas a pagar da NF-e, extrato, transferências, fluxo de caixa | ✅ lançada |
 | v0.14.0 | 4 | Vendas: registro no backoffice (leitor ou grade, descontos, vários pagamentos, troco), formas de pagamento com taxa/prazo, baixa de estoque, caixa e recebíveis, cancelamento, comissão por venda e relatório de comissões | ✅ lançada |
-| v0.15.0 | 4 | Trocas vinculadas à venda, vale-troca como crédito do cliente, fechamento de comissões | ⏳ |
+| v0.15.0 | 4 | Trocas vinculadas à venda, vale-troca como crédito do cliente (e forma de pagamento), fechamento de comissões com conta a pagar, compras na ficha do cliente | ⏳ |
 | v0.16.0 | 5 | Crediário e condicional | ⏳ |
 | v0.17.0 | 6 | Dashboard real, app mobile, resumo diário | ⏳ |
 | v1.0.0 | 7 | Produção e primeira loja piloto | ⏳ depende de servidor |
@@ -841,4 +841,8 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | 2026-10-17 | Estoque negativo na venda: configurável por empresa, padrão **permitir com aviso**; desligado, a venda é recusada mostrando o saldo | Aceita |
 | 2026-10-17 | Cancelamento de venda (Dono/Gerente, motivo obrigatório) devolve o estoque (movimento "Cancelamento de venda") e estorna o financeiro (baixas estornadas e títulos cancelados); nada é apagado | Aceita |
 | 2026-10-17 | Comissão = % do vendedor (do cadastro, gravado na venda) sobre o total da venda concluída; vendas sem vendedor aparecem como "Sem vendedor" | Aceita (provisória — ver dúvida 4 do README) |
+| 2026-10-18 | Troca (v0.15.0) sempre vinculada à venda: a peça devolvida vale o que o cliente pagou (desconto da venda rateado por SKU; devolver tudo devolve exatamente o pago); destino "volta ao estoque" (custo da venda original) ou "avariada" (não volta); diferença a maior é paga como numa venda, a menor vira vale-troca | Aceita (provisória) |
+| 2026-10-18 | Vale-troca: código único (VT + 6 caracteres sem ambíguos), validade configurável (padrão 90 dias), uso parcial como forma de pagamento "Vale-troca" (sem taxa/conta, não gera receita), saldo volta se a venda for cancelada, cancelamento por Dono/Gerente | Aceita |
+| 2026-10-18 | Comissão: troca ajusta pela diferença (positiva ou negativa) no período da troca; fechamento por vendedor e período marca vendas e trocas (não entram de novo), pode gerar conta a pagar (categoria Comissões) e pode ser reaberto se a conta não foi paga; venda fechada ou com troca não é cancelada | Aceita |
+| 2026-10-18 | Datas "de hoje" no web seguem o calendário de Brasília (como a API), não o fuso do navegador | Aceita |
 | 2026-10-17 | Vendas conversam com os outros módulos só pelo SharedKernel: `IMovimentacaoDeEstoque` (Estoque), `IContasAReceber` (Financeiro), `IDiretorioDeVendedores` e `ICatalogoDeProdutos` (Cadastros) | Aceita |

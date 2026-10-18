@@ -135,7 +135,7 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 8 | Licença: cliente suspenso pode exportar os próprios dados? | Provisório e implementado: **sim** (hoje só o histórico; os demais relatórios entram conforme forem criados) |
 | 9 | Período de teste (trial) de cliente novo | Provisório e implementado: **14 dias** (ajustável ao criar) |
 | 10 | Painel Admin: só o dono usa ou haverá equipe (suporte, financeiro)? | Provisório e implementado: **só SuperAdmin** |
-| 11 | Troca: prazo padrão e validade do vale-troca | Em aberto |
+| 11 | Troca: prazo padrão e validade do vale-troca | Provisório e implementado (v0.15.0): **30 dias** de prazo (fora dele, só Dono/Gerente) e vale com **90 dias** de validade — ambos configuráveis por empresa |
 | 12 | Condicional: prazo de devolução e limite por cliente | Em aberto |
 | 13 | Resumo diário: blocos ligados por padrão | Em aberto |
 | 14 | Idioma/moeda: só Brasil? | Assumido **só Brasil** (pt-BR, R$) |
@@ -174,6 +174,12 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 47 | Cancelamento de venda: prazo limite e quem pode | Provisório: **Dono e Gerente**, sem prazo, motivo obrigatório |
 | 48 | Vendedor vê só as próprias vendas? | Provisório: **sim** (as que ele registrou); Dono, Gerente e Financeiro veem todas |
 | 49 | Antecipação de recebíveis de cartão e taxa por bandeira | Em aberto (hoje uma taxa à vista e uma parcelado por forma) |
+| 50 | Troca sem a venda localizada (cliente sem comprovante) | Provisório: **não aceita** — toda troca parte do nº da venda |
+| 51 | Na troca, devolver dinheiro em vez de vale-troca | Provisório: **não** — crédito sempre vira vale-troca (devolução em dinheiro fica para depois) |
+| 52 | Vale-troca vale em outra empresa (CNPJ) do mesmo dono? | Provisório: **não**, só na empresa que emitiu |
+| 53 | Peça avariada: precisa de local próprio no estoque e destino (devolver ao fornecedor, descartar)? | Provisório: só registrada na troca (não volta ao estoque disponível); local "avariados" e relatório depois |
+| 54 | Metas mensais e faixas progressivas de comissão | Em aberto (fica para depois do crediário) |
+| 55 | Troca ajusta a comissão no período da troca (não no da venda) — está bom? | Provisório: **sim**; e venda com troca não pode mais ser cancelada |
 
 ### Débitos técnicos
 
@@ -196,7 +202,7 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Sem "esqueci minha senha" por e-mail | Quem esquece depende do Dono redefinir | Quando houver envio de e-mail |
 | Busca e aniversariantes de clientes filtram **em memória** | Lento com dezenas de milhares de clientes | Com PostgreSQL em produção: `unaccent`/`pg_trgm` e consulta por mês/dia |
 | Modelos de mensagem do WhatsApp fixos no código | A loja não personaliza o texto | Configurações de mensagens (junto com o resumo diário) |
-| Ficha do cliente ainda sem histórico de compras, vale-troca e crediário | Visão 360° incompleta | Junto com trocas/vale-troca (v0.15.0) e crediário (v0.16.0) |
+| Ficha do cliente com compras e vales (v0.15.0), ainda sem crediário, ticket médio e frequência | Visão 360° incompleta | Crediário (v0.16.0) e dashboard (v0.17.0) |
 | Sem busca de endereço por CEP | Digitação manual | Integração com serviço de CEP (ViaCEP) |
 | Busca de produtos em memória | Lenta com catálogos grandes | `pg_trgm` e índice por código de barras no PostgreSQL |
 | Grade em uso não pode ganhar tamanho novo | Para um tamanho novo é preciso criar outra grade | Permitir acrescentar tamanhos ao produto |
@@ -204,7 +210,9 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Importação em segundo plano grava como "Sistema" no histórico | O histórico não mostra quem importou (o aviso vai para quem enviou) | Propagar o usuário para tarefas em segundo plano |
 | Sequência do código interno calculada pelo maior existente | Duas criações simultâneas podem colidir (o índice único recusa uma) | Sequência no banco quando houver PostgreSQL em produção |
 | Venda grava estoque, financeiro e vendas em **contextos separados** (sem transação única); se uma etapa falha, as anteriores são desfeitas por compensação | Uma falha no meio da compensação deixaria estoque/financeiro sem a venda | Com PostgreSQL em produção: transação compartilhada ou outbox |
-| Número da venda calculado pelo maior existente da empresa | Duas vendas simultâneas podem colidir (o índice único recusa uma; basta registrar de novo) | Sequência no banco quando houver PostgreSQL em produção |
+| Troca: se falhar depois da devolução ao estoque, a compensação desfaz a saída das peças levadas e o financeiro, mas não a devolução | Peça devolvida ficaria no estoque sem a troca registrada (raro) | Junto com a transação compartilhada no PostgreSQL |
+| Troca não tem cancelamento | Troca lançada errada precisa de ajuste manual (estoque e vale) | Avaliar com a loja piloto |
+| Número da venda (e da troca) calculado pelo maior existente da empresa | Duas vendas simultâneas podem colidir (o índice único recusa uma; basta registrar de novo) | Sequência no banco quando houver PostgreSQL em produção |
 | Lista de vendas e comissões carregam itens e pagamentos **em memória** | Lento com muitos milhares de vendas no período | Projeções/consultas agregadas no PostgreSQL |
 | Posição de estoque e estoque inicial carregam o catálogo **em memória** (`ICatalogoDeProdutos.TodosOsSkusAsync`) | Lento com dezenas de milhares de SKUs | Consulta paginada/projeção no PostgreSQL |
 | Movimentos e saldos de estoque ficam sem histórico de alterações (o kardex é o histórico) | Ajuste de estoque também vira evento; demais movimentos só no kardex | — (decisão consciente) |

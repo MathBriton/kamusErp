@@ -488,3 +488,37 @@ Content-Type: application/json
 GET {{api}}/api/vendas/comissoes
 Authorization: Bearer {{login.response.body.accessToken}}
 X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### --- Trocas e vales-troca ---
+
+### Peças que podem ser devolvidas da venda nº 1 (prazo, valor pago por peça)
+GET {{api}}/api/vendas/devolviveis?numero=1
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Registrar troca (sem levar nada: gera vale-troca). Troque vendaId e skuId pelos seus.
+POST {{api}}/api/vendas/trocas
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{
+  "vendaId": "00000000-0000-0000-0000-000000000000",
+  "motivo": "Tamanho",
+  "devolvidos": [{ "skuId": "00000000-0000-0000-0000-000000000000", "quantidade": 1, "destino": "Estoque" }],
+  "levados": [],
+  "pagamentos": []
+}
+
+### Vales-troca ativos (situacao: ativos, usados, vencidos, cancelados, todos)
+GET {{api}}/api/vendas/vales?situacao=ativos
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Fechar a comissão de um vendedor no mês, gerando conta a pagar
+POST {{api}}/api/vendas/comissoes/fechamentos
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "vendedorId": "00000000-0000-0000-0000-000000000000", "de": "2026-10-01", "ate": "2026-10-31", "gerarContaAPagar": true, "vencimento": "2026-11-05" }

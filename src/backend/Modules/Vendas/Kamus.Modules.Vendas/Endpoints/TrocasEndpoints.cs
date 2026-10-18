@@ -39,7 +39,10 @@ internal static class TrocasEndpoints
     public static IEndpointRouteBuilder MapTrocas(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/vendas").RequireAuthorization().WithTags("Vendas");
-        g.MapGet("/{id:guid}/devolviveis", Devolviveis).WithSummary("Peças da venda que ainda podem ser devolvidas, com o valor pago por peça e o prazo de troca");
+        g.MapGet("/{id:guid}/devolviveis", (Guid id, VendasDbContext db, IEmpresaAtiva e, TimeProvider r, CancellationToken ct) => Devolviveis(id, null, db, e, r, ct))
+            .WithSummary("Peças da venda que ainda podem ser devolvidas, com o valor pago por peça e o prazo de troca");
+        g.MapGet("/devolviveis", (int numero, VendasDbContext db, IEmpresaAtiva e, TimeProvider r, CancellationToken ct) => Devolviveis(null, numero, db, e, r, ct))
+            .WithSummary("O mesmo, pelo nº da venda (qualquer venda da empresa, para quem registra trocas)");
         g.MapGet("/trocas", Listar).WithSummary("Trocas no período (de, ate, busca, vendaId)");
         g.MapGet("/trocas/{id:guid}", Obter).WithSummary("Troca com peças devolvidas, levadas, pagamentos e vale");
         g.MapPost("/trocas", Registrar).WithSummary("Registra a troca: devolve ao estoque, baixa as peças levadas e lança a diferença ou emite o vale-troca")
@@ -53,13 +56,17 @@ internal static class TrocasEndpoints
         (await db.Trocas.Where(t => t.VendaId == vendaId).SelectMany(t => t.Devolvidos).Select(d => new { d.SkuId, d.Quantidade }).ToListAsync(ct))
             .GroupBy(d => d.SkuId).ToDictionary(g => g.Key, g => g.Sum(d => d.Quantidade));
 
-    private static async Task<IResult> Devolviveis(Guid id, VendasDbContext db, IEmpresaAtiva empresa, TimeProvider relogio, CancellationToken ct)
+    private static async Task<IResult> Devolviveis(Guid? id, int? numero, VendasDbContext db, IEmpresaAtiva empresa, TimeProvider relogio, CancellationToken ct)
     {
         if (Permissoes.Exigir(empresa, Perfis, "Seu perfil não acessa as vendas.") is { } negado) return negado;
         var ids = empresa.EmpresaIds;
-        var venda = await db.Vendas.AsNoTracking().Include(v => v.Itens).SingleOrDefaultAsync(v => v.Id == id && ids.Contains(v.EmpresaId), ct);
-        if (venda is null) return Results.NotFound();
-        var ja = await JaDevolvidasAsync(db, id, ct);
+        var venda = await db.Vendas.AsNoTracking().Include(v => v.Itens)
+            .Where(v => ids.Contains(v.EmpresaId) && (id == null || v.Id == id) && (numero == null || v.Numero == numero))
+            .OrderByDescending(v => v.EmpresaId == empresa.EmpresaId).FirstOrDefaultAsync(ct);
+        if (venda is null)
+            return Permissoes.Problema(StatusCodes.Status404NotFound, numero is null ? "Venda não encontrada." : $"Venda nº {numero} não encontrada nesta empresa.");
+        if (venda.Status == StatusDaVenda.Cancelada) return Permissoes.Erro($"A venda nº {venda.Numero} foi cancelada: não há o que trocar.");
+        var ja = await JaDevolvidasAsync(db, venda.Id, ct);
         var prazo = (await FormasEndpoints.ConfiguracaoAsync(db, venda.EmpresaId, ct)).PrazoDeTrocaDias;
         var dias = CalendarioBrasilia.Hoje(relogio).DayNumber - venda.Data.DayNumber;
         var itens = venda.ValoresPagosPorSku().Select(x =>

@@ -145,6 +145,9 @@ public sealed class TrocasTests : IAsyncDisposable
         var antiga = await Vender(c, [new { skuId = c.AzulM, quantidade = 1, desconto = 0m }], [new { formaId = c.Formas["PIX"].Id, valor = 59.90m, parcelas = 1 }], data: Hoje.AddDays(-40));
 
         var vendedora = await Entrar(_api, "vendedor@kamus.local");
+        var pelaVendedora = (await vendedora.GetFromJsonAsync<DevolviveisDto>(U($"/api/vendas/devolviveis?numero={antiga.Numero}"), Ct))!; // venda de outra pessoa
+        (pelaVendedora.VendaId, pelaVendedora.DentroDoPrazo, pelaVendedora.DiasDesdeAVenda).ShouldBe((antiga.Id, false, 40));
+        (await vendedora.GetAsync(U("/api/vendas/devolviveis?numero=999"), Ct)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
         var negada = await Trocar(vendedora, antiga.Id, [new { skuId = c.AzulM, quantidade = 1, destino = "Estoque" }], foraDoPrazo: true);
         negada.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await negada.Content.ReadAsStringAsync(Ct)).ShouldContain("40 dias");

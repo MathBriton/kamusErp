@@ -13,7 +13,7 @@ import { EntradaDeItens } from './EntradaDeItens'
 import { calcularPagamentos, corpoDosPagamentos, inteiro, novaLinha, somaDosItens, valorDe, type ItemDigitado, type PagamentoDigitado } from './itens'
 import {
   centavos, inicioDoMes, MOTIVOS_DA_TROCA, PERFIS_DE_GESTAO, PERFIS_QUE_VENDEM,
-  type Devolviveis, type LinhaDeTroca, type ListaDeVendas, type MotivoDaTroca, type Troca,
+  type Devolviveis, type LinhaDeTroca, type MotivoDaTroca, type Troca,
 } from './tipos'
 import { useFormas } from './useVendas'
 
@@ -74,13 +74,7 @@ export function TrocasPage() {
     const n = numero.trim()
     if (!n) return
     try {
-      const lista = await getJson<ListaDeVendas>(`/api/vendas?${new URLSearchParams({ status: 'concluidas', busca: n })}`)
-      const achada = lista.itens.find((v) => String(v.numero) === n)
-      if (!achada) {
-        setErro(`Venda nº ${n} não encontrada (ou cancelada).`)
-        return
-      }
-      setVenda(await getJson<Devolviveis>(`/api/vendas/${achada.id}/devolviveis`))
+      setVenda(await getJson<Devolviveis>(`/api/vendas/devolviveis?${new URLSearchParams({ numero: n })}`))
       setRegistrada(null)
     } catch (ex) {
       setErro(ex instanceof ErroDeApi ? ex.message : 'Não foi possível buscar a venda.')
