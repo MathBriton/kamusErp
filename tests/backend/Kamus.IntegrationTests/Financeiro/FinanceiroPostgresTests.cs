@@ -70,9 +70,15 @@ public sealed class FinanceiroPostgresTests(PostgresFixture db)
         var fluxo = (await client.GetFromJsonAsync<FluxoDto>(U($"/api/financeiro/fluxo?de={hoje:yyyy-MM-dd}&ate={hoje.AddDays(40):yyyy-MM-dd}&contaId={caixa.Id}"), Ct))!;
         (fluxo.SaldoInicial, fluxo.SaldoFinal).ShouldBe((1000m, 500m));
 
+        (await client.PutAsJsonAsync(U($"/api/financeiro/crediario/clientes/{Guid.NewGuid()}/limite"), new { clienteNome = $"Cliente {sufixo}", limite = 300m, bloqueado = false }, Ct))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await client.PutAsJsonAsync(U("/api/financeiro/crediario/configuracao"), new { multaPercentual = 2m, jurosMensalPercentual = 1m, diasParaBloquear = 15 }, Ct))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await client.GetAsync(U("/api/financeiro/crediario/carteira"), Ct)).StatusCode.ShouldBe(HttpStatusCode.OK);
+
         await using var conn = new NpgsqlConnection(db.AppConnectionString);
         await conn.OpenAsync(Ct);
-        foreach (var tabela in new[] { "contas", "categorias", "titulos", "parcelas", "baixas", "movimentos" })
+        foreach (var tabela in new[] { "contas", "categorias", "titulos", "parcelas", "baixas", "movimentos", "limites_de_credito", "configuracoes_do_crediario" })
         {
             await using var cmd = new NpgsqlCommand($"SELECT count(*) FROM financeiro.{tabela}", conn);
             ((long)(await cmd.ExecuteScalarAsync(Ct))!).ShouldBe(0, $"RLS em financeiro.{tabela}");

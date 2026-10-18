@@ -18,6 +18,8 @@ public sealed class FinanceiroDbContext(DbContextOptions<FinanceiroDbContext> op
     public DbSet<Parcela> Parcelas => Set<Parcela>();
     public DbSet<Baixa> Baixas => Set<Baixa>();
     public DbSet<MovimentoFinanceiro> Movimentos => Set<MovimentoFinanceiro>();
+    public DbSet<LimiteDeCredito> LimitesDeCredito => Set<LimiteDeCredito>();
+    public DbSet<ConfiguracaoDoCrediario> ConfiguracoesDoCrediario => Set<ConfiguracaoDoCrediario>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,6 +57,7 @@ public sealed class FinanceiroDbContext(DbContextOptions<FinanceiroDbContext> op
             e.Ignore(t => t.Quitado);
             e.HasIndex(t => new { t.TenantId, t.EmpresaId, t.Tipo });
             e.HasIndex(t => new { t.TenantId, t.Origem, t.OrigemId });
+            e.HasIndex(t => new { t.TenantId, t.PessoaId, t.Crediario });
             e.HasOne<Categoria>().WithMany().HasForeignKey(t => t.CategoriaId).OnDelete(DeleteBehavior.Restrict);
             e.HasMany(t => t.Parcelas).WithOne().HasForeignKey(p => p.TituloId).OnDelete(DeleteBehavior.Cascade);
             e.Navigation(t => t.Parcelas).HasField("_parcelas").UsePropertyAccessMode(PropertyAccessMode.Field);
@@ -93,6 +96,24 @@ public sealed class FinanceiroDbContext(DbContextOptions<FinanceiroDbContext> op
             e.Property(m => m.Usuario).HasMaxLength(150);
             e.HasIndex(m => new { m.TenantId, m.ContaId, m.Data });
             e.HasOne<ContaFinanceira>().WithMany().HasForeignKey(m => m.ContaId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<LimiteDeCredito>(e =>
+        {
+            e.ToTable("limites_de_credito");
+            e.Property(l => l.ClienteNome).HasMaxLength(150);
+            e.Property(l => l.Limite).HasPrecision(14, 2);
+            e.Property(l => l.Observacao).HasMaxLength(300);
+            e.Property(l => l.AtualizadoPor).HasMaxLength(150);
+            e.HasIndex(l => new { l.TenantId, l.ClienteId }).IsUnique();
+        });
+
+        modelBuilder.Entity<ConfiguracaoDoCrediario>(e =>
+        {
+            e.ToTable("configuracoes_do_crediario");
+            e.Property(c => c.MultaPercentual).HasPrecision(5, 2);
+            e.Property(c => c.JurosMensalPercentual).HasPrecision(5, 2);
+            e.HasIndex(c => c.TenantId).IsUnique();
         });
 
         base.OnModelCreating(modelBuilder);

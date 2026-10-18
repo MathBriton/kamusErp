@@ -12,6 +12,7 @@ public enum TipoDePagamento
     Credito,
     Outro,
     ValeTroca,
+    Crediario,
 }
 
 /// <summary>
@@ -46,6 +47,7 @@ public sealed class FormaDePagamento : ITenantOwned
         ("Cartão de débito", TipoDePagamento.Debito, 1.5m, 1.5m, 1, 1),
         ("Cartão de crédito", TipoDePagamento.Credito, 3.5m, 5.5m, 12, 30),
         ("Vale-troca", TipoDePagamento.ValeTroca, 0m, 0m, 1, 0),
+        ("Crediário", TipoDePagamento.Crediario, 0m, 0m, 10, 30),
     ];
 
     public bool EntraNaHora => Tipo is TipoDePagamento.Dinheiro or TipoDePagamento.Pix;
@@ -68,8 +70,10 @@ public sealed class FormaDePagamento : ITenantOwned
         if (prazoDias is < 0 or > 365) throw new ArgumentException("Prazo: de 0 a 365 dias.", nameof(prazoDias));
         if (tipo == TipoDePagamento.ValeTroca && (taxaAVista != 0 || taxaParcelado != 0 || prazoDias != 0 || contaId is not null))
             throw new ArgumentException("Vale-troca não tem taxa, prazo nem conta: é um crédito do cliente.", nameof(tipo));
+        if (tipo == TipoDePagamento.Crediario && (taxaAVista != 0 || taxaParcelado != 0 || contaId is not null))
+            throw new ArgumentException("Crediário não tem taxa nem conta: as parcelas ficam a receber do cliente.", nameof(tipo));
         (Nome, Tipo, ContaId, TaxaAVista, TaxaParcelado, PrazoDias) = (nome.Trim()[..Math.Min(nome.Trim().Length, 60)], tipo, contaId, taxaAVista, taxaParcelado, prazoDias);
-        MaxParcelas = tipo == TipoDePagamento.Credito ? maxParcelas : 1;
+        MaxParcelas = tipo is TipoDePagamento.Credito or TipoDePagamento.Crediario ? maxParcelas : 1;
     }
 
     public void Desativar() => Ativa = false;
@@ -85,7 +89,9 @@ public sealed class FormaDePagamento : ITenantOwned
         var liquido = Dinheiro.Arredondar(valor * (1 - Taxa(n) / 100));
         var cada = Math.Floor(liquido / n * 100) / 100;
         var resto = liquido - cada * n;
-        return Enumerable.Range(0, n).Select(i => new ParcelaAReceber(data.AddDays(PrazoDias + 30 * i), i == 0 ? cada + resto : cada)).ToList();
+        // Crediário vence no mesmo dia de cada mês; cartão, a cada 30 dias.
+        return Enumerable.Range(0, n).Select(i => new ParcelaAReceber(
+            Tipo == TipoDePagamento.Crediario ? data.AddDays(PrazoDias).AddMonths(i) : data.AddDays(PrazoDias + 30 * i), i == 0 ? cada + resto : cada)).ToList();
     }
 }
 

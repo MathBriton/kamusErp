@@ -21,10 +21,13 @@ public static class ModuloFinanceiro
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IContasAPagar, ContasAPagar>();
         services.AddScoped<IContasAReceber, ContasAReceber>();
+        services.AddScoped<Crediario>();
+        services.AddScoped<ICrediario>(sp => sp.GetRequiredService<Crediario>());
+        services.AddScoped<IRelatorio, RelatorioDeInadimplencia>();
         services.AddScoped<IRelatorio, RelatorioDeTitulos>();
         services.AddScoped<IRelatorio, RelatorioDeFluxo>();
         return services;
     }
 
-    public static IEndpointRouteBuilder MapModuloFinanceiro(this IEndpointRouteBuilder app) => app.MapContas().MapCategorias().MapTitulos().MapFluxo();
+    public static IEndpointRouteBuilder MapModuloFinanceiro(this IEndpointRouteBuilder app) => app.MapContas().MapCategorias().MapTitulos().MapFluxo().MapCrediario();
 }

@@ -22,7 +22,8 @@ internal static class Pagamentos
     /// <paramref name="db"/> — só fica gravado se quem chama salvar.
     /// </summary>
     public static async Task<(List<PagamentoNovo> Pagamentos, Dictionary<Guid, FormaDePagamento> Formas, string? Erro)> ResolverAsync(
-        VendasDbContext db, IContasAReceber financeiro, Guid empresaId, IReadOnlyList<PagamentoPedido> pedidos, DateOnly hoje, CancellationToken ct)
+        VendasDbContext db, IContasAReceber financeiro, ICrediario crediario, Guid empresaId, Guid? clienteId, IReadOnlyList<PagamentoPedido> pedidos, DateOnly hoje,
+        CancellationToken ct)
     {
         var formaIds = pedidos.Select(p => p.FormaId).Distinct().ToList();
         var formas = await db.Formas.AsNoTracking().Where(f => formaIds.Contains(f.Id) && f.EmpresaId == empresaId).ToDictionaryAsync(f => f.Id, ct);
@@ -55,10 +56,19 @@ internal static class Pagamentos
             }
             resultado.Add(new PagamentoNovo(forma.Id, forma.Nome, forma.Tipo, p.Valor, p.Parcelas, forma.Taxa(p.Parcelas), valeId));
         }
+        var noCrediario = resultado.Where(p => p.Tipo == TipoDePagamento.Crediario).Sum(p => p.Valor);
+        if (noCrediario > 0)
+        {
+            if (clienteId is not { } cliente) return ([], formas, "Venda no crediário precisa de cliente cadastrado: escolha o cliente.");
+            var situacao = await crediario.SituacaoAsync(cliente, ct);
+            if (situacao.Bloqueado) return ([], formas, situacao.Motivo);
+            if (noCrediario > situacao.Disponivel)
+                return ([], formas, $"Limite disponível no crediário: R$ {Dinheiro.Formatar(situacao.Disponivel)} (a compra pede R$ {Dinheiro.Formatar(noCrediario)}).");
+        }
         return (resultado, formas, null);
     }
 
-    /// <summary>Dinheiro/PIX entram baixados na conta da forma; cartões e outros ficam a receber (líquidos da taxa); vale-troca não gera nada (é crédito do cliente).</summary>
+    /// <summary>Dinheiro/PIX entram baixados na conta da forma; cartões e outros ficam a receber (líquidos da taxa); crediário vira dívida do cliente; vale-troca não gera nada.</summary>
     public static ContasAReceberDeVenda Recebiveis(Guid empresaId, string origem, Guid origemId, string documento, Guid? clienteId, string? clienteNome, DateOnly data,
         IEnumerable<PagamentoGravado> pagamentos, IReadOnlyDictionary<Guid, FormaDePagamento> formas) =>
         new(empresaId, origem, origemId.ToString(), clienteId, clienteNome, data,
@@ -66,6 +76,8 @@ internal static class Pagamentos
             {
                 var forma = formas[p.FormaId];
                 var descricao = $"{documento} — {p.FormaNome}{(p.Parcelas > 1 ? $" {p.Parcelas}x" : "")}";
+                if (forma.Tipo == TipoDePagamento.Crediario)
+                    return new RecebimentoDeVenda(descricao, forma.Recebimentos(p.Valor, p.Parcelas, data), null, JaRecebido: false, "Crediário próprio.", Crediario: true);
                 return forma.EntraNaHora
                     ? new RecebimentoDeVenda(descricao, [new ParcelaAReceber(data, p.Valor)], forma.ContaId, JaRecebido: true, null)
                     : new RecebimentoDeVenda(descricao, forma.Recebimentos(p.Valor, p.Parcelas, data), forma.ContaId, JaRecebido: false,

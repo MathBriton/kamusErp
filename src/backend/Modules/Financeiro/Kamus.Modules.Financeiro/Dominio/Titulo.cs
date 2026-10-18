@@ -53,6 +53,9 @@ public sealed class Titulo : ITenantOwned
     public bool Cancelado { get; private set; }
     public DateTimeOffset CriadoEm { get; private set; }
 
+    /// <summary>Conta a receber do crediário próprio (dívida do cliente <see cref="PessoaId"/>).</summary>
+    public bool Crediario { get; private set; }
+
     public IReadOnlyCollection<Parcela> Parcelas => _parcelas;
 
     public decimal ValorTotal => _parcelas.Sum(p => p.Valor);
@@ -99,6 +102,12 @@ public sealed class Titulo : ITenantOwned
         Documento = Limitar(dados.Documento, 60);
         Competencia = dados.Competencia;
         Observacao = Limitar(dados.Observacao, 1000);
+    }
+
+    public void MarcarComoCrediario()
+    {
+        if (Tipo != TipoDeTitulo.Receber || PessoaId is null) throw new InvalidOperationException("Crediário é conta a receber de um cliente cadastrado.");
+        Crediario = true;
     }
 
     /// <summary>Religa as parcelas ao título depois de carregar do banco (para as regras que dependem do cancelamento).</summary>

@@ -84,7 +84,7 @@ internal static class VendasEndpoints
     }
 
     private static async Task<IResult> Registrar(VendaRequest r, VendasDbContext db, IEmpresaAtiva empresa, IUsuarioAtual usuario, ICatalogoDeProdutos catalogo,
-        IDiretorioDeVendedores vendedores, IMovimentacaoDeEstoque estoque, IContasAReceber financeiro, TimeProvider relogio, CancellationToken ct)
+        IDiretorioDeVendedores vendedores, IMovimentacaoDeEstoque estoque, IContasAReceber financeiro, ICrediario crediario, TimeProvider relogio, CancellationToken ct)
     {
         if (Permissoes.Exigir(empresa, Permissoes.Registrar, "Só Dono, Gerente e Vendedor registram vendas.") is { } negado) return negado;
         var empresaId = empresa.EmpresaId!.Value;
@@ -107,7 +107,7 @@ internal static class VendasEndpoints
         if (itens.Any(i => !skus.ContainsKey(i.SkuId))) return Permissoes.Erro("Há itens que não existem no catálogo.");
         if (itens.FirstOrDefault(i => !skus[i.SkuId].Ativo) is { } inativo) return Permissoes.Erro($"{Nome(skus[inativo.SkuId])} está inativo no catálogo.");
 
-        var (pagamentos, formas, erro) = await Pagamentos.ResolverAsync(db, financeiro, empresaId, pedidos, hoje, ct);
+        var (pagamentos, formas, erro) = await Pagamentos.ResolverAsync(db, financeiro, crediario, empresaId, r.ClienteId, pedidos, hoje, ct);
         if (erro is not null) return Permissoes.Erro(erro);
 
         var numero = (await db.Vendas.Where(v => v.EmpresaId == empresaId).MaxAsync(v => (int?)v.Numero, ct) ?? 0) + 1;

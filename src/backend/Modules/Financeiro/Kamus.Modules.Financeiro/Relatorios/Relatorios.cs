@@ -5,6 +5,7 @@ using Kamus.Modules.Financeiro.Persistencia;
 using Kamus.SharedKernel.MultiTenancy;
 using Kamus.SharedKernel.Relatorios;
 using Kamus.SharedKernel.Tempo;
+using Microsoft.EntityFrameworkCore;
 
 namespace Kamus.Modules.Financeiro.Relatorios;
 
@@ -75,5 +76,48 @@ internal sealed class RelatorioDeFluxo(FinanceiroDbContext db, IEmpresaAtiva emp
             new("Saldo inicial", $"R$ {Dominio.Titulo.Moeda(f.SaldoInicial)}"),
             new("Em atraso", $"a receber R$ {Dominio.Titulo.Moeda(f.AReceberEmAtraso)} · a pagar R$ {Dominio.Titulo.Moeda(f.APagarEmAtraso)}"),
         ]);
+    }
+}
+
+/// <summary>Inadimplência do crediário: por cliente, saldo em aberto, atrasado e dias do atraso mais antigo.</summary>
+internal sealed class RelatorioDeInadimplencia(FinanceiroDbContext db, Crediario crediario, IEmpresaAtiva empresa) : IRelatorio
+{
+    public string Codigo => "inadimplencia";
+    public string Titulo => "Crediário — inadimplência";
+    public IReadOnlyCollection<string> Perfis => CrediarioEndpoints.Perfis;
+
+    public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
+    {
+        var hoje = crediario.Hoje;
+        var config = await crediario.ConfiguracaoAsync(ct);
+        var titulos = await crediario.TitulosAsync(null, empresa.EmpresaIds, ct);
+        var limites = (await db.LimitesDeCredito.ToListAsync(ct)).ToDictionary(l => l.ClienteId);
+        var linhas = titulos.Where(t => t.PessoaId is not null).GroupBy(t => t.PessoaId!.Value).Select(g =>
+        {
+            var abertas = g.SelectMany(t => t.Parcelas).Where(p => p.Saldo > 0).ToList();
+            var situacao = Credito.Avaliar(limites.GetValueOrDefault(g.Key), abertas.Sum(p => p.Saldo), crediario.DiasDeAtraso(g), config);
+            return (Nome: g.First().PessoaNome ?? "?", situacao.Limite, situacao.EmAberto, Atrasado: abertas.Where(p => p.Vencimento < hoje).Sum(p => p.Saldo),
+                situacao.DiasDeAtraso, Faixa: Credito.Faixa(situacao.DiasDeAtraso), situacao.Bloqueado);
+        }).Where(l => l.EmAberto > 0).OrderByDescending(l => l.DiasDeAtraso).ThenByDescending(l => l.EmAberto).ToList();
+
+        static string Rotulo(FaixaDeAtraso f) => f switch
+        {
+            FaixaDeAtraso.AVencer => "Em dia",
+            FaixaDeAtraso.Ate30 => "1 a 30 dias",
+            FaixaDeAtraso.Ate60 => "31 a 60 dias",
+            FaixaDeAtraso.Ate90 => "61 a 90 dias",
+            _ => "Mais de 90 dias",
+        };
+        return new DadosDoRelatorio(Titulo,
+        [
+            new ColunaRelatorio("Cliente", Largura: 2f),
+            new ColunaRelatorio("Limite", TipoColuna.Moeda),
+            new ColunaRelatorio("Em aberto", TipoColuna.Moeda, Totalizar: true),
+            new ColunaRelatorio("Atrasado", TipoColuna.Moeda, Totalizar: true),
+            new ColunaRelatorio("Dias de atraso", TipoColuna.Inteiro, Largura: 0.7f),
+            new ColunaRelatorio("Faixa", Largura: 0.9f),
+            new ColunaRelatorio("Situação", Largura: 0.7f),
+        ], linhas.Select(l => (IReadOnlyList<object?>)[l.Nome, l.Limite, l.EmAberto, l.Atrasado, l.DiasDeAtraso, Rotulo(l.Faixa), l.Bloqueado ? "Bloqueado" : "Liberado"]).ToList(),
+        [new("Data", $"{hoje:dd/MM/yyyy}")]);
     }
 }

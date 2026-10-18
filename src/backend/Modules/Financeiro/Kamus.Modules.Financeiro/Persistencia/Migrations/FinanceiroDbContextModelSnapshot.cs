@@ -149,6 +149,41 @@ namespace Kamus.Modules.Financeiro.Persistencia.Migrations
                     b.ToTable("categorias", "financeiro");
                 });
 
+            modelBuilder.Entity("Kamus.Modules.Financeiro.Dominio.ConfiguracaoDoCrediario", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("DiasParaBloquear")
+                        .HasColumnType("integer")
+                        .HasColumnName("dias_para_bloquear");
+
+                    b.Property<decimal>("JurosMensalPercentual")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("juros_mensal_percentual");
+
+                    b.Property<decimal>("MultaPercentual")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("multa_percentual");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_configuracoes_do_crediario");
+
+                    b.HasIndex("TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_configuracoes_do_crediario_tenant_id");
+
+                    b.ToTable("configuracoes_do_crediario", "financeiro");
+                });
+
             modelBuilder.Entity("Kamus.Modules.Financeiro.Dominio.ContaFinanceira", b =>
                 {
                     b.Property<Guid>("Id")
@@ -200,6 +235,59 @@ namespace Kamus.Modules.Financeiro.Persistencia.Migrations
                         .HasDatabaseName("ix_contas_tenant_id_empresa_id_nome");
 
                     b.ToTable("contas", "financeiro");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Financeiro.Dominio.LimiteDeCredito", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AtualizadoPor")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("atualizado_por");
+
+                    b.Property<bool>("Bloqueado")
+                        .HasColumnType("boolean")
+                        .HasColumnName("bloqueado");
+
+                    b.Property<Guid>("ClienteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cliente_id");
+
+                    b.Property<string>("ClienteNome")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("cliente_nome");
+
+                    b.Property<decimal>("Limite")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("limite");
+
+                    b.Property<string>("Observacao")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("observacao");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_limites_de_credito");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_limites_de_credito_tenant_id");
+
+                    b.HasIndex("TenantId", "ClienteId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_limites_de_credito_tenant_id_cliente_id");
+
+                    b.ToTable("limites_de_credito", "financeiro");
                 });
 
             modelBuilder.Entity("Kamus.Modules.Financeiro.Dominio.MovimentoFinanceiro", b =>
@@ -340,6 +428,10 @@ namespace Kamus.Modules.Financeiro.Persistencia.Migrations
                         .HasColumnType("date")
                         .HasColumnName("competencia");
 
+                    b.Property<bool>("Crediario")
+                        .HasColumnType("boolean")
+                        .HasColumnName("crediario");
+
                     b.Property<DateTimeOffset>("CriadoEm")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("criado_em");
@@ -408,6 +500,9 @@ namespace Kamus.Modules.Financeiro.Persistencia.Migrations
 
                     b.HasIndex("TenantId", "Origem", "OrigemId")
                         .HasDatabaseName("ix_titulos_tenant_id_origem_origem_id");
+
+                    b.HasIndex("TenantId", "PessoaId", "Crediario")
+                        .HasDatabaseName("ix_titulos_tenant_id_pessoa_id_crediario");
 
                     b.ToTable("titulos", "financeiro");
                 });

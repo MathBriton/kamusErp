@@ -39,8 +39,8 @@ public class FormaDePagamentoTests
         Should.Throw<ArgumentException>(() => FormaDePagamento.Criar(Guid.NewGuid(), "X", TipoDePagamento.Credito, null, aVista, parcelado, max, 30));
 
     [Fact]
-    public void Padroes_DinheiroPixDebitoCreditoEValeTroca()
+    public void Padroes_DinheiroPixDebitoCreditoValeTrocaECrediario()
     {
-        FormaDePagamento.Padroes.Select(p => p.Tipo).ShouldBe([TipoDePagamento.Dinheiro, TipoDePagamento.Pix, TipoDePagamento.Debito, TipoDePagamento.Credito, TipoDePagamento.ValeTroca]);
+        FormaDePagamento.Padroes.Select(p => p.Tipo).ShouldBe([TipoDePagamento.Dinheiro, TipoDePagamento.Pix, TipoDePagamento.Debito, TipoDePagamento.Credito, TipoDePagamento.ValeTroca, TipoDePagamento.Crediario]);
     }
 }

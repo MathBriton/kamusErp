@@ -128,7 +128,7 @@ internal static class TrocasEndpoints
     }
 
     private static async Task<IResult> Registrar(TrocaRequest r, VendasDbContext db, IEmpresaAtiva empresa, IUsuarioAtual usuario, ICatalogoDeProdutos catalogo,
-        IMovimentacaoDeEstoque estoque, IContasAReceber financeiro, IRegistradorDeEventos eventos, TimeProvider relogio, CancellationToken ct)
+        IMovimentacaoDeEstoque estoque, IContasAReceber financeiro, ICrediario crediario, IRegistradorDeEventos eventos, TimeProvider relogio, CancellationToken ct)
     {
         if (Permissoes.Exigir(empresa, Permissoes.Registrar, "Só Dono, Gerente e Vendedor registram trocas.") is { } negado) return negado;
         var empresaId = empresa.EmpresaId!.Value;
@@ -156,7 +156,7 @@ internal static class TrocasEndpoints
         if (levados.Any(i => !skus.ContainsKey(i.SkuId))) return Permissoes.Erro("Há peças levadas que não existem no catálogo.");
         if (levados.FirstOrDefault(i => !skus[i.SkuId].Ativo) is { } inativo) return Permissoes.Erro($"{Nome(skus[inativo.SkuId])} está inativo no catálogo.");
 
-        var (pagamentos, formas, erro) = await Pagamentos.ResolverAsync(db, financeiro, empresaId, r.Pagamentos ?? [], hoje, ct);
+        var (pagamentos, formas, erro) = await Pagamentos.ResolverAsync(db, financeiro, crediario, empresaId, venda.ClienteId, r.Pagamentos ?? [], hoje, ct);
         if (erro is not null) return Permissoes.Erro(erro);
 
         var numero = (await db.Trocas.Where(t => t.EmpresaId == empresaId).MaxAsync(t => (int?)t.Numero, ct) ?? 0) + 1;

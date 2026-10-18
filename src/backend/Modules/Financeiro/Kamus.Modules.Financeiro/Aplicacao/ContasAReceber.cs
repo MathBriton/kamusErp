@@ -33,6 +33,7 @@ internal sealed class ContasAReceber(FinanceiroDbContext db, TimeProvider relogi
             var titulo = Titulo.Criar(venda.EmpresaId,
                 new DadosDoTitulo(TipoDeTitulo.Receber, r.Descricao, venda.ClienteId, venda.ClienteNome, categoria.Id, null, venda.Data, r.Observacao),
                 r.Parcelas.Select(p => new NovaParcela(p.Vencimento, p.Valor)).ToList(), agora, venda.Origem, venda.OrigemId);
+            if (r.Crediario) titulo.MarcarComoCrediario();
             db.Titulos.Add(titulo);
             if (!r.JaRecebido) continue;
             var conta = r.ContaId is { } id ? await db.Contas.SingleOrDefaultAsync(c => c.Id == id && c.EmpresaId == venda.EmpresaId, ct) : null;

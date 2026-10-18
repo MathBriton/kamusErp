@@ -3,7 +3,8 @@ namespace Kamus.SharedKernel.Financeiro;
 public sealed record ParcelaAReceber(DateOnly Vencimento, decimal Valor);
 
 /// <param name="JaRecebido">Dinheiro/PIX: entra na hora na conta <paramref name="ContaId"/> (título já baixado). Cartão/outros: fica a receber.</param>
-public sealed record RecebimentoDeVenda(string Descricao, IReadOnlyList<ParcelaAReceber> Parcelas, Guid? ContaId, bool JaRecebido, string? Observacao);
+/// <param name="Crediario">Venda no crediário próprio: as parcelas são dívida do cliente (limite, atraso, carnê).</param>
+public sealed record RecebimentoDeVenda(string Descricao, IReadOnlyList<ParcelaAReceber> Parcelas, Guid? ContaId, bool JaRecebido, string? Observacao, bool Crediario = false);
 
 /// <param name="OrigemId">Identifica a venda: registrar de novo não duplica, e o cancelamento usa a mesma origem.</param>
 public sealed record ContasAReceberDeVenda(Guid EmpresaId, string Origem, string OrigemId, Guid? ClienteId, string? ClienteNome, DateOnly Data,
