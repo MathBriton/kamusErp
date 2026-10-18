@@ -317,7 +317,7 @@ function ReceberParcela({ parcela, onFechar, onRecebido }: { parcela: ParcelaDoC
           <p className="rounded-lg bg-success-soft px-3 py-2.5 font-semibold text-success">{`Recebido: ${moeda(recebido.total)}`}</p>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => void recibo()} className={estilos.botao}>Recibo (PDF)</button>
-            <button type="button" onClick={onFechar} className={estilos.botaoPrimario}>Fechar</button>
+            <button type="button" onClick={onFechar} className={estilos.botaoPrimario}>Concluir</button>
           </div>
         </div>
       ) : (

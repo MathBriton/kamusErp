@@ -129,7 +129,7 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 2 | Loja piloto: loja única ou várias lojas? Que sistema usa hoje? | Em aberto |
 | 3 | Compras: precisa de pedido de compra ou só a entrada de mercadoria? | Em aberto |
 | 4 | Comissão sobre venda **faturada** ou **recebida** como padrão? | Provisório e implementado (v0.14.0): **faturada** (total da venda concluída, depois dos descontos); cancelada não conta |
-| 5 | Crediário: multa/juros padrão e dias de atraso para bloquear novas compras | Em aberto |
+| 5 | Crediário: multa/juros padrão e dias de atraso para bloquear novas compras | Provisório e implementado (v0.16.0): **multa 2%** (teto do CDC), **juros 1% a.m.** pro rata dia e **bloqueio com mais de 15 dias** de atraso — configuráveis; validar com o contador |
 | 6 | Modelo de cobrança do SaaS (por loja, usuário ou plano) | Provisório e implementado (v0.6.0): **plano único "Piloto"**, valor e limites por cliente |
 | 7 | Licença: dias de carência e uso durante a carência | Provisório e implementado: **5 dias, uso normal com banner** (ajustável por cliente) |
 | 8 | Licença: cliente suspenso pode exportar os próprios dados? | Provisório e implementado: **sim** (hoje só o histórico; os demais relatórios entram conforme forem criados) |
@@ -167,7 +167,7 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 40 | Formas de pagamento com taxa e prazo da maquininha (crédito, débito, PIX) | Implementado (v0.14.0): por empresa; dinheiro/PIX entram na hora numa conta; cartões viram contas a receber **líquidas da taxa** (1ª parcela no prazo, demais a cada 30 dias) |
 | 41 | Fluxo de caixa: contas vencidas e não pagas entram na projeção? | Provisório: **não** — aparecem à parte ("em atraso") até serem pagas ou renegociadas |
 | 42 | Quem acessa o financeiro? | Provisório: Dono, Gerente e Financeiro |
-| 43 | Avisos de contas vencendo (sininho) e resumo diário | Previsto com o resumo diário (v0.17.0) |
+| 43 | Avisos de contas vencendo (sininho) e resumo diário | Previsto com o resumo diário (v0.18.0) |
 | 44 | Venda pode ter data retroativa? | Provisório: **sim** (lançar vendas de dias anteriores); data futura é recusada |
 | 45 | Preço na venda: o vendedor pode alterar o preço do item? | Provisório: **não** — o preço vem do cadastro; ajustes só por desconto (no item ou na venda) |
 | 46 | Desconto máximo por perfil (ex.: vendedor até 10%) e motivo do desconto | Em aberto (hoje qualquer desconto até o valor do item/venda) |
@@ -180,6 +180,11 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 53 | Peça avariada: precisa de local próprio no estoque e destino (devolver ao fornecedor, descartar)? | Provisório: só registrada na troca (não volta ao estoque disponível); local "avariados" e relatório depois |
 | 54 | Metas mensais e faixas progressivas de comissão | Em aberto (fica para depois do crediário) |
 | 55 | Troca ajusta a comissão no período da troca (não no da venda) — está bom? | Provisório: **sim**; e venda com troca não pode mais ser cancelada |
+| 56 | Crediário: limite vale para todas as empresas (CNPJs) do cliente? | Provisório: **sim** — limite e dívida somados no cliente do SaaS |
+| 57 | Crediário: entrada obrigatória? Juros de parcelamento (preço a prazo maior)? | Provisório: **sem entrada obrigatória e sem juros de parcelamento** (a entrada é outra forma de pagamento na mesma venda) |
+| 58 | Vendedor pode receber parcelas do crediário no balcão? | Provisório: **sim** (consulta, recebe, imprime recibo/carnê); limite e regras só Dono/Gerente |
+| 59 | Comissão de venda no crediário: sobre o faturado ou só quando o cliente paga? | Provisório: **faturado** (igual às demais vendas); "sobre o recebido" fica como opção futura (dúvida 4) |
+| 60 | Cobrança do crediário por WhatsApp em 1 clique e aviso de parcela vencendo | Previsto com o resumo diário (v0.18.0) |
 
 ### Débitos técnicos
 
@@ -202,7 +207,7 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Sem "esqueci minha senha" por e-mail | Quem esquece depende do Dono redefinir | Quando houver envio de e-mail |
 | Busca e aniversariantes de clientes filtram **em memória** | Lento com dezenas de milhares de clientes | Com PostgreSQL em produção: `unaccent`/`pg_trgm` e consulta por mês/dia |
 | Modelos de mensagem do WhatsApp fixos no código | A loja não personaliza o texto | Configurações de mensagens (junto com o resumo diário) |
-| Ficha do cliente com compras e vales (v0.15.0), ainda sem crediário, ticket médio e frequência | Visão 360° incompleta | Crediário (v0.16.0) e dashboard (v0.17.0) |
+| Ficha do cliente com compras, vales e crediário (v0.16.0), ainda sem condicionais, ticket médio e frequência | Visão 360° incompleta | Condicional (v0.17.0) e dashboard (v0.18.0) |
 | Sem busca de endereço por CEP | Digitação manual | Integração com serviço de CEP (ViaCEP) |
 | Busca de produtos em memória | Lenta com catálogos grandes | `pg_trgm` e índice por código de barras no PostgreSQL |
 | Grade em uso não pode ganhar tamanho novo | Para um tamanho novo é preciso criar outra grade | Permitir acrescentar tamanhos ao produto |
@@ -211,6 +216,8 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Sequência do código interno calculada pelo maior existente | Duas criações simultâneas podem colidir (o índice único recusa uma) | Sequência no banco quando houver PostgreSQL em produção |
 | Venda grava estoque, financeiro e vendas em **contextos separados** (sem transação única); se uma etapa falha, as anteriores são desfeitas por compensação | Uma falha no meio da compensação deixaria estoque/financeiro sem a venda | Com PostgreSQL em produção: transação compartilhada ou outbox |
 | Troca: se falhar depois da devolução ao estoque, a compensação desfaz a saída das peças levadas e o financeiro, mas não a devolução | Peça devolvida ficaria no estoque sem a troca registrada (raro) | Junto com a transação compartilhada no PostgreSQL |
+| Carnê e recibo do crediário sem logotipo nem código de barras/PIX para pagamento | Cliente paga só na loja | Gateway de boleto/PIX (pós-piloto) |
+| Carteira do crediário calculada em memória (todos os títulos de crediário) | Lenta com milhares de clientes no crediário | Consulta agregada no PostgreSQL |
 | Troca não tem cancelamento | Troca lançada errada precisa de ajuste manual (estoque e vale) | Avaliar com a loja piloto |
 | Número da venda (e da troca) calculado pelo maior existente da empresa | Duas vendas simultâneas podem colidir (o índice único recusa uma; basta registrar de novo) | Sequência no banco quando houver PostgreSQL em produção |
 | Lista de vendas e comissões carregam itens e pagamentos **em memória** | Lento com muitos milhares de vendas no período | Projeções/consultas agregadas no PostgreSQL |
@@ -225,7 +232,7 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Leitor de código no inventário faz uma requisição por leitura | Lento com internet ruim e contagens grandes | Fila local no navegador / app mobile |
 | Financeiro: listagens e fluxo de caixa calculados **em memória** (carregam todos os títulos da empresa) | Lento com dezenas de milhares de parcelas | Consultas agregadas no PostgreSQL / paginação |
 | Conta a pagar da NF-e é criada depois da gravação da entrada (outro contexto) | Se falhar, a entrada fica sem a conta a pagar (relançar não duplica, mas a nota já está lançada) | Transação única / outbox quando houver PostgreSQL em produção |
-| Sem DRE, conciliação bancária (OFX) nem centro de custo | Relatórios financeiros básicos | DRE na central de relatórios (v0.17.0); OFX pós-MVP |
+| Sem DRE, conciliação bancária (OFX) nem centro de custo | Relatórios financeiros básicos | DRE na central de relatórios (v0.18.0); OFX pós-MVP |
 | Pessoa do título é guardada pelo nome (o vínculo com o cadastro é opcional) | Renomear o fornecedor no cadastro não muda títulos antigos | Mostrar o nome atual quando houver vínculo |
 
 ## Multi-tenancy em uma frase

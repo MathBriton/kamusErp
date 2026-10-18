@@ -522,3 +522,26 @@ X-Empresa-Id: {{login.response.body.empresas[0].id}}
 Content-Type: application/json
 
 { "vendedorId": "00000000-0000-0000-0000-000000000000", "de": "2026-10-01", "ate": "2026-10-31", "gerarContaAPagar": true, "vencimento": "2026-11-05" }
+
+### --- Crediário ---
+
+### Liberar R$ 500 de limite para um cliente (troque o id pelo de um cliente cadastrado)
+PUT {{api}}/api/financeiro/crediario/clientes/00000000-0000-0000-0000-000000000000/limite
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "clienteNome": "Maria Souza", "limite": 500, "bloqueado": false }
+
+### Carteira do crediário (faixas de atraso e clientes)
+GET {{api}}/api/financeiro/crediario/carteira
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Regras: multa (até 2%), juros ao mês e dias de atraso para bloquear
+PUT {{api}}/api/financeiro/crediario/configuracao
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "multaPercentual": 2, "jurosMensalPercentual": 1, "diasParaBloquear": 15 }
