@@ -4,16 +4,18 @@ import { moeda } from '../cadastros/catalogo'
 import { dataBr } from '../financeiro/tipos'
 import type { ListaDeVales, ListaDeVendas } from './tipos'
 
-/** Na ficha do cliente: compras (concluídas) e vales-troca. Some se o perfil não acessa vendas. */
+/** Na ficha do cliente: compras, vales-troca e crediário. Some se o perfil não acessa vendas. */
 export function HistoricoDoCliente({ clienteId }: { clienteId: string }) {
   const { getJson } = useApi()
   const [vendas, setVendas] = useState<ListaDeVendas | null>(null)
   const [vales, setVales] = useState<ListaDeVales | null>(null)
+  const [crediario, setCrediario] = useState<{ limite: number; emAberto: number; disponivel: number; bloqueado: boolean; motivo: string | null } | null>(null)
 
   useEffect(() => {
     const controle = new AbortController()
     getJson<ListaDeVendas>(`/api/vendas?${new URLSearchParams({ status: 'todas', clienteId })}`, controle.signal).then(setVendas).catch(() => {})
     getJson<ListaDeVales>(`/api/vendas/vales?${new URLSearchParams({ situacao: 'todos', clienteId })}`, controle.signal).then(setVales).catch(() => {})
+    getJson<NonNullable<typeof crediario>>(`/api/financeiro/crediario/clientes/${clienteId}`, controle.signal).then(setCrediario).catch(() => {})
     return () => controle.abort()
   }, [getJson, clienteId])
 
@@ -35,6 +37,12 @@ export function HistoricoDoCliente({ clienteId }: { clienteId: string }) {
             </ul>
           )}
         </>
+      )}
+      {crediario && (crediario.limite > 0 || crediario.emAberto > 0) && (
+        <p className={crediario.bloqueado ? 'text-danger' : ''}>
+          {`Crediário: limite ${moeda(crediario.limite)} · em aberto ${moeda(crediario.emAberto)} · disponível ${moeda(crediario.disponivel)}`}
+          {crediario.bloqueado && crediario.motivo ? ` — ${crediario.motivo}` : ''}
+        </p>
       )}
       {ativos.length > 0 && (
         <ul className="space-y-0.5">

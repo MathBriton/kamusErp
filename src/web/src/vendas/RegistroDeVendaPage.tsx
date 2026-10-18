@@ -202,7 +202,7 @@ export function RegistroDeVendaPage() {
           <section className="grid gap-6 rounded-2xl border border-border bg-surface p-5 shadow-sm md:grid-cols-2">
             <div className="space-y-3">
               <h2 className="font-semibold">Pagamento</h2>
-              <EditorDePagamentos formas={formas} total={total} linhas={linhasDePagamento} onLinhas={setPagamentos} />
+              <EditorDePagamentos formas={formas} total={total} linhas={linhasDePagamento} onLinhas={setPagamentos} clienteId={cliente.id} />
               <Campo rotulo="Observação (opcional)">
                 <input value={observacao} onChange={(e) => setObservacao(e.target.value)} maxLength={500} className={estilos.campo} />
               </Campo>

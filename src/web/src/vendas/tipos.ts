@@ -1,4 +1,4 @@
-export type TipoDePagamento = 'Dinheiro' | 'Pix' | 'Debito' | 'Credito' | 'Outro' | 'ValeTroca'
+export type TipoDePagamento = 'Dinheiro' | 'Pix' | 'Debito' | 'Credito' | 'Outro' | 'ValeTroca' | 'Crediario'
 
 export interface FormaDePagamento {
   id: string
@@ -221,6 +221,7 @@ export const ROTULO_DO_TIPO: Record<TipoDePagamento, string> = {
   Credito: 'Cartão de crédito',
   Outro: 'Outro',
   ValeTroca: 'Vale-troca',
+  Crediario: 'Crediário',
 }
 
 /** Dinheiro e PIX entram na hora numa conta; os demais viram contas a receber. */

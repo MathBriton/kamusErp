@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useApi } from '../api/useApi'
 import { ErroDeApi } from '../auth/api'
 import { decimal, moeda } from '../cadastros/catalogo'
@@ -12,10 +12,12 @@ interface Props {
   total: number
   linhas: PagamentoDigitado[]
   onLinhas: (linhas: PagamentoDigitado[]) => void
+  /** Cliente da venda (para mostrar o limite do crediário). Indefinido = não mostra. */
+  clienteId?: string | null
 }
 
 /** Uma ou mais formas de pagamento; a linha sem valor digitado cobre o que falta. Vale-troca pede o código e mostra o saldo. */
-export function EditorDePagamentos({ formas, total, linhas, onLinhas }: Props) {
+export function EditorDePagamentos({ formas, total, linhas, onLinhas, clienteId }: Props) {
   const { valores } = calcularPagamentos(linhas, total)
   const forma = (id: string) => formas.find((f) => f.id === id)
   const mudar = (indice: number, mudanca: Partial<PagamentoDigitado>) => onLinhas(linhas.map((p, i) => (i === indice ? { ...p, ...mudanca } : p)))
@@ -77,6 +79,7 @@ export function EditorDePagamentos({ formas, total, linhas, onLinhas }: Props) {
               )}
             </div>
             {f?.tipo === 'ValeTroca' && <CodigoDoVale indice={i + 1} codigo={p.valeCodigo ?? ''} onCodigo={(c) => mudar(i, { valeCodigo: c })} />}
+            {f?.tipo === 'Crediario' && clienteId !== undefined && <SituacaoDoCrediario clienteId={clienteId} />}
           </div>
         )
       })}
@@ -121,5 +124,27 @@ function CodigoDoVale({ indice, codigo, onCodigo }: { indice: number; codigo: st
       )}
       {erro && <span className="text-danger">{erro}</span>}
     </div>
+  )
+}
+
+function SituacaoDoCrediario({ clienteId }: { clienteId: string | null }) {
+  const { getJson } = useApi()
+  const [situacao, setSituacao] = useState<{ id: string; disponivel: number; bloqueado: boolean; motivo: string | null } | null>(null)
+
+  useEffect(() => {
+    if (!clienteId) return
+    const controle = new AbortController()
+    getJson<{ disponivel: number; bloqueado: boolean; motivo: string | null }>(`/api/financeiro/crediario/clientes/${clienteId}`, controle.signal)
+      .then((s) => setSituacao({ id: clienteId, ...s }))
+      .catch(() => {})
+    return () => controle.abort()
+  }, [getJson, clienteId])
+
+  if (!clienteId) return <p className="pl-1 text-sm text-warning">Escolha um cliente cadastrado para vender no crediário.</p>
+  if (!situacao || situacao.id !== clienteId) return null
+  return situacao.bloqueado ? (
+    <p className="pl-1 text-sm text-danger">{situacao.motivo}</p>
+  ) : (
+    <p className="pl-1 text-sm text-success">{`Crediário disponível: ${moeda(situacao.disponivel)}`}</p>
   )
 }
