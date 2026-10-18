@@ -674,7 +674,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.12.0 | 2 | Estoque: importação de XML da NF-e, inventário, etiquetas | ✅ lançada |
 | v0.13.0 | 3 | Financeiro: contas financeiras, categorias, contas a pagar/receber com baixas, contas a pagar da NF-e, extrato, transferências, fluxo de caixa | ✅ lançada |
 | v0.14.0 | 4 | Vendas: registro no backoffice (leitor ou grade, descontos, vários pagamentos, troco), formas de pagamento com taxa/prazo, baixa de estoque, caixa e recebíveis, cancelamento, comissão por venda e relatório de comissões | ✅ lançada |
-| v0.15.0 | 4 | Trocas vinculadas à venda, vale-troca como crédito do cliente (e forma de pagamento), fechamento de comissões com conta a pagar, compras na ficha do cliente | ⏳ |
+| v0.15.0 | 4 | Trocas vinculadas à venda, vale-troca como crédito do cliente (e forma de pagamento), fechamento de comissões com conta a pagar, compras na ficha do cliente | ✅ lançada |
 | v0.16.0 | 5 | Crediário e condicional | ⏳ |
 | v0.17.0 | 6 | Dashboard real, app mobile, resumo diário | ⏳ |
 | v1.0.0 | 7 | Produção e primeira loja piloto | ⏳ depende de servidor |
