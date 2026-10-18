@@ -38,9 +38,17 @@ namespace Kamus.Modules.Vendas.Persistencia.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("permitir_estoque_negativo");
 
+                    b.Property<int>("PrazoDeTrocaDias")
+                        .HasColumnType("integer")
+                        .HasColumnName("prazo_de_troca_dias");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
+
+                    b.Property<int>("ValidadeDoValeDias")
+                        .HasColumnType("integer")
+                        .HasColumnName("validade_do_vale_dias");
 
                     b.HasKey("Id")
                         .HasName("pk_configuracoes");
@@ -53,6 +61,82 @@ namespace Kamus.Modules.Vendas.Persistencia.Migrations
                         .HasDatabaseName("ix_configuracoes_tenant_id_empresa_id");
 
                     b.ToTable("configuracoes", "vendas");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Vendas.Dominio.FechamentoDeComissao", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateOnly>("Ate")
+                        .HasColumnType("date")
+                        .HasColumnName("ate");
+
+                    b.Property<decimal>("Comissao")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("comissao");
+
+                    b.Property<bool>("ContaAPagarGerada")
+                        .HasColumnType("boolean")
+                        .HasColumnName("conta_a_pagar_gerada");
+
+                    b.Property<DateOnly>("De")
+                        .HasColumnType("date")
+                        .HasColumnName("de");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("empresa_id");
+
+                    b.Property<DateTimeOffset>("FechadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fechado_em");
+
+                    b.Property<string>("FechadoPor")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("fechado_por");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("TotalVendido")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("total_vendido");
+
+                    b.Property<int>("Trocas")
+                        .HasColumnType("integer")
+                        .HasColumnName("trocas");
+
+                    b.Property<int>("Vendas")
+                        .HasColumnType("integer")
+                        .HasColumnName("vendas");
+
+                    b.Property<Guid>("VendedorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("vendedor_id");
+
+                    b.Property<string>("VendedorNome")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("vendedor_nome");
+
+                    b.HasKey("Id")
+                        .HasName("pk_fechamentos_de_comissao");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_fechamentos_de_comissao_tenant_id");
+
+                    b.HasIndex("TenantId", "EmpresaId", "VendedorId")
+                        .HasDatabaseName("ix_fechamentos_de_comissao_tenant_id_empresa_id_vendedor_id");
+
+                    b.ToTable("fechamentos_de_comissao", "vendas");
                 });
 
             modelBuilder.Entity("Kamus.Modules.Vendas.Dominio.FormaDePagamento", b =>
@@ -184,6 +268,188 @@ namespace Kamus.Modules.Vendas.Persistencia.Migrations
                     b.ToTable("itens_da_venda", "vendas");
                 });
 
+            modelBuilder.Entity("Kamus.Modules.Vendas.Dominio.ItemDevolvidoNaTroca", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("CustoUnitario")
+                        .HasPrecision(14, 4)
+                        .HasColumnType("numeric(14,4)")
+                        .HasColumnName("custo_unitario");
+
+                    b.Property<string>("Descricao")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("descricao");
+
+                    b.Property<string>("Destino")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("destino");
+
+                    b.Property<Guid>("ProdutoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("produto_id");
+
+                    b.Property<int>("Quantidade")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantidade");
+
+                    b.Property<Guid>("SkuId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sku_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrocaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("troca_id");
+
+                    b.Property<decimal>("Valor")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("valor");
+
+                    b.HasKey("Id")
+                        .HasName("pk_itens_devolvidos");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_itens_devolvidos_tenant_id");
+
+                    b.HasIndex("TrocaId")
+                        .HasDatabaseName("ix_itens_devolvidos_troca_id");
+
+                    b.ToTable("itens_devolvidos", "vendas");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Vendas.Dominio.ItemLevadoNaTroca", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("CustoUnitario")
+                        .HasPrecision(14, 4)
+                        .HasColumnType("numeric(14,4)")
+                        .HasColumnName("custo_unitario");
+
+                    b.Property<decimal>("Desconto")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("desconto");
+
+                    b.Property<string>("Descricao")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("descricao");
+
+                    b.Property<decimal>("PrecoUnitario")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("preco_unitario");
+
+                    b.Property<Guid>("ProdutoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("produto_id");
+
+                    b.Property<int>("Quantidade")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantidade");
+
+                    b.Property<Guid>("SkuId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sku_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrocaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("troca_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_itens_levados");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_itens_levados_tenant_id");
+
+                    b.HasIndex("TrocaId")
+                        .HasDatabaseName("ix_itens_levados_troca_id");
+
+                    b.ToTable("itens_levados", "vendas");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Vendas.Dominio.PagamentoDaTroca", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("FormaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("forma_id");
+
+                    b.Property<string>("FormaNome")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("forma_nome");
+
+                    b.Property<int>("Parcelas")
+                        .HasColumnType("integer")
+                        .HasColumnName("parcelas");
+
+                    b.Property<decimal>("TaxaPercentual")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("taxa_percentual");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("tipo");
+
+                    b.Property<Guid>("TrocaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("troca_id");
+
+                    b.Property<Guid?>("ValeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("vale_id");
+
+                    b.Property<decimal>("Valor")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("valor");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pagamentos_da_troca");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_pagamentos_da_troca_tenant_id");
+
+                    b.HasIndex("TrocaId")
+                        .HasDatabaseName("ix_pagamentos_da_troca_troca_id");
+
+                    b.ToTable("pagamentos_da_troca", "vendas");
+                });
+
             modelBuilder.Entity("Kamus.Modules.Vendas.Dominio.PagamentoDaVenda", b =>
                 {
                     b.Property<Guid>("Id")
@@ -220,6 +486,10 @@ namespace Kamus.Modules.Vendas.Persistencia.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("tipo");
 
+                    b.Property<Guid?>("ValeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("vale_id");
+
                     b.Property<decimal>("Valor")
                         .HasPrecision(14, 2)
                         .HasColumnType("numeric(14,2)")
@@ -239,6 +509,210 @@ namespace Kamus.Modules.Vendas.Persistencia.Migrations
                         .HasDatabaseName("ix_pagamentos_da_venda_venda_id");
 
                     b.ToTable("pagamentos_da_venda", "vendas");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Vendas.Dominio.Troca", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ClienteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cliente_id");
+
+                    b.Property<string>("ClienteNome")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("cliente_nome");
+
+                    b.Property<decimal>("ComissaoPercentual")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("comissao_percentual");
+
+                    b.Property<DateOnly>("Data")
+                        .HasColumnType("date")
+                        .HasColumnName("data");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("empresa_id");
+
+                    b.Property<Guid?>("FechamentoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fechamento_id");
+
+                    b.Property<Guid>("LojaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("loja_id");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("motivo");
+
+                    b.Property<int>("Numero")
+                        .HasColumnType("integer")
+                        .HasColumnName("numero");
+
+                    b.Property<string>("Observacao")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("observacao");
+
+                    b.Property<Guid?>("OperacaoDeDevolucaoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operacao_de_devolucao_id");
+
+                    b.Property<Guid?>("OperacaoDeSaidaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operacao_de_saida_id");
+
+                    b.Property<DateTimeOffset>("RegistradaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("registrada_em");
+
+                    b.Property<string>("RegistradaPor")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("registrada_por");
+
+                    b.Property<Guid?>("RegistradaPorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("registrada_por_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("Troco")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("troco");
+
+                    b.Property<Guid?>("ValeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("vale_id");
+
+                    b.Property<Guid>("VendaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("venda_id");
+
+                    b.Property<int>("VendaNumero")
+                        .HasColumnType("integer")
+                        .HasColumnName("venda_numero");
+
+                    b.Property<Guid?>("VendedorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("vendedor_id");
+
+                    b.Property<string>("VendedorNome")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("vendedor_nome");
+
+                    b.HasKey("Id")
+                        .HasName("pk_trocas");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_trocas_tenant_id");
+
+                    b.HasIndex("VendaId")
+                        .HasDatabaseName("ix_trocas_venda_id");
+
+                    b.HasIndex("TenantId", "VendaId")
+                        .HasDatabaseName("ix_trocas_tenant_id_venda_id");
+
+                    b.HasIndex("TenantId", "EmpresaId", "Numero")
+                        .IsUnique()
+                        .HasDatabaseName("ix_trocas_tenant_id_empresa_id_numero");
+
+                    b.ToTable("trocas", "vendas");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Vendas.Dominio.ValeTroca", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Cancelado")
+                        .HasColumnType("boolean")
+                        .HasColumnName("cancelado");
+
+                    b.Property<string>("CanceladoPor")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("cancelado_por");
+
+                    b.Property<Guid?>("ClienteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cliente_id");
+
+                    b.Property<string>("ClienteNome")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("cliente_nome");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("codigo");
+
+                    b.Property<DateOnly>("EmitidoEm")
+                        .HasColumnType("date")
+                        .HasColumnName("emitido_em");
+
+                    b.Property<Guid>("EmpresaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("empresa_id");
+
+                    b.Property<string>("MotivoDoCancelamento")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("motivo_do_cancelamento");
+
+                    b.Property<decimal>("Saldo")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("saldo");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid?>("TrocaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("troca_id");
+
+                    b.Property<DateOnly>("ValidoAte")
+                        .HasColumnType("date")
+                        .HasColumnName("valido_ate");
+
+                    b.Property<decimal>("Valor")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("valor");
+
+                    b.HasKey("Id")
+                        .HasName("pk_vales_troca");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_vales_troca_tenant_id");
+
+                    b.HasIndex("TenantId", "ClienteId")
+                        .HasDatabaseName("ix_vales_troca_tenant_id_cliente_id");
+
+                    b.HasIndex("TenantId", "Codigo")
+                        .IsUnique()
+                        .HasDatabaseName("ix_vales_troca_tenant_id_codigo");
+
+                    b.ToTable("vales_troca", "vendas");
                 });
 
             modelBuilder.Entity("Kamus.Modules.Vendas.Dominio.Venda", b =>
@@ -283,6 +757,10 @@ namespace Kamus.Modules.Vendas.Persistencia.Migrations
                     b.Property<Guid>("EmpresaId")
                         .HasColumnType("uuid")
                         .HasColumnName("empresa_id");
+
+                    b.Property<Guid?>("FechamentoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fechamento_id");
 
                     b.Property<Guid>("LojaId")
                         .HasColumnType("uuid")
@@ -354,6 +832,9 @@ namespace Kamus.Modules.Vendas.Persistencia.Migrations
                     b.HasIndex("TenantId")
                         .HasDatabaseName("ix_vendas_tenant_id");
 
+                    b.HasIndex("TenantId", "ClienteId")
+                        .HasDatabaseName("ix_vendas_tenant_id_cliente_id");
+
                     b.HasIndex("TenantId", "EmpresaId", "Data")
                         .HasDatabaseName("ix_vendas_tenant_id_empresa_id_data");
 
@@ -374,6 +855,36 @@ namespace Kamus.Modules.Vendas.Persistencia.Migrations
                         .HasConstraintName("fk_itens_da_venda_vendas_venda_id");
                 });
 
+            modelBuilder.Entity("Kamus.Modules.Vendas.Dominio.ItemDevolvidoNaTroca", b =>
+                {
+                    b.HasOne("Kamus.Modules.Vendas.Dominio.Troca", null)
+                        .WithMany("Devolvidos")
+                        .HasForeignKey("TrocaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_itens_devolvidos_trocas_troca_id");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Vendas.Dominio.ItemLevadoNaTroca", b =>
+                {
+                    b.HasOne("Kamus.Modules.Vendas.Dominio.Troca", null)
+                        .WithMany("Levados")
+                        .HasForeignKey("TrocaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_itens_levados_trocas_troca_id");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Vendas.Dominio.PagamentoDaTroca", b =>
+                {
+                    b.HasOne("Kamus.Modules.Vendas.Dominio.Troca", null)
+                        .WithMany("Pagamentos")
+                        .HasForeignKey("TrocaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pagamentos_da_troca_trocas_troca_id");
+                });
+
             modelBuilder.Entity("Kamus.Modules.Vendas.Dominio.PagamentoDaVenda", b =>
                 {
                     b.HasOne("Kamus.Modules.Vendas.Dominio.Venda", null)
@@ -382,6 +893,25 @@ namespace Kamus.Modules.Vendas.Persistencia.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_pagamentos_da_venda_vendas_venda_id");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Vendas.Dominio.Troca", b =>
+                {
+                    b.HasOne("Kamus.Modules.Vendas.Dominio.Venda", null)
+                        .WithMany()
+                        .HasForeignKey("VendaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_trocas_vendas_venda_id");
+                });
+
+            modelBuilder.Entity("Kamus.Modules.Vendas.Dominio.Troca", b =>
+                {
+                    b.Navigation("Devolvidos");
+
+                    b.Navigation("Levados");
+
+                    b.Navigation("Pagamentos");
                 });
 
             modelBuilder.Entity("Kamus.Modules.Vendas.Dominio.Venda", b =>

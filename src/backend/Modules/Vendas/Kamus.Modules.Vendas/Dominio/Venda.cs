@@ -17,7 +17,49 @@ public sealed record DadosDaVenda(Guid EmpresaId, Guid LojaId, int Numero, DateO
 /// <param name="Desconto">Desconto em reais na linha.</param>
 public sealed record ItemNovo(Guid SkuId, Guid ProdutoId, string Descricao, int Quantidade, decimal PrecoUnitario, decimal Desconto);
 
-public sealed record PagamentoNovo(Guid FormaId, string FormaNome, TipoDePagamento Tipo, decimal Valor, int Parcelas, decimal TaxaPercentual);
+/// <param name="ValeId">Pagamento com vale-troca: o vale usado.</param>
+public sealed record PagamentoNovo(Guid FormaId, string FormaNome, TipoDePagamento Tipo, decimal Valor, int Parcelas, decimal TaxaPercentual, Guid? ValeId = null);
+
+/// <summary>Arredondamento e formatação de dinheiro, e a conferência dos pagamentos (total, troco).</summary>
+public static class Dinheiro
+{
+    private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
+
+    /// <summary>Centavos, meio para cima.</summary>
+    public static decimal Arredondar(decimal valor) => Math.Round(valor, 2, MidpointRounding.AwayFromZero);
+
+    public static string Formatar(decimal valor) => valor.ToString("N2", PtBr);
+
+    /// <summary>
+    /// Confere se os pagamentos cobrem o total (só dinheiro pode passar, e o excesso vira troco) e devolve os pagamentos
+    /// como ficam gravados: o troco sai do dinheiro.
+    /// </summary>
+    public static (IReadOnlyList<PagamentoNovo> Pagamentos, decimal Troco) Distribuir(decimal total, IReadOnlyList<PagamentoNovo> pagamentos)
+    {
+        if (pagamentos.Any(p => p.Valor <= 0 || p.Parcelas < 1)) throw new ArgumentException("Cada pagamento precisa de valor e de ao menos 1 parcela.", nameof(pagamentos));
+        var pago = pagamentos.Sum(p => p.Valor);
+        if (pago < total) throw new ArgumentException($"Os pagamentos somam R$ {Formatar(pago)}: faltam R$ {Formatar(total - pago)}.", nameof(pagamentos));
+        var troco = pago - total;
+        var dinheiro = pagamentos.Where(p => p.Tipo == TipoDePagamento.Dinheiro).Sum(p => p.Valor);
+        if (troco > dinheiro)
+            throw new ArgumentException($"Os pagamentos passam do total em R$ {Formatar(troco)}: só pagamento em dinheiro pode ter troco.", nameof(pagamentos));
+
+        var gravados = new List<PagamentoNovo>();
+        var trocoAAbater = troco;
+        foreach (var p in pagamentos)
+        {
+            var valor = p.Valor;
+            if (p.Tipo == TipoDePagamento.Dinheiro && trocoAAbater > 0)
+            {
+                var abatido = Math.Min(valor, trocoAAbater);
+                valor -= abatido;
+                trocoAAbater -= abatido;
+            }
+            if (valor > 0) gravados.Add(p with { Valor = Arredondar(valor) });
+        }
+        return (gravados, troco);
+    }
+}
 
 /// <summary>
 /// Venda registrada no backoffice (sem emissão fiscal: a nota sai no sistema atual da loja e o número fica em <see cref="NotaExterna"/>).
@@ -26,7 +68,6 @@ public sealed record PagamentoNovo(Guid FormaId, string FormaNome, TipoDePagamen
 [DisplayName("Venda")]
 public sealed class Venda : ITenantOwned
 {
-    private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
     private readonly List<ItemDaVenda> _itens = [];
     private readonly List<PagamentoDaVenda> _pagamentos = [];
 
@@ -54,20 +95,23 @@ public sealed class Venda : ITenantOwned
     public string? CanceladaPor { get; private set; }
     public DateTimeOffset? CanceladaEm { get; private set; }
 
+    /// <summary>Fechamento de comissão que incluiu esta venda (venda fechada não cancela sem reabrir o fechamento).</summary>
+    public Guid? FechamentoId { get; private set; }
+
     public IReadOnlyCollection<ItemDaVenda> Itens => _itens;
     public IReadOnlyCollection<PagamentoDaVenda> Pagamentos => _pagamentos;
 
     public decimal Subtotal => _itens.Sum(i => i.Total);
     public decimal Total => Subtotal - DescontoGeral;
     public int Pecas => _itens.Sum(i => i.Quantidade);
-    public decimal Comissao => Math.Round(Total * ComissaoPercentual / 100, 2);
+    public decimal Comissao => Dinheiro.Arredondar(Total * ComissaoPercentual / 100);
     public decimal TaxaTotal => _pagamentos.Sum(p => p.ValorTaxa);
     public decimal CustoTotal => _itens.Sum(i => i.CustoUnitario * i.Quantidade);
     public decimal LucroBruto => Total - CustoTotal - TaxaTotal;
 
     private Venda() { }
 
-    public static string Moeda(decimal v) => v.ToString("N2", PtBr);
+    public static string Moeda(decimal v) => Dinheiro.Formatar(v);
 
     public static Venda Criar(DadosDaVenda dados, IReadOnlyList<ItemNovo> itens, decimal descontoGeral, IReadOnlyList<PagamentoNovo> pagamentos, string? usuario, DateTimeOffset agora)
     {
@@ -98,29 +142,11 @@ public sealed class Venda : ITenantOwned
         };
         venda._itens.AddRange(itens.Select(i => ItemDaVenda.De(venda.Id, i)));
         if (descontoGeral < 0 || descontoGeral > venda.Subtotal) throw new ArgumentException("O desconto da venda passa do subtotal.", nameof(descontoGeral));
-        venda.DescontoGeral = Math.Round(descontoGeral, 2);
+        venda.DescontoGeral = Dinheiro.Arredondar(descontoGeral);
 
-        if (pagamentos.Any(p => p.Valor <= 0 || p.Parcelas < 1)) throw new ArgumentException("Cada pagamento precisa de valor e de ao menos 1 parcela.", nameof(pagamentos));
-        var pago = pagamentos.Sum(p => p.Valor);
-        if (pago < venda.Total) throw new ArgumentException($"Os pagamentos somam R$ {Moeda(pago)}: faltam R$ {Moeda(venda.Total - pago)}.", nameof(pagamentos));
-        var troco = pago - venda.Total;
-        var dinheiro = pagamentos.Where(p => p.Tipo == TipoDePagamento.Dinheiro).Sum(p => p.Valor);
-        if (troco > dinheiro)
-            throw new ArgumentException($"Os pagamentos passam do total em R$ {Moeda(troco)}: só pagamento em dinheiro pode ter troco.", nameof(pagamentos));
+        var (gravados, troco) = Dinheiro.Distribuir(venda.Total, pagamentos);
         venda.Troco = troco;
-
-        var trocoAAbater = troco;
-        foreach (var p in pagamentos)
-        {
-            var valor = p.Valor;
-            if (p.Tipo == TipoDePagamento.Dinheiro && trocoAAbater > 0)
-            {
-                var abatido = Math.Min(valor, trocoAAbater);
-                valor -= abatido;
-                trocoAAbater -= abatido;
-            }
-            if (valor > 0) venda._pagamentos.Add(PagamentoDaVenda.De(venda.Id, p with { Valor = valor }));
-        }
+        venda._pagamentos.AddRange(gravados.Select(p => PagamentoDaVenda.De(venda.Id, p)));
         return venda;
     }
 
@@ -135,10 +161,29 @@ public sealed class Venda : ITenantOwned
     {
         if (string.IsNullOrWhiteSpace(motivo)) throw new ArgumentException("Informe o motivo do cancelamento.", nameof(motivo));
         if (Status == StatusDaVenda.Cancelada) throw new InvalidOperationException("Esta venda já foi cancelada.");
+        if (FechamentoId is not null) throw new InvalidOperationException("A comissão desta venda já foi fechada: reabra o fechamento antes de cancelar.");
         (Status, MotivoDoCancelamento, CanceladaPor, CanceladaEm) = (StatusDaVenda.Cancelada, Limitar(motivo, 300), usuario, agora);
     }
 
-    private static string? Limitar(string? texto, int maximo) =>
+    internal void MarcarFechamento(Guid? fechamentoId) => FechamentoId = fechamentoId;
+
+    /// <summary>Quanto o cliente pagou por cada SKU (desconto da venda rateado; a soma fecha o total). Base do valor devolvido na troca.</summary>
+    public IReadOnlyDictionary<Guid, (int Quantidade, decimal ValorPago)> ValoresPagosPorSku()
+    {
+        var porSku = _itens.GroupBy(i => i.SkuId).OrderBy(g => g.Key).Select(g => (Sku: g.Key, Quantidade: g.Sum(i => i.Quantidade), Total: g.Sum(i => i.Total))).ToList();
+        var fator = Subtotal == 0 ? 0 : Total / Subtotal;
+        var resultado = new Dictionary<Guid, (int, decimal)>();
+        var acumulado = 0m;
+        for (var i = 0; i < porSku.Count; i++)
+        {
+            var valor = i == porSku.Count - 1 ? Total - acumulado : Dinheiro.Arredondar(porSku[i].Total * fator);
+            acumulado += valor;
+            resultado[porSku[i].Sku] = (porSku[i].Quantidade, valor);
+        }
+        return resultado;
+    }
+
+    internal static string? Limitar(string? texto, int maximo) =>
         string.IsNullOrWhiteSpace(texto) ? null : texto.Trim()[..Math.Min(texto.Trim().Length, maximo)];
 }
 
@@ -170,8 +215,8 @@ public sealed class ItemDaVenda : ITenantOwned
         ProdutoId = i.ProdutoId,
         Descricao = i.Descricao[..Math.Min(i.Descricao.Length, 200)],
         Quantidade = i.Quantidade,
-        PrecoUnitario = Math.Round(i.PrecoUnitario, 2),
-        Desconto = Math.Round(i.Desconto, 2),
+        PrecoUnitario = Dinheiro.Arredondar(i.PrecoUnitario),
+        Desconto = Dinheiro.Arredondar(i.Desconto),
     };
 
     internal void DefinirCusto(decimal custo) => CustoUnitario = custo;
@@ -189,8 +234,9 @@ public sealed class PagamentoDaVenda : ITenantOwned
     public decimal Valor { get; private set; }
     public int Parcelas { get; private set; }
     public decimal TaxaPercentual { get; private set; }
+    public Guid? ValeId { get; private set; }
 
-    public decimal ValorTaxa => Math.Round(Valor * TaxaPercentual / 100, 2);
+    public decimal ValorTaxa => Dinheiro.Arredondar(Valor * TaxaPercentual / 100);
 
     private PagamentoDaVenda() { }
 
@@ -201,8 +247,9 @@ public sealed class PagamentoDaVenda : ITenantOwned
         FormaId = p.FormaId,
         FormaNome = p.FormaNome,
         Tipo = p.Tipo,
-        Valor = Math.Round(p.Valor, 2),
+        Valor = Dinheiro.Arredondar(p.Valor),
         Parcelas = p.Parcelas,
         TaxaPercentual = p.TaxaPercentual,
+        ValeId = p.ValeId,
     };
 }

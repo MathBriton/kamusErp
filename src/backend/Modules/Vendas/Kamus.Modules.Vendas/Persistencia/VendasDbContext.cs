@@ -17,6 +17,12 @@ public sealed class VendasDbContext(DbContextOptions<VendasDbContext> options, I
     public DbSet<Venda> Vendas => Set<Venda>();
     public DbSet<ItemDaVenda> Itens => Set<ItemDaVenda>();
     public DbSet<PagamentoDaVenda> Pagamentos => Set<PagamentoDaVenda>();
+    public DbSet<Troca> Trocas => Set<Troca>();
+    public DbSet<ItemDevolvidoNaTroca> ItensDevolvidos => Set<ItemDevolvidoNaTroca>();
+    public DbSet<ItemLevadoNaTroca> ItensLevados => Set<ItemLevadoNaTroca>();
+    public DbSet<PagamentoDaTroca> PagamentosDaTroca => Set<PagamentoDaTroca>();
+    public DbSet<ValeTroca> Vales => Set<ValeTroca>();
+    public DbSet<FechamentoDeComissao> Fechamentos => Set<FechamentoDeComissao>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -61,6 +67,7 @@ public sealed class VendasDbContext(DbContextOptions<VendasDbContext> options, I
             e.Ignore(v => v.LucroBruto);
             e.HasIndex(v => new { v.TenantId, v.EmpresaId, v.Numero }).IsUnique();
             e.HasIndex(v => new { v.TenantId, v.EmpresaId, v.Data });
+            e.HasIndex(v => new { v.TenantId, v.ClienteId });
             e.HasMany(v => v.Itens).WithOne().HasForeignKey(i => i.VendaId).OnDelete(DeleteBehavior.Cascade);
             e.Navigation(v => v.Itens).HasField("_itens").UsePropertyAccessMode(PropertyAccessMode.Field);
             e.HasMany(v => v.Pagamentos).WithOne().HasForeignKey(p => p.VendaId).OnDelete(DeleteBehavior.Cascade);
@@ -86,6 +93,85 @@ public sealed class VendasDbContext(DbContextOptions<VendasDbContext> options, I
             e.Property(p => p.Valor).HasPrecision(14, 2);
             e.Property(p => p.TaxaPercentual).HasPrecision(5, 2);
             e.Ignore(p => p.ValorTaxa);
+        });
+
+        modelBuilder.Entity<Troca>(e =>
+        {
+            e.ToTable("trocas");
+            e.Property(t => t.ClienteNome).HasMaxLength(150);
+            e.Property(t => t.VendedorNome).HasMaxLength(150);
+            e.Property(t => t.ComissaoPercentual).HasPrecision(5, 2);
+            e.Property(t => t.Motivo).HasConversion<string>().HasMaxLength(20);
+            e.Property(t => t.Observacao).HasMaxLength(500);
+            e.Property(t => t.Troco).HasPrecision(14, 2);
+            e.Property(t => t.RegistradaPor).HasMaxLength(150);
+            e.Ignore(t => t.ValorDevolvido);
+            e.Ignore(t => t.ValorLevado);
+            e.Ignore(t => t.Diferenca);
+            e.Ignore(t => t.ValorDoVale);
+            e.Ignore(t => t.Comissao);
+            e.Ignore(t => t.TaxaTotal);
+            e.HasIndex(t => new { t.TenantId, t.EmpresaId, t.Numero }).IsUnique();
+            e.HasIndex(t => new { t.TenantId, t.VendaId });
+            e.HasOne<Venda>().WithMany().HasForeignKey(t => t.VendaId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(t => t.Devolvidos).WithOne().HasForeignKey(i => i.TrocaId).OnDelete(DeleteBehavior.Cascade);
+            e.Navigation(t => t.Devolvidos).HasField("_devolvidos").UsePropertyAccessMode(PropertyAccessMode.Field);
+            e.HasMany(t => t.Levados).WithOne().HasForeignKey(i => i.TrocaId).OnDelete(DeleteBehavior.Cascade);
+            e.Navigation(t => t.Levados).HasField("_levados").UsePropertyAccessMode(PropertyAccessMode.Field);
+            e.HasMany(t => t.Pagamentos).WithOne().HasForeignKey(p => p.TrocaId).OnDelete(DeleteBehavior.Cascade);
+            e.Navigation(t => t.Pagamentos).HasField("_pagamentos").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<ItemDevolvidoNaTroca>(e =>
+        {
+            e.ToTable("itens_devolvidos");
+            e.Property(i => i.Descricao).HasMaxLength(200);
+            e.Property(i => i.Valor).HasPrecision(14, 2);
+            e.Property(i => i.CustoUnitario).HasPrecision(14, 4);
+            e.Property(i => i.Destino).HasConversion<string>().HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<ItemLevadoNaTroca>(e =>
+        {
+            e.ToTable("itens_levados");
+            e.Property(i => i.Descricao).HasMaxLength(200);
+            e.Property(i => i.PrecoUnitario).HasPrecision(14, 2);
+            e.Property(i => i.Desconto).HasPrecision(14, 2);
+            e.Property(i => i.CustoUnitario).HasPrecision(14, 4);
+            e.Ignore(i => i.Total);
+        });
+
+        modelBuilder.Entity<PagamentoDaTroca>(e =>
+        {
+            e.ToTable("pagamentos_da_troca");
+            e.Property(p => p.FormaNome).HasMaxLength(60);
+            e.Property(p => p.Tipo).HasConversion<string>().HasMaxLength(20);
+            e.Property(p => p.Valor).HasPrecision(14, 2);
+            e.Property(p => p.TaxaPercentual).HasPrecision(5, 2);
+            e.Ignore(p => p.ValorTaxa);
+        });
+
+        modelBuilder.Entity<ValeTroca>(e =>
+        {
+            e.ToTable("vales_troca");
+            e.Property(v => v.Codigo).HasMaxLength(12);
+            e.Property(v => v.ClienteNome).HasMaxLength(150);
+            e.Property(v => v.Valor).HasPrecision(14, 2);
+            e.Property(v => v.Saldo).HasPrecision(14, 2);
+            e.Property(v => v.MotivoDoCancelamento).HasMaxLength(300);
+            e.Property(v => v.CanceladoPor).HasMaxLength(150);
+            e.HasIndex(v => new { v.TenantId, v.Codigo }).IsUnique();
+            e.HasIndex(v => new { v.TenantId, v.ClienteId });
+        });
+
+        modelBuilder.Entity<FechamentoDeComissao>(e =>
+        {
+            e.ToTable("fechamentos_de_comissao");
+            e.Property(f => f.VendedorNome).HasMaxLength(150);
+            e.Property(f => f.TotalVendido).HasPrecision(14, 2);
+            e.Property(f => f.Comissao).HasPrecision(14, 2);
+            e.Property(f => f.FechadoPor).HasMaxLength(150);
+            e.HasIndex(f => new { f.TenantId, f.EmpresaId, f.VendedorId });
         });
 
         base.OnModelCreating(modelBuilder);

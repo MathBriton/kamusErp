@@ -88,7 +88,7 @@ public sealed class VendasTests : IAsyncDisposable
         (await client.PostAsync(U("/api/vendas/formas/padrao"), null, Ct)).EnsureSuccessStatusCode();
 
         var formas = await Formas(client);
-        formas.Keys.Order().ShouldBe(["Cartão de crédito", "Cartão de débito", "Dinheiro", "PIX"]);
+        formas.Keys.Order().ShouldBe(["Cartão de crédito", "Cartão de débito", "Dinheiro", "PIX", "Vale-troca"]);
         formas["Cartão de crédito"].ShouldBe(formas["Cartão de crédito"] with { Tipo = "Credito", TaxaAVista = 3.5m, TaxaParcelado = 5.5m, MaxParcelas = 12, PrazoDias = 30, Ativa = true });
 
         var outra = await Entrar(_api, empresa: "Kamus Moda Shopping");

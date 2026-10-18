@@ -11,6 +11,7 @@ public enum TipoDePagamento
     Debito,
     Credito,
     Outro,
+    ValeTroca,
 }
 
 /// <summary>
@@ -44,6 +45,7 @@ public sealed class FormaDePagamento : ITenantOwned
         ("PIX", TipoDePagamento.Pix, 0m, 0m, 1, 0),
         ("Cartão de débito", TipoDePagamento.Debito, 1.5m, 1.5m, 1, 1),
         ("Cartão de crédito", TipoDePagamento.Credito, 3.5m, 5.5m, 12, 30),
+        ("Vale-troca", TipoDePagamento.ValeTroca, 0m, 0m, 1, 0),
     ];
 
     public bool EntraNaHora => Tipo is TipoDePagamento.Dinheiro or TipoDePagamento.Pix;
@@ -64,6 +66,8 @@ public sealed class FormaDePagamento : ITenantOwned
         if (taxaAVista is < 0 or > 100 || taxaParcelado is < 0 or > 100) throw new ArgumentException("A taxa vai de 0% a 100%.", nameof(taxaAVista));
         if (maxParcelas is < 1 or > 24) throw new ArgumentException("Parcelas: de 1 a 24.", nameof(maxParcelas));
         if (prazoDias is < 0 or > 365) throw new ArgumentException("Prazo: de 0 a 365 dias.", nameof(prazoDias));
+        if (tipo == TipoDePagamento.ValeTroca && (taxaAVista != 0 || taxaParcelado != 0 || prazoDias != 0 || contaId is not null))
+            throw new ArgumentException("Vale-troca não tem taxa, prazo nem conta: é um crédito do cliente.", nameof(tipo));
         (Nome, Tipo, ContaId, TaxaAVista, TaxaParcelado, PrazoDias) = (nome.Trim()[..Math.Min(nome.Trim().Length, 60)], tipo, contaId, taxaAVista, taxaParcelado, prazoDias);
         MaxParcelas = tipo == TipoDePagamento.Credito ? maxParcelas : 1;
     }
@@ -78,7 +82,7 @@ public sealed class FormaDePagamento : ITenantOwned
     public IReadOnlyList<ParcelaAReceber> Recebimentos(decimal valor, int parcelas, DateOnly data)
     {
         var n = Math.Max(1, parcelas);
-        var liquido = Math.Round(valor * (1 - Taxa(n) / 100), 2);
+        var liquido = Dinheiro.Arredondar(valor * (1 - Taxa(n) / 100));
         var cada = Math.Floor(liquido / n * 100) / 100;
         var resto = liquido - cada * n;
         return Enumerable.Range(0, n).Select(i => new ParcelaAReceber(data.AddDays(PrazoDias + 30 * i), i == 0 ? cada + resto : cada)).ToList();
@@ -96,9 +100,22 @@ public sealed class ConfiguracaoDeVendas : ITenantOwned
     /// <summary>Vender sem saldo deixa o estoque negativo (com aviso) em vez de travar a venda. Padrão: sim.</summary>
     public bool PermitirEstoqueNegativo { get; private set; } = true;
 
+    /// <summary>Dias após a venda em que a troca é aceita (fora do prazo, só Dono/Gerente). Padrão: 30.</summary>
+    public int PrazoDeTrocaDias { get; private set; } = 30;
+
+    /// <summary>Validade do vale-troca em dias. Padrão: 90.</summary>
+    public int ValidadeDoValeDias { get; private set; } = 90;
+
     private ConfiguracaoDeVendas() { }
 
     public static ConfiguracaoDeVendas Padrao(Guid empresaId) => new() { Id = Guid.NewGuid(), EmpresaId = empresaId };
 
-    public void Definir(bool permitirEstoqueNegativo) => PermitirEstoqueNegativo = permitirEstoqueNegativo;
+    public void Definir(bool permitirEstoqueNegativo, int? prazoDeTrocaDias = null, int? validadeDoValeDias = null)
+    {
+        var prazo = prazoDeTrocaDias ?? PrazoDeTrocaDias;
+        var validade = validadeDoValeDias ?? ValidadeDoValeDias;
+        if (prazo is < 0 or > 365) throw new ArgumentException("Prazo de troca: de 0 a 365 dias.", nameof(prazoDeTrocaDias));
+        if (validade is < 1 or > 3650) throw new ArgumentException("Validade do vale-troca: de 1 a 3650 dias.", nameof(validadeDoValeDias));
+        (PermitirEstoqueNegativo, PrazoDeTrocaDias, ValidadeDoValeDias) = (permitirEstoqueNegativo, prazo, validade);
+    }
 }
