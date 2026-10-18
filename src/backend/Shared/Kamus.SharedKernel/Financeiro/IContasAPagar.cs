@@ -6,9 +6,19 @@ public sealed record ParcelaAPagar(DateOnly Vencimento, decimal Valor);
 public sealed record ContaAPagarDeCompra(Guid EmpresaId, string Origem, string OrigemId, string Descricao, Guid? FornecedorId, string FornecedorNome,
     string? Documento, DateOnly Competencia, IReadOnlyList<ParcelaAPagar> Parcelas);
 
+/// <summary>Conta a pagar avulsa de outro módulo (ex.: fechamento de comissão), numa categoria de despesa (criada se faltar).</summary>
+public sealed record NovaContaAPagar(Guid EmpresaId, string Origem, string OrigemId, string Descricao, string? PessoaNome, string GrupoDaCategoria,
+    string Categoria, DateOnly Vencimento, decimal Valor);
+
 /// <summary>Contas a pagar geradas por outros módulos (ex.: duplicatas da NF-e lançada no estoque). Implementado pelo módulo Financeiro.</summary>
 public interface IContasAPagar
 {
     /// <returns>Id do título (o já existente, se a origem já foi registrada).</returns>
     Task<Guid> RegistrarCompraAsync(ContaAPagarDeCompra conta, CancellationToken ct = default);
+
+    /// <returns>Id do título (o já existente, se a origem já foi registrada).</returns>
+    Task<Guid> RegistrarContaAsync(NovaContaAPagar conta, CancellationToken ct = default);
+
+    /// <summary>Cancela os títulos da origem. Falso (e nada muda) se algum já tem pagamento ativo.</summary>
+    Task<bool> CancelarOrigemAsync(string origem, string origemId, string? usuario, CancellationToken ct = default);
 }

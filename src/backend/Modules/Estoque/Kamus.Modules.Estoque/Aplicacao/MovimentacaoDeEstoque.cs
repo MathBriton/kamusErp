@@ -64,4 +64,20 @@ internal sealed class MovimentacaoDeEstoque(EstoqueDbContext db, ICatalogoDeProd
         }
         await db.SaveChangesAsync(ct);
     }
+
+    public async Task<Guid> RegistrarDevolucaoAsync(DevolucaoDeEstoque devolucao, CancellationToken ct = default)
+    {
+        var loja = await db.Lojas.SingleOrDefaultAsync(l => l.Id == devolucao.LojaId && l.EmpresaId == devolucao.EmpresaId, ct)
+            ?? throw new SaidaDeEstoqueRecusadaException("Loja não encontrada nesta empresa.");
+        if (devolucao.Itens.Count == 0 || devolucao.Itens.Any(i => i.Quantidade <= 0)) throw new SaidaDeEstoqueRecusadaException("Informe as quantidades devolvidas.");
+        var skus = (await catalogo.SkusAsync(devolucao.Itens.Select(i => i.SkuId).Distinct().ToList(), ct)).ToDictionary(s => s.Id);
+        if (devolucao.Itens.Any(i => !skus.ContainsKey(i.SkuId))) throw new SaidaDeEstoqueRecusadaException("Há itens que não existem no catálogo.");
+
+        var saldos = await Saldos.DaLojaAsync(db, loja.Id, skus.Values, ct);
+        var op = new Operacao(Guid.NewGuid(), relogio.GetUtcNow(), usuario.Id, usuario.Nome, "Troca", devolucao.Documento, null, null);
+        foreach (var item in devolucao.Itens)
+            db.Movimentos.Add(saldos[item.SkuId].Entrar(TipoDeMovimento.Devolucao, item.Quantidade, item.CustoUnitario, op));
+        await db.SaveChangesAsync(ct);
+        return op.Id;
+    }
 }

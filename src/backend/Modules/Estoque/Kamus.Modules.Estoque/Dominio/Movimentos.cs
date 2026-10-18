@@ -14,6 +14,7 @@ public enum TipoDeMovimento
     Inventario,
     Venda,
     EstornoDeVenda,
+    Devolucao,
 }
 
 /// <summary>Dados comuns aos itens de uma mesma operação (uma entrada com vários SKUs, uma transferência...).</summary>

@@ -54,7 +54,7 @@ export interface Posicao {
   valorEmVenda: number
 }
 
-export type TipoDeMovimento = 'Entrada' | 'Ajuste' | 'TransferenciaSaida' | 'TransferenciaEntrada' | 'EstoqueInicial' | 'Inventario' | 'Venda' | 'EstornoDeVenda'
+export type TipoDeMovimento = 'Entrada' | 'Ajuste' | 'TransferenciaSaida' | 'TransferenciaEntrada' | 'EstoqueInicial' | 'Inventario' | 'Venda' | 'EstornoDeVenda' | 'Devolucao'
 
 export interface Movimento {
   id: string
@@ -88,6 +88,7 @@ export const ROTULO_DO_TIPO: Record<TipoDeMovimento, string> = {
   Inventario: 'Inventário',
   Venda: 'Venda',
   EstornoDeVenda: 'Cancelamento de venda',
+  Devolucao: 'Devolução (troca)',
 }
 
 export const MOTIVOS_DE_AJUSTE = [

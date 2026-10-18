@@ -106,6 +106,58 @@ public sealed class ContratosDeVendaTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Estoque_DevolucaoDeTrocaVoltaComOCustoDaVenda()
+    {
+        var client = await Entrar(_api);
+        var empresa = await EmpresaCentro();
+        var camiseta = await CriarCamiseta(client);
+        var loja = (await Lojas(client)).Single();
+        var azulM = Sku(camiseta, "Azul", "M").Id;
+        await Entrada(client, loja.Id, new { skuId = azulM, quantidade = 2, custoUnitario = 30m });
+
+        await using var escopo = Escopo();
+        var estoque = escopo.ServiceProvider.GetRequiredService<IMovimentacaoDeEstoque>();
+        await estoque.RegistrarDevolucaoAsync(new DevolucaoDeEstoque(empresa, loja.Id, "Troca nº 1", [new ItemDevolvidoAoEstoque(azulM, 1, 20m)]), Ct);
+
+        (await Saldo(client, camiseta.Id, azulM)).ShouldBe(3);
+        (await client.GetFromJsonAsync<List<MovimentoDto>>(U($"/api/estoque/kardex?skuId={azulM}"), Ct))![0].ShouldBe(new MovimentoDto("Devolucao", 1, "Troca nº 1"));
+        await Should.ThrowAsync<SaidaDeEstoqueRecusadaException>(() =>
+            estoque.RegistrarDevolucaoAsync(new DevolucaoDeEstoque(Guid.NewGuid(), loja.Id, "X", [new ItemDevolvidoAoEstoque(azulM, 1, 20m)]), Ct));
+    }
+
+    [Fact]
+    public async Task Financeiro_ContaAPagarAvulsa_CancelaSoSemPagamento()
+    {
+        var client = await Entrar(_api);
+        var empresa = await EmpresaCentro();
+        var caixa = (await (await client.PostAsJsonAsync(U("/api/financeiro/contas"), new { nome = "Caixa", tipo = "Caixa", saldoInicial = 100m, saldoInicialEm = "2026-10-01" }, Ct))
+            .Content.ReadFromJsonAsync<ContaDto>(Ct))!;
+        var vencimento = new DateOnly(2026, 11, 5);
+        var conta = new NovaContaAPagar(empresa, "Comissao", "f-1", "Comissão de Bia — 10/2026", "Bia", "Pessoal", "Comissões", vencimento, 42.5m);
+
+        await using (var escopo = Escopo())
+        {
+            var pagar = escopo.ServiceProvider.GetRequiredService<IContasAPagar>();
+            var id = await pagar.RegistrarContaAsync(conta, Ct);
+            (await pagar.RegistrarContaAsync(conta, Ct)).ShouldBe(id); // não duplica
+            (await pagar.CancelarOrigemAsync("Comissao", "f-1", "Ana", Ct)).ShouldBeTrue();
+            (await pagar.CancelarOrigemAsync("Comissao", "nao-existe", "Ana", Ct)).ShouldBeTrue();
+        }
+        (await client.GetFromJsonAsync<ListaDto>(U("/api/financeiro/titulos?tipo=pagar&situacao=canceladas"), Ct))!.Itens.Single().Descricao.ShouldBe("Comissão de Bia — 10/2026");
+
+        Guid parcela;
+        await using (var escopo = Escopo())
+            await escopo.ServiceProvider.GetRequiredService<IContasAPagar>().RegistrarContaAsync(conta with { OrigemId = "f-2" }, Ct);
+        parcela = (await client.GetFromJsonAsync<System.Text.Json.JsonElement>(U("/api/financeiro/titulos?tipo=pagar&situacao=abertas"), Ct))
+            .GetProperty("itens")[0].GetProperty("parcelaId").GetGuid();
+        (await client.PostAsJsonAsync(U($"/api/financeiro/parcelas/{parcela}/baixas"), new { data = vencimento, contaId = caixa.Id, valor = 42.5m, juros = 0m, multa = 0m, desconto = 0m }, Ct))
+            .EnsureSuccessStatusCode();
+        await using (var escopo = Escopo())
+            (await escopo.ServiceProvider.GetRequiredService<IContasAPagar>().CancelarOrigemAsync("Comissao", "f-2", "Ana", Ct)).ShouldBeFalse();
+        (await client.GetFromJsonAsync<ListaDto>(U("/api/financeiro/titulos?tipo=pagar&situacao=pagas"), Ct))!.Itens.Single().Valor.ShouldBe(42.5m);
+    }
+
+    [Fact]
     public async Task Cadastros_VendedorComComissao()
     {
         var client = await Entrar(_api);
