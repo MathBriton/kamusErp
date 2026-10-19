@@ -237,3 +237,70 @@ export const centavos = (valor: number) => Math.round(valor * 100) / 100
 export function inicioDoMes(hoje: string) {
   return `${hoje.slice(0, 7)}-01`
 }
+
+export type SituacaoDaCondicional = 'Aberta' | 'Atrasada' | 'Fechada'
+
+export interface LinhaDeCondicional {
+  id: string
+  numero: number
+  data: string
+  prazo: string
+  clienteId: string
+  clienteNome: string
+  vendedorNome: string | null
+  pecas: number
+  valor: number
+  situacao: SituacaoDaCondicional
+  vendaNumero: number | null
+}
+
+export interface ListaDeCondicionais {
+  itens: LinhaDeCondicional[]
+  abertas: number
+  atrasadas: number
+  pecasNaRua: number
+  valorNaRua: number
+}
+
+export interface Condicional {
+  id: string
+  numero: number
+  data: string
+  prazo: string
+  clienteId: string
+  clienteNome: string
+  vendedorId: string | null
+  vendedorNome: string | null
+  situacao: SituacaoDaCondicional
+  pecas: number
+  valor: number
+  itens: { skuId: string; descricao: string; quantidade: number; precoUnitario: number; devolvidas: number }[]
+  vendaId: string | null
+  vendaNumero: number | null
+  observacao: string | null
+  registradaPor: string | null
+}
+
+export interface ConversaoDoVendedor {
+  vendedorId: string | null
+  vendedor: string
+  condicionais: number
+  pecasLevadas: number
+  pecasVendidas: number
+  valorLevado: number
+  valorVendido: number
+  conversao: number
+}
+
+/** Regras da venda (/api/vendas/configuracao). Limites da condicional: 0 = sem limite. */
+export interface RegrasDeVenda {
+  permitirEstoqueNegativo: boolean
+  prazoDeTrocaDias: number
+  validadeDoValeDias: number
+  prazoCondicionalDias: number
+  limiteCondicionalPecas: number
+  limiteCondicionalValor: number
+}
+
+/** 1 → "1 peça", 3 → "3 peças". */
+export const pecas = (n: number) => `${n} ${n === 1 ? 'peça' : 'peças'}`

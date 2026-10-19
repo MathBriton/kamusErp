@@ -29,11 +29,10 @@ describe('Shell', () => {
     renderApp()
     await screen.findByText(/Olá, Admin/)
 
-    await userEvent.click(within(menuLateral()).getByRole('button', { name: /Vendas/ }))
-    await userEvent.click(within(menuLateral()).getByRole('link', { name: 'Condicional' }))
+    await userEvent.click(within(menuLateral()).getByRole('link', { name: /Relatórios/ }))
 
-    expect(await screen.findByRole('heading', { name: 'Condicional' })).toBeInTheDocument()
-    expect(screen.getByText(/Previsto para a v0\.17\.0/)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Relatórios' })).toBeInTheDocument()
+    expect(screen.getByText(/Previsto para a v0\.18\.0/)).toBeInTheDocument()
   })
 
   it('recolher o menu guarda a preferência', async () => {

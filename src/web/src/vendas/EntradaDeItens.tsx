@@ -22,10 +22,12 @@ interface Props {
   /** Rótulo da tabela (acessível) e do botão da grade. */
   rotulo: string
   botaoDaGrade: string
+  /** Sem a coluna de desconto (ex.: peças da condicional). */
+  semDesconto?: boolean
 }
 
 /** Itens pelo leitor de código de barras (cada leitura soma 1) ou pela busca + grade, com quantidade e desconto editáveis. */
-export function EntradaDeItens({ lojaId, itens, onItens, onErro, rotulo, botaoDaGrade }: Props) {
+export function EntradaDeItens({ lojaId, itens, onItens, onErro, rotulo, botaoDaGrade, semDesconto = false }: Props) {
   const { getJson } = useApi()
   const [codigo, setCodigo] = useState('')
   const [matriz, setMatriz] = useState<Matriz | null>(null)
@@ -126,7 +128,7 @@ export function EntradaDeItens({ lojaId, itens, onItens, onErro, rotulo, botaoDa
               <th className="py-2">Produto</th>
               <th className="w-20 py-2 text-right">Qtd.</th>
               <th className="py-2 text-right">Preço</th>
-              <th className="w-28 py-2 text-right">Desconto (R$)</th>
+              {!semDesconto && <th className="w-28 py-2 text-right">Desconto (R$)</th>}
               <th className="py-2 text-right">Total</th>
               <th />
             </tr>
@@ -145,16 +147,18 @@ export function EntradaDeItens({ lojaId, itens, onItens, onErro, rotulo, botaoDa
                   />
                 </td>
                 <td className="py-2 text-right tabular-nums">{moeda(i.preco)}</td>
-                <td className="py-2 pl-2">
-                  <input
-                    aria-label={`Desconto de ${i.descricao}`}
-                    value={i.desconto}
-                    onChange={(e) => mudar(i.skuId, 'desconto', e.target.value)}
-                    inputMode="decimal"
-                    placeholder="0,00"
-                    className="h-9 w-full rounded-lg border border-border bg-surface px-2 text-right tabular-nums"
-                  />
-                </td>
+                {!semDesconto && (
+                  <td className="py-2 pl-2">
+                    <input
+                      aria-label={`Desconto de ${i.descricao}`}
+                      value={i.desconto}
+                      onChange={(e) => mudar(i.skuId, 'desconto', e.target.value)}
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      className="h-9 w-full rounded-lg border border-border bg-surface px-2 text-right tabular-nums"
+                    />
+                  </td>
+                )}
                 <td className="py-2 text-right font-semibold tabular-nums">{moeda(totalDoItem(i))}</td>
                 <td className="py-2 text-right">
                   <button type="button" onClick={() => onItens((atual) => atual.filter((x) => x.skuId !== i.skuId))} className="text-xs text-danger hover:underline">

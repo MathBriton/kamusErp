@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react'
 import { useApi } from '../api/useApi'
 import { moeda } from '../cadastros/catalogo'
 import { dataBr } from '../financeiro/tipos'
-import type { ListaDeVales, ListaDeVendas } from './tipos'
+import { pecas, type ListaDeCondicionais, type ListaDeVales, type ListaDeVendas } from './tipos'
 
-/** Na ficha do cliente: compras, vales-troca e crediário. Some se o perfil não acessa vendas. */
+/** Na ficha do cliente: compras, vales-troca, crediário e condicionais abertas. Some se o perfil não acessa vendas. */
 export function HistoricoDoCliente({ clienteId }: { clienteId: string }) {
   const { getJson } = useApi()
   const [vendas, setVendas] = useState<ListaDeVendas | null>(null)
   const [vales, setVales] = useState<ListaDeVales | null>(null)
+  const [condicionais, setCondicionais] = useState<ListaDeCondicionais | null>(null)
   const [crediario, setCrediario] = useState<{ limite: number; emAberto: number; disponivel: number; bloqueado: boolean; motivo: string | null } | null>(null)
 
   useEffect(() => {
@@ -16,6 +17,7 @@ export function HistoricoDoCliente({ clienteId }: { clienteId: string }) {
     getJson<ListaDeVendas>(`/api/vendas?${new URLSearchParams({ status: 'todas', clienteId })}`, controle.signal).then(setVendas).catch(() => {})
     getJson<ListaDeVales>(`/api/vendas/vales?${new URLSearchParams({ situacao: 'todos', clienteId })}`, controle.signal).then(setVales).catch(() => {})
     getJson<NonNullable<typeof crediario>>(`/api/financeiro/crediario/clientes/${clienteId}`, controle.signal).then(setCrediario).catch(() => {})
+    getJson<ListaDeCondicionais>(`/api/vendas/condicionais?${new URLSearchParams({ situacao: 'abertas', clienteId })}`, controle.signal).then(setCondicionais).catch(() => {})
     return () => controle.abort()
   }, [getJson, clienteId])
 
@@ -43,6 +45,15 @@ export function HistoricoDoCliente({ clienteId }: { clienteId: string }) {
           {`Crediário: limite ${moeda(crediario.limite)} · em aberto ${moeda(crediario.emAberto)} · disponível ${moeda(crediario.disponivel)}`}
           {crediario.bloqueado && crediario.motivo ? ` — ${crediario.motivo}` : ''}
         </p>
+      )}
+      {condicionais && condicionais.itens.length > 0 && (
+        <ul className="space-y-0.5">
+          {condicionais.itens.map((k) => (
+            <li key={k.id} className={k.situacao === 'Atrasada' ? 'text-danger' : 'text-warning'}>
+              {`Condicional nº ${k.numero} · ${pecas(k.pecas)} · ${moeda(k.valor)} · devolver até ${dataBr(k.prazo)}${k.situacao === 'Atrasada' ? ' (atrasada)' : ''}`}
+            </li>
+          ))}
+        </ul>
       )}
       {ativos.length > 0 && (
         <ul className="space-y-0.5">

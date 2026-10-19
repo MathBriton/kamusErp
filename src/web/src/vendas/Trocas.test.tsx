@@ -222,6 +222,11 @@ describe('Clientes → ficha com compras e vales', () => {
       'GET /api/pessoas/aniversariantes?periodo=semana': () => json([]),
       'GET /api/vendas?status=todas&clienteId=p1': () => json(listaDaVenda),
       'GET /api/vendas/vales?situacao=todos&clienteId=p1': () => json({ itens: [vale], saldoAtivo: 54.51, saldoVencido: 0 }),
+      'GET /api/vendas/condicionais?situacao=abertas&clienteId=p1': () =>
+        json({
+          itens: [{ id: 'k4', numero: 4, data: '2026-10-01', prazo: '2026-10-03', clienteId: 'p1', clienteNome: 'Maria Silva', vendedorNome: 'Bia', pecas: 3, valor: 179.7, situacao: 'Atrasada', vendaNumero: null }],
+          abertas: 1, atrasadas: 1, pecasNaRua: 3, valorNaRua: 179.7,
+        }),
     })
     renderApp('/cadastros/clientes')
     await userEvent.click(await screen.findByRole('button', { name: 'Maria Silva' }))
@@ -229,5 +234,6 @@ describe('Clientes → ficha com compras e vales', () => {
     expect(await within(compras).findByText('1 compra · R$ 109,02')).toBeInTheDocument()
     expect(within(compras).getByText(/VT7K2M9Q/)).toBeInTheDocument()
     expect(within(compras).getByText(/saldo R\$ 54,51/)).toBeInTheDocument()
+    expect(await within(compras).findByText('Condicional nº 4 · 3 peças · R$ 179,70 · devolver até 03/10/2026 (atrasada)')).toBeInTheDocument()
   })
 })

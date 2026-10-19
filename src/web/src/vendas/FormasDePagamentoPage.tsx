@@ -7,7 +7,7 @@ import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { useContas } from '../financeiro/useFinanceiro'
-import { entraNaHora, PERFIS_DE_GESTAO, porcentagem, ROTULO_DO_TIPO, type FormaDePagamento, type TipoDePagamento } from './tipos'
+import { entraNaHora, PERFIS_DE_GESTAO, porcentagem, ROTULO_DO_TIPO, type FormaDePagamento, type RegrasDeVenda, type TipoDePagamento } from './tipos'
 import { useFormas } from './useVendas'
 
 /** Formas de pagamento (taxa, prazo, parcelas e conta onde o dinheiro entra) e a regra de estoque negativo. */
@@ -130,27 +130,27 @@ export function FormasDePagamentoPage() {
   )
 }
 
-interface Regras {
-  permitirEstoqueNegativo: boolean
-  prazoDeTrocaDias: number
-  validadeDoValeDias: number
-}
-
 function RegraDeEstoque() {
   const { getJson, enviar } = useApi()
-  const [regras, setRegras] = useState<Regras | null>(null)
+  const [regras, setRegras] = useState<RegrasDeVenda | null>(null)
   const [prazo, setPrazo] = useState('')
   const [validade, setValidade] = useState('')
+  const [prazoCondicional, setPrazoCondicional] = useState('')
+  const [limitePecas, setLimitePecas] = useState('')
+  const [limiteValor, setLimiteValor] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const [salvo, setSalvo] = useState(false)
 
   useEffect(() => {
     const controle = new AbortController()
-    getJson<Regras>('/api/vendas/configuracao', controle.signal)
+    getJson<RegrasDeVenda>('/api/vendas/configuracao', controle.signal)
       .then((c) => {
         setRegras(c)
         setPrazo(String(c.prazoDeTrocaDias))
         setValidade(String(c.validadeDoValeDias))
+        setPrazoCondicional(String(c.prazoCondicionalDias))
+        setLimitePecas(String(c.limiteCondicionalPecas))
+        setLimiteValor(decimal(c.limiteCondicionalValor))
       })
       .catch(() => {})
     return () => controle.abort()
@@ -158,7 +158,7 @@ function RegraDeEstoque() {
 
   if (regras === null) return null
 
-  const salvar = async (novas: Regras) => {
+  const salvar = async (novas: RegrasDeVenda) => {
     setErro(null)
     setSalvo(false)
     const anteriores = regras
@@ -174,7 +174,14 @@ function RegraDeEstoque() {
 
   const salvarPrazos = (e: FormEvent) => {
     e.preventDefault()
-    void salvar({ ...regras, prazoDeTrocaDias: Number.parseInt(prazo, 10) || 0, validadeDoValeDias: Number.parseInt(validade, 10) || 0 })
+    void salvar({
+      ...regras,
+      prazoDeTrocaDias: Number.parseInt(prazo, 10) || 0,
+      validadeDoValeDias: Number.parseInt(validade, 10) || 0,
+      prazoCondicionalDias: Number.parseInt(prazoCondicional, 10) || 0,
+      limiteCondicionalPecas: Number.parseInt(limitePecas, 10) || 0,
+      limiteCondicionalValor: lerNumero(limiteValor) ?? 0,
+    })
   }
 
   return (
@@ -199,10 +206,22 @@ function RegraDeEstoque() {
         <Campo rotulo="Validade do vale-troca (dias)" className="w-56">
           <input value={validade} onChange={(e) => setValidade(e.target.value.replace(/\D/g, ''))} inputMode="numeric" className={estilos.campo} />
         </Campo>
+        <Campo rotulo="Prazo da condicional (dias)" className="w-52">
+          <input value={prazoCondicional} onChange={(e) => setPrazoCondicional(e.target.value.replace(/\D/g, ''))} inputMode="numeric" className={estilos.campo} />
+        </Campo>
+        <Campo rotulo="Limite de peças na condicional" className="w-56">
+          <input value={limitePecas} onChange={(e) => setLimitePecas(e.target.value.replace(/\D/g, ''))} inputMode="numeric" className={estilos.campo} />
+        </Campo>
+        <Campo rotulo="Limite de valor na condicional (R$)" className="w-60">
+          <input value={limiteValor} onChange={(e) => setLimiteValor(e.target.value)} inputMode="decimal" className={estilos.campo} />
+        </Campo>
         <button type="submit" className={estilos.botao}>Salvar regras</button>
         {salvo && <span className="text-sm text-success">Salvo.</span>}
       </form>
-      <p className="mt-2 text-xs text-muted">Depois do prazo, só Dono ou Gerente aceitam a troca.</p>
+      <p className="mt-2 text-xs text-muted">
+        Depois do prazo, só Dono ou Gerente aceitam a troca. Os limites da condicional valem por cliente (0 = sem limite); acima deles, ou com condicional atrasada, só Dono ou
+        Gerente liberam.
+      </p>
       {erro && <p role="alert" className={`mt-3 ${estilos.erro}`}>{erro}</p>}
     </section>
   )

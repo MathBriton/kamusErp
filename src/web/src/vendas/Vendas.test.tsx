@@ -206,10 +206,11 @@ describe('Vendas → Vendas realizadas', () => {
 
 describe('Vendas → Formas de pagamento', () => {
   it('avisa forma sem conta, edita a conta e muda a regra de estoque negativo', async () => {
+    const condicional = { prazoCondicionalDias: 2, limiteCondicionalPecas: 10, limiteCondicionalValor: 1000 }
     let forma: Record<string, unknown> | null = null
     let regra: Record<string, unknown> | null = null
     api({
-      'GET /api/vendas/configuracao': () => json({ permitirEstoqueNegativo: true, prazoDeTrocaDias: 30, validadeDoValeDias: 90 }),
+      'GET /api/vendas/configuracao': () => json({ permitirEstoqueNegativo: true, prazoDeTrocaDias: 30, validadeDoValeDias: 90, ...condicional }),
       'PUT /api/vendas/formas/f2': (init) => {
         forma = corpo(init)
         return json({ ...formas[1], contaId: 'c1' })
@@ -234,13 +235,19 @@ describe('Vendas → Formas de pagamento', () => {
     const caixa = await screen.findByRole('checkbox', { name: /Permitir vender sem saldo/ })
     expect(caixa).toBeChecked()
     await userEvent.click(caixa)
-    expect(regra).toEqual({ permitirEstoqueNegativo: false, prazoDeTrocaDias: 30, validadeDoValeDias: 90 })
+    expect(regra).toEqual({ permitirEstoqueNegativo: false, prazoDeTrocaDias: 30, validadeDoValeDias: 90, ...condicional })
 
     const prazo = screen.getByLabelText('Prazo de troca (dias)')
     await userEvent.clear(prazo)
     await userEvent.type(prazo, '15')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar regras' }))
-    await waitFor(() => expect(regra).toEqual({ permitirEstoqueNegativo: false, prazoDeTrocaDias: 15, validadeDoValeDias: 90 }))
+    await waitFor(() => expect(regra).toEqual({ permitirEstoqueNegativo: false, prazoDeTrocaDias: 15, validadeDoValeDias: 90, ...condicional }))
+
+    const pecas = screen.getByLabelText('Limite de peças na condicional')
+    await userEvent.clear(pecas)
+    await userEvent.type(pecas, '6')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar regras' }))
+    await waitFor(() => expect(regra).toMatchObject({ prazoDeTrocaDias: 15, limiteCondicionalPecas: 6, limiteCondicionalValor: 1000, prazoCondicionalDias: 2 }))
   })
 })
 
