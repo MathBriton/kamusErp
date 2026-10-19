@@ -102,6 +102,21 @@ describe('Dashboard', () => {
     expect(within(card).getByText('▲ 200% vs 7 dias anteriores')).toBeInTheDocument()
   })
 
+  it('enquanto o novo período carrega, o cartão continua com o título e os números do anterior', async () => {
+    let responder: (r: Response) => void = () => {}
+    api({ 'GET /api/indicadores?periodo=7dias': () => new Promise<Response>((r) => (responder = r)) })
+    renderApp()
+    await screen.findByText('Vendas hoje')
+
+    await userEvent.click(screen.getByRole('radio', { name: '7 dias' }))
+
+    expect(screen.getByRole('radio', { name: '7 dias' })).toHaveAttribute('aria-checked', 'true')
+    expect(within(screen.getByText('Vendas hoje').closest('article')!).getByText('R$ 179,70')).toBeInTheDocument()
+    expect(screen.queryByText('Vendas em 7 dias')).not.toBeInTheDocument()
+    responder(json(dashboard({ periodo: '7dias', vendas: { ...dashboard().vendas, periodo: cartao({ total: 900 }) } })))
+    expect(await screen.findByText('Vendas em 7 dias')).toBeInTheDocument()
+  })
+
   it('loja sem dados mostra os primeiros passos', async () => {
     api({ 'GET /api/indicadores?periodo=hoje': () => json(vazio()) })
     renderApp()

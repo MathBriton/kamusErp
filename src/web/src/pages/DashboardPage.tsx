@@ -111,7 +111,7 @@ export function DashboardPage() {
         </p>
       )}
 
-      {dados && <Cartoes dados={dados} periodo={periodo} />}
+      {dados && <Cartoes dados={dados} />}
 
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
@@ -210,7 +210,7 @@ export function DashboardPage() {
           {dados?.condicionais && dados.condicionais.abertas > 0 && (
             <Bloco titulo="Condicionais na rua">
               <p className="text-2xl font-bold tabular-nums">{moeda(dados.condicionais.valor)}</p>
-              <p className="text-sm text-muted">{`${dados.condicionais.abertas} abertas · ${pecas(dados.condicionais.pecas)}`}</p>
+              <p className="text-sm text-muted">{`${dados.condicionais.abertas} ${dados.condicionais.abertas === 1 ? 'aberta' : 'abertas'} · ${pecas(dados.condicionais.pecas)}`}</p>
             </Bloco>
           )}
           {dados?.estoque && (
@@ -227,8 +227,10 @@ export function DashboardPage() {
   )
 }
 
-function Cartoes({ dados, periodo }: { dados: Dashboard; periodo: CodigoDoPeriodo }) {
-  const info = PERIODOS.find((p) => p.valor === periodo)!
+function Cartoes({ dados }: { dados: Dashboard }) {
+  // O rótulo vem da resposta (e não do botão escolhido) para nunca misturar o título novo com os números do período anterior.
+  const periodo = dados.periodo
+  const info = PERIODOS.find((p) => p.valor === periodo) ?? PERIODOS[0]!
   const cartoes: ReactNode[] = []
   const v = dados.vendas
   if (v) {
