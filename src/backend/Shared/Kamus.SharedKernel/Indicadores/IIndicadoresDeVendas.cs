@@ -14,11 +14,21 @@ public sealed record ResumoDeVendas(int Vendas, int Pecas, decimal Total, decima
 
 public sealed record CondicionaisNaRua(int Abertas, int Atrasadas, int Pecas, decimal Valor);
 
+/// <param name="TaxasDeCartao">Taxas das maquininhas descontadas nas vendas.</param>
+/// <param name="CustoDasMercadorias">Custo médio das peças no momento de cada venda.</param>
+public sealed record ResultadoDasVendas(int Vendas, decimal ReceitaBruta, decimal TaxasDeCartao, decimal CustoDasMercadorias);
+
 /// <summary>Números de vendas para o dashboard e o resumo diário (só vendas concluídas). Implementado pelo módulo Vendas.</summary>
 public interface IIndicadoresDeVendas
 {
     /// <param name="registradasPor">Só as vendas registradas por este usuário (visão do vendedor).</param>
     Task<ResumoDeVendas> VendasAsync(IReadOnlyCollection<Guid> empresaIds, DateOnly de, DateOnly ate, Guid? registradasPor = null, CancellationToken ct = default);
+
+    /// <summary>Receita, taxas e custo das vendas concluídas no período (base da DRE).</summary>
+    Task<ResultadoDasVendas> ResultadoAsync(IReadOnlyCollection<Guid> empresaIds, DateOnly de, DateOnly ate, CancellationToken ct = default);
+
+    /// <summary>Data da última venda concluída de cada produto (produtos nunca vendidos ficam de fora).</summary>
+    Task<IReadOnlyDictionary<Guid, DateOnly>> UltimaVendaPorProdutoAsync(IReadOnlyCollection<Guid> empresaIds, CancellationToken ct = default);
 
     Task<CondicionaisNaRua> CondicionaisAsync(IReadOnlyCollection<Guid> empresaIds, DateOnly hoje, CancellationToken ct = default);
 }

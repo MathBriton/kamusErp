@@ -13,6 +13,8 @@ internal sealed class RelatorioDePosicao(Lojas lojas, EstoqueDbContext db, ICata
     public string Codigo => "posicao-de-estoque";
     public string Titulo => "Posição de estoque";
     public IReadOnlyCollection<string> Perfis => Permissoes.VerCusto;
+    public string Area => "Estoque";
+    public string? Descricao => "Saldo por produto, cor e tamanho, com custo médio e valor em estoque.";
 
     public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
     {

@@ -39,4 +39,16 @@ internal sealed class IndicadoresFinanceiros(FinanceiroDbContext db) : IIndicado
             crediarioVencido.Sum(x => x.Parcela.Saldo),
             crediarioVencido.Select(x => x.Titulo.PessoaId?.ToString() ?? x.Titulo.PessoaNome).Distinct().Count());
     }
+
+    public async Task<IReadOnlyList<LancamentoPorCategoria>> PorCategoriaAsync(IReadOnlyCollection<Guid> empresaIds, DateOnly de, DateOnly ate, CancellationToken ct = default)
+    {
+        var titulos = await db.Titulos.AsNoTracking().Include(t => t.Parcelas)
+            .Where(t => empresaIds.Contains(t.EmpresaId) && !t.Cancelado && t.Competencia >= de && t.Competencia <= ate).ToListAsync(ct);
+        var categorias = await db.Categorias.AsNoTracking().ToDictionaryAsync(c => c.Id, ct);
+        return titulos
+            .GroupBy(t => (t.Tipo, Categoria: t.CategoriaId is { } id ? categorias.GetValueOrDefault(id) : null, t.Origem))
+            .Select(g => new LancamentoPorCategoria(g.Key.Tipo == TipoDeTitulo.Receber ? "Receita" : "Despesa", g.Key.Categoria?.Grupo ?? "Sem categoria",
+                g.Key.Categoria?.Nome ?? "Sem categoria", g.Key.Origem, g.Sum(t => t.ValorTotal)))
+            .ToList();
+    }
 }

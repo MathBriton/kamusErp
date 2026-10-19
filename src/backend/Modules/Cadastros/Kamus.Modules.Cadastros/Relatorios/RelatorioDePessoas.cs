@@ -11,6 +11,8 @@ internal abstract class RelatorioDePessoas(CadastrosDbContext db, IEmpresaAtiva 
     public abstract string Codigo { get; }
     public abstract string Titulo { get; }
     public abstract IReadOnlyCollection<string> Perfis { get; }
+    public string Area => "Cadastros";
+    public string? Descricao => $"Lista de {Titulo.ToLowerInvariant()} com documento, contato e cidade.";
 
     public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
     {

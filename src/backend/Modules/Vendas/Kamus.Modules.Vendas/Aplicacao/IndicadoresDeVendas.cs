@@ -37,6 +37,20 @@ internal sealed class IndicadoresDeVendas(VendasDbContext db) : IIndicadoresDeVe
             dias, porForma, porVendedor, maisVendidos);
     }
 
+    public async Task<ResultadoDasVendas> ResultadoAsync(IReadOnlyCollection<Guid> empresaIds, DateOnly de, DateOnly ate, CancellationToken ct = default)
+    {
+        var vendas = await db.Vendas.AsNoTracking().Include(v => v.Itens).Include(v => v.Pagamentos)
+            .Where(v => empresaIds.Contains(v.EmpresaId) && v.Status == StatusDaVenda.Concluida && v.Data >= de && v.Data <= ate).ToListAsync(ct);
+        return new ResultadoDasVendas(vendas.Count, vendas.Sum(v => v.Total), vendas.Sum(v => v.TaxaTotal), vendas.Sum(v => v.CustoTotal));
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, DateOnly>> UltimaVendaPorProdutoAsync(IReadOnlyCollection<Guid> empresaIds, CancellationToken ct = default)
+    {
+        var itens = await db.Vendas.AsNoTracking().Where(v => empresaIds.Contains(v.EmpresaId) && v.Status == StatusDaVenda.Concluida)
+            .SelectMany(v => v.Itens.Select(i => new { i.ProdutoId, v.Data })).ToListAsync(ct);
+        return itens.GroupBy(i => i.ProdutoId).ToDictionary(g => g.Key, g => g.Max(i => i.Data));
+    }
+
     public async Task<CondicionaisNaRua> CondicionaisAsync(IReadOnlyCollection<Guid> empresaIds, DateOnly hoje, CancellationToken ct = default)
     {
         var abertas = await db.Condicionais.AsNoTracking().Include(c => c.Itens).Where(c => empresaIds.Contains(c.EmpresaId) && !c.Fechada).ToListAsync(ct);

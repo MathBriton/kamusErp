@@ -40,4 +40,19 @@ internal sealed class IndicadoresDeEstoque(EstoqueDbContext db, ICatalogoDeProdu
             quebras.Take(QuantidadeDeQuebras).ToList(),
             quebras.Count);
     }
+
+    public async Task<IReadOnlyList<EstoqueDoProduto>> PorProdutoAsync(IReadOnlyCollection<Guid> empresaIds, CancellationToken ct = default)
+    {
+        var lojas = db.Lojas.Where(l => empresaIds.Contains(l.EmpresaId)).Select(l => l.Id);
+        var saldos = await db.Saldos.AsNoTracking().Where(s => lojas.Contains(s.LojaId) && s.Quantidade > 0).ToListAsync(ct);
+        var skus = (await catalogo.SkusAsync(saldos.Select(s => s.SkuId).Distinct().ToList(), ct)).ToDictionary(s => s.Id);
+        return saldos.GroupBy(s => s.ProdutoId)
+            .Select(g =>
+            {
+                var sku = g.Select(s => skus.GetValueOrDefault(s.SkuId)).FirstOrDefault(s => s is not null);
+                return new EstoqueDoProduto(g.Key, sku?.Referencia ?? "", sku?.Descricao ?? "(produto removido)", g.Sum(s => s.Quantidade),
+                    Math.Round(g.Sum(s => s.Quantidade * s.CustoMedio), 2));
+            })
+            .OrderBy(p => p.Descricao, StringComparer.CurrentCulture).ToList();
+    }
 }

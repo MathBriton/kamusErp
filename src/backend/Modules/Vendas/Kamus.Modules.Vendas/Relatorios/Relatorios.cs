@@ -9,7 +9,7 @@ using Kamus.SharedKernel.Tempo;
 
 namespace Kamus.Modules.Vendas.Relatorios;
 
-internal static class Parametros
+internal static class Filtros
 {
     public static DateOnly? Data(string? texto) => DateOnly.TryParse(texto, CultureInfo.InvariantCulture, out var d) ? d : null;
 
@@ -26,10 +26,14 @@ internal sealed class RelatorioDeVendas(VendasDbContext db, IEmpresaAtiva empres
     public string Codigo => "vendas";
     public string Titulo => "Vendas";
     public IReadOnlyCollection<string> Perfis => [.. Permissoes.Registrar, .. Permissoes.Consultar];
+    public string Area => "Vendas";
+    public string? Descricao => "Vendas do período com cliente, vendedor, pagamento e total.";
+    public IReadOnlyList<ParametroDoRelatorio> Parametros =>
+        [new("periodo", "Período", TipoDeParametro.Periodo, "mes"), new("status", "Situação", TipoDeParametro.Opcao, "todas", [new("todas", "Todas"), new("concluidas", "Concluídas"), new("canceladas", "Canceladas")])];
 
     public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
     {
-        var (de, ate) = Parametros.Periodo(parametros, relogio);
+        var (de, ate) = Filtros.Periodo(parametros, relogio);
         var status = parametros.GetValueOrDefault("status")?.ToLowerInvariant() is { } s && Consultas.Status.Contains(s) ? s : "todas";
         var vendedorId = Guid.TryParse(parametros.GetValueOrDefault("vendedorId"), out var v) ? v : (Guid?)null;
         var busca = parametros.GetValueOrDefault("busca");
@@ -61,10 +65,14 @@ internal sealed class RelatorioDeComissoes(VendasDbContext db, IEmpresaAtiva emp
     public string Codigo => "comissoes";
     public string Titulo => "Comissões";
     public IReadOnlyCollection<string> Perfis => Permissoes.Consultar;
+    public string Area => "Vendas";
+    public string? Descricao => "Comissão de cada vendedor no período.";
+    public IReadOnlyList<ParametroDoRelatorio> Parametros =>
+        [new("periodo", "Período", TipoDeParametro.Periodo, "mes")];
 
     public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
     {
-        var (de, ate) = Parametros.Periodo(parametros, relogio);
+        var (de, ate) = Filtros.Periodo(parametros, relogio);
         var comissoes = await Consultas.ComissoesAsync(db, empresa, de, ate, ct);
         return new DadosDoRelatorio(Titulo,
         [
@@ -83,6 +91,10 @@ internal sealed class RelatorioDeVales(VendasDbContext db, IEmpresaAtiva empresa
     public string Codigo => "vales-troca";
     public string Titulo => "Vales-troca";
     public IReadOnlyCollection<string> Perfis => [.. Permissoes.Registrar, .. Permissoes.Consultar];
+    public string Area => "Vendas";
+    public string? Descricao => "Vales-troca emitidos com saldo e validade.";
+    public IReadOnlyList<ParametroDoRelatorio> Parametros =>
+        [new("situacao", "Situação", TipoDeParametro.Opcao, "ativos", [new("ativos", "Ativos"), new("vencidos", "Vencidos"), new("usados", "Usados"), new("cancelados", "Cancelados"), new("todos", "Todos")])];
 
     public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
     {
@@ -111,6 +123,10 @@ internal sealed class RelatorioDeCondicionais(VendasDbContext db, IEmpresaAtiva 
     public string Codigo => "condicionais";
     public string Titulo => "Condicionais";
     public IReadOnlyCollection<string> Perfis => [.. Permissoes.Registrar, .. Permissoes.Consultar];
+    public string Area => "Vendas";
+    public string? Descricao => "Condicionais com cliente, peças, valor e prazo de devolução.";
+    public IReadOnlyList<ParametroDoRelatorio> Parametros =>
+        [new("situacao", "Situação", TipoDeParametro.Opcao, "abertas", [new("abertas", "Abertas"), new("atrasadas", "Atrasadas"), new("fechadas", "Fechadas"), new("todas", "Todas")])];
 
     public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
     {

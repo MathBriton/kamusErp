@@ -13,6 +13,8 @@ internal sealed class RelatorioHistoricoDeAlteracoes(AuditoriaDbContext db, IEmp
     public string Codigo => "historico-de-alteracoes";
     public string Titulo => "Histórico de alterações";
     public IReadOnlyCollection<string> Perfis => AuditoriaEndpoints.PerfisComAcesso;
+    public string Area => "Sistema";
+    public string? Descricao => "Quem alterou o quê e quando (inclusive logins e exportações).";
 
     public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
     {

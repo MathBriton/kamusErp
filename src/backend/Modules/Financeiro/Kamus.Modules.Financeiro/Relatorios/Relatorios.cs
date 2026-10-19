@@ -15,6 +15,10 @@ internal sealed class RelatorioDeTitulos(FinanceiroDbContext db, IEmpresaAtiva e
     public string Codigo => "titulos";
     public string Titulo => "Contas a pagar e a receber";
     public IReadOnlyCollection<string> Perfis => Permissoes.Financeiro;
+    public string Area => "Financeiro";
+    public string? Descricao => "Parcelas a pagar ou a receber, com situação, vencimento e saldo.";
+    public IReadOnlyList<ParametroDoRelatorio> Parametros =>
+        [new("tipo", "Tipo", TipoDeParametro.Opcao, "pagar", [new("pagar", "A pagar"), new("receber", "A receber")]), new("situacao", "Situação", TipoDeParametro.Opcao, "abertas", [new("abertas", "Em aberto"), new("vencidas", "Vencidas"), new("pagas", "Pagas"), new("todas", "Todas")]), new("periodo", "Vencimento", TipoDeParametro.Periodo, "mes")];
 
     private static DateOnly? Data(string? texto) => DateOnly.TryParse(texto, System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : null;
 
@@ -51,6 +55,10 @@ internal sealed class RelatorioDeFluxo(FinanceiroDbContext db, IEmpresaAtiva emp
     public string Codigo => "fluxo-de-caixa";
     public string Titulo => "Fluxo de caixa";
     public IReadOnlyCollection<string> Perfis => Permissoes.Financeiro;
+    public string Area => "Financeiro";
+    public string? Descricao => "Realizado até hoje e previsto daqui em diante, dia a dia (ou mês a mês em períodos longos).";
+    public IReadOnlyList<ParametroDoRelatorio> Parametros =>
+        [new("periodo", "Período", TipoDeParametro.Periodo, "30dias")];
 
     public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
     {
@@ -85,6 +93,8 @@ internal sealed class RelatorioDeInadimplencia(FinanceiroDbContext db, Crediario
     public string Codigo => "inadimplencia";
     public string Titulo => "Crediário — inadimplência";
     public IReadOnlyCollection<string> Perfis => CrediarioEndpoints.Perfis;
+    public string Area => "Financeiro";
+    public string? Descricao => "Clientes do crediário com parcelas em atraso: saldo, atraso mais antigo e limite.";
 
     public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
     {

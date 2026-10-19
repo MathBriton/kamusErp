@@ -11,6 +11,8 @@ internal sealed class RelatorioDeProdutos(CadastrosDbContext db) : IRelatorio
     public string Codigo => "produtos";
     public string Titulo => "Produtos e SKUs";
     public IReadOnlyCollection<string> Perfis => ["Dono", "Gerente", "Estoquista", "Vendedor", "Financeiro"];
+    public string Area => "Cadastros";
+    public string? Descricao => "Catálogo de produtos com grade, preços e SKUs.";
 
     public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
     {

@@ -11,8 +11,15 @@ public sealed record Compromissos(decimal Hoje, decimal Amanha, decimal Proximos
 public sealed record ResumoFinanceiro(IReadOnlyList<SaldoDeConta> Contas, decimal SaldoTotal, Compromissos AReceber, Compromissos APagar,
     decimal CrediarioEmAtraso, int ClientesEmAtraso);
 
+/// <param name="Tipo">Receita ou Despesa.</param>
+/// <param name="Origem">Quem gerou o título (Manual, Venda, Troca, NotaDeEntrada, FechamentoDeComissao...).</param>
+public sealed record LancamentoPorCategoria(string Tipo, string Grupo, string Categoria, string Origem, decimal Valor);
+
 /// <summary>Números financeiros para o dashboard e o resumo diário. Implementado pelo módulo Financeiro.</summary>
 public interface IIndicadoresFinanceiros
 {
     Task<ResumoFinanceiro> ResumoAsync(IReadOnlyCollection<Guid> empresaIds, DateOnly hoje, CancellationToken ct = default);
+
+    /// <summary>Títulos não cancelados pela competência no período, somados por tipo, categoria e origem (base da DRE).</summary>
+    Task<IReadOnlyList<LancamentoPorCategoria>> PorCategoriaAsync(IReadOnlyCollection<Guid> empresaIds, DateOnly de, DateOnly ate, CancellationToken ct = default);
 }

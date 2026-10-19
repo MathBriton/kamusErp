@@ -20,6 +20,8 @@ public static class ModuloIndicadores
         services.AddScoped<ResumoDiario>();
         services.AddScoped<GeradorDeResumos>();
         services.AddHostedService<RotinaDoResumoDiario>();
+        services.AddScoped<Kamus.SharedKernel.Relatorios.IRelatorio, Relatorios.RelatorioDeProdutosSemGiro>();
+        services.AddScoped<Kamus.SharedKernel.Relatorios.IRelatorio, Relatorios.RelatorioDre>();
         return services;
     }
 

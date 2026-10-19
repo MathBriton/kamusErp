@@ -26,6 +26,20 @@ public sealed record DadosDoRelatorio(
     IReadOnlyList<IReadOnlyList<object?>> Linhas,
     IReadOnlyList<FiltroAplicado> Filtros);
 
+/// <summary>Periodo = par de/ate (padrão: "mes", "hoje" ou "30dias"); Opcao = lista fechada; Inteiro e Data = campo simples.</summary>
+public enum TipoDeParametro
+{
+    Periodo,
+    Data,
+    Inteiro,
+    Opcao,
+}
+
+public sealed record OpcaoDoParametro(string Valor, string Rotulo);
+
+/// <param name="Nome">Nome na query string ("periodo" vira <c>de</c> e <c>ate</c>).</param>
+public sealed record ParametroDoRelatorio(string Nome, string Rotulo, TipoDeParametro Tipo, string? Padrao = null, IReadOnlyList<OpcaoDoParametro>? Opcoes = null);
+
 /// <summary>Relatório exportável. Cada módulo registra os seus; o endpoint de exportação é único.</summary>
 public interface IRelatorio
 {
@@ -38,4 +52,15 @@ public interface IRelatorio
 
     /// <param name="parametros">Filtros da tela, vindos da query string.</param>
     Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct);
+
+    /// <summary>Grupo na central de relatórios (Vendas, Estoque, Financeiro, Cadastros, Gestão, Sistema).</summary>
+    string Area => "Outros";
+
+    string? Descricao => null;
+
+    /// <summary>Falso para relatórios que dependem de uma tela (ex.: um inventário específico): ficam fora da central.</summary>
+    bool NaCentral => true;
+
+    /// <summary>Filtros que a central de relatórios mostra para este relatório.</summary>
+    IReadOnlyList<ParametroDoRelatorio> Parametros => [];
 }

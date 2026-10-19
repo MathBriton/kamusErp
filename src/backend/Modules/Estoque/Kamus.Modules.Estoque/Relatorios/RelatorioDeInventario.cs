@@ -13,6 +13,8 @@ internal sealed class RelatorioDeInventario(Lojas lojas, EstoqueDbContext db, IC
     public string Codigo => "inventario";
     public string Titulo => "Divergências do inventário";
     public IReadOnlyCollection<string> Perfis => Permissoes.Movimentar;
+    public string Area => "Estoque";
+    public bool NaCentral => false; // depende de um inventário: sai pela tela do inventário
 
     public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
     {
