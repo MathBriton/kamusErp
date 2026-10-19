@@ -83,80 +83,12 @@ internal static class VendasEndpoints
         return venda is null ? Results.NotFound() : Results.Ok(Dto(venda, Permissoes.VeTudo(empresa)));
     }
 
-    private static async Task<IResult> Registrar(VendaRequest r, VendasDbContext db, IEmpresaAtiva empresa, IUsuarioAtual usuario, ICatalogoDeProdutos catalogo,
-        IDiretorioDeVendedores vendedores, IMovimentacaoDeEstoque estoque, IContasAReceber financeiro, ICrediario crediario, TimeProvider relogio, CancellationToken ct)
+    private static async Task<IResult> Registrar(VendaRequest r, IEmpresaAtiva empresa, RegistroDeVendas registro, CancellationToken ct)
     {
         if (Permissoes.Exigir(empresa, Permissoes.Registrar, "Só Dono, Gerente e Vendedor registram vendas.") is { } negado) return negado;
-        var empresaId = empresa.EmpresaId!.Value;
-        var hoje = CalendarioBrasilia.Hoje(relogio);
-        var data = r.Data ?? hoje;
-        if (data > hoje) return Permissoes.Erro("A data da venda não pode ser futura.");
-        var itens = r.Itens ?? [];
-        var pedidos = r.Pagamentos ?? [];
-        if (pedidos.Count == 0) return Permissoes.Erro("Informe ao menos uma forma de pagamento.");
-
-        VendedorResumo? vendedor = null;
-        if (r.VendedorId is { } vendedorId)
-        {
-            vendedor = await vendedores.ObterAsync(vendedorId, ct);
-            if (vendedor is null) return Permissoes.Erro("Vendedor não encontrado.");
-            if (!vendedor.Ativo) return Permissoes.Erro($"{vendedor.Nome} está inativo.");
-        }
-
-        var skus = (await catalogo.SkusAsync(itens.Select(i => i.SkuId).Distinct().ToList(), ct)).ToDictionary(s => s.Id);
-        if (itens.Any(i => !skus.ContainsKey(i.SkuId))) return Permissoes.Erro("Há itens que não existem no catálogo.");
-        if (itens.FirstOrDefault(i => !skus[i.SkuId].Ativo) is { } inativo) return Permissoes.Erro($"{Nome(skus[inativo.SkuId])} está inativo no catálogo.");
-
-        var (pagamentos, formas, erro) = await Pagamentos.ResolverAsync(db, financeiro, crediario, empresaId, r.ClienteId, pedidos, hoje, ct);
-        if (erro is not null) return Permissoes.Erro(erro);
-
-        var numero = (await db.Vendas.Where(v => v.EmpresaId == empresaId).MaxAsync(v => (int?)v.Numero, ct) ?? 0) + 1;
-        Venda venda;
-        try
-        {
-            venda = Venda.Criar(
-                new DadosDaVenda(empresaId, r.LojaId, numero, data, r.ClienteId, r.ClienteNome, vendedor?.Id, vendedor?.Nome, vendedor?.ComissaoPercentual ?? 0,
-                    r.NotaExterna, r.Observacao, usuario.Id),
-                itens.Select(i => new ItemNovo(i.SkuId, skus[i.SkuId].ProdutoId, Nome(skus[i.SkuId]), i.Quantidade, skus[i.SkuId].PrecoVenda, i.Desconto)).ToList(),
-                r.DescontoGeral, pagamentos, usuario.Nome, relogio.GetUtcNow());
-        }
-        catch (ArgumentException ex)
-        {
-            return Permissoes.Erro(Permissoes.Mensagem(ex));
-        }
-
-        var documento = $"Venda nº {numero}";
-        var configuracao = await FormasEndpoints.ConfiguracaoAsync(db, empresaId, ct);
-        SaidaRegistrada saida;
-        try
-        {
-            saida = await estoque.RegistrarVendaAsync(new SaidaDeEstoque(empresaId, r.LojaId, documento,
-                venda.Itens.Select(i => new ItemDeSaida(i.SkuId, i.Quantidade)).ToList(), configuracao.PermitirEstoqueNegativo), ct);
-        }
-        catch (SaidaDeEstoqueRecusadaException ex)
-        {
-            return Permissoes.Problema(StatusCodes.Status409Conflict, ex.Message);
-        }
-        venda.RegistrarBaixaDeEstoque(saida.OperacaoId, saida.Itens.ToDictionary(i => i.SkuId, i => i.CustoUnitario));
-
-        try
-        {
-            await financeiro.RegistrarVendaAsync(Pagamentos.Recebiveis(venda.EmpresaId, Origem, venda.Id, documento, venda.ClienteId, venda.ClienteNome, venda.Data,
-                venda.Pagamentos.Select(Gravado), formas), ct);
-            db.Vendas.Add(venda);
-            await db.SaveChangesAsync(ct);
-        }
-        catch
-        {
-            // Sem transação entre módulos: desfaz o que já foi gravado nos outros contextos.
-            await estoque.EstornarVendaAsync(saida.OperacaoId, $"{documento} não concluída", CancellationToken.None);
-            await financeiro.CancelarOrigemAsync(Origem, venda.Id.ToString(), usuario.Nome, CancellationToken.None);
-            throw;
-        }
-
-        var avisos = saida.Itens.Where(i => i.SaldoApos < 0)
-            .Select(i => $"{Nome(skus[i.SkuId])} ficou com estoque {i.SaldoApos}.").ToList();
-        return Results.Created($"/api/vendas/{venda.Id}", Dto(venda, Permissoes.VeTudo(empresa), avisos));
+        var resultado = await registro.RegistrarAsync(r, ct);
+        if (resultado.Erro is not null) return resultado.Erro;
+        return Results.Created($"/api/vendas/{resultado.Venda!.Id}", Dto(resultado.Venda, Permissoes.VeTudo(empresa), resultado.Avisos));
     }
 
     private static string Nome(SkuDoCatalogo sku) => $"{sku.Descricao} {sku.Cor} {sku.Tamanho}";

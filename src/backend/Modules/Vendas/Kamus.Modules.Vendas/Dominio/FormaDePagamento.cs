@@ -112,16 +112,33 @@ public sealed class ConfiguracaoDeVendas : ITenantOwned
     /// <summary>Validade do vale-troca em dias. Padrão: 90.</summary>
     public int ValidadeDoValeDias { get; private set; } = 90;
 
+    /// <summary>Prazo padrão para devolver a condicional. Padrão: 2 dias.</summary>
+    public int PrazoCondicionalDias { get; private set; } = 2;
+
+    /// <summary>Peças em condicional por cliente (somando as abertas). 0 = sem limite. Padrão: 10.</summary>
+    public int LimiteCondicionalPecas { get; private set; } = 10;
+
+    /// <summary>Valor em condicional por cliente (somando as abertas). 0 = sem limite. Padrão: R$ 1.000.</summary>
+    public decimal LimiteCondicionalValor { get; private set; } = 1000m;
+
     private ConfiguracaoDeVendas() { }
 
     public static ConfiguracaoDeVendas Padrao(Guid empresaId) => new() { Id = Guid.NewGuid(), EmpresaId = empresaId };
 
-    public void Definir(bool permitirEstoqueNegativo, int? prazoDeTrocaDias = null, int? validadeDoValeDias = null)
+    /// <summary>Altera as regras; parâmetros nulos mantêm o valor atual.</summary>
+    public void Definir(bool permitirEstoqueNegativo, int? prazoDeTrocaDias = null, int? validadeDoValeDias = null, int? prazoCondicionalDias = null,
+        int? limiteCondicionalPecas = null, decimal? limiteCondicionalValor = null)
     {
         var prazo = prazoDeTrocaDias ?? PrazoDeTrocaDias;
         var validade = validadeDoValeDias ?? ValidadeDoValeDias;
+        var prazoCondicional = prazoCondicionalDias ?? PrazoCondicionalDias;
+        var pecas = limiteCondicionalPecas ?? LimiteCondicionalPecas;
+        var valor = limiteCondicionalValor ?? LimiteCondicionalValor;
         if (prazo is < 0 or > 365) throw new ArgumentException("Prazo de troca: de 0 a 365 dias.", nameof(prazoDeTrocaDias));
         if (validade is < 1 or > 3650) throw new ArgumentException("Validade do vale-troca: de 1 a 3650 dias.", nameof(validadeDoValeDias));
+        if (prazoCondicional is < 1 or > 60) throw new ArgumentException("Prazo da condicional: de 1 a 60 dias.", nameof(prazoCondicionalDias));
+        if (pecas < 0 || valor < 0) throw new ArgumentException("Os limites da condicional não podem ser negativos (0 = sem limite).", nameof(limiteCondicionalPecas));
         (PermitirEstoqueNegativo, PrazoDeTrocaDias, ValidadeDoValeDias) = (permitirEstoqueNegativo, prazo, validade);
+        (PrazoCondicionalDias, LimiteCondicionalPecas, LimiteCondicionalValor) = (prazoCondicional, pecas, Dinheiro.Arredondar(valor));
     }
 }

@@ -104,3 +104,32 @@ internal sealed class RelatorioDeVales(VendasDbContext db, IEmpresaAtiva empresa
         ]);
     }
 }
+
+/// <summary>Condicionais com cliente, prazo, peças e valor (as abertas são mercadoria "na rua").</summary>
+internal sealed class RelatorioDeCondicionais(VendasDbContext db, IEmpresaAtiva empresa, TimeProvider relogio) : IRelatorio
+{
+    public string Codigo => "condicionais";
+    public string Titulo => "Condicionais";
+    public IReadOnlyCollection<string> Perfis => [.. Permissoes.Registrar, .. Permissoes.Consultar];
+
+    public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
+    {
+        var situacao = parametros.GetValueOrDefault("situacao")?.ToLowerInvariant() is { } s && CondicionaisEndpoints.Situacoes.Contains(s) ? s : "abertas";
+        var lista = await CondicionaisEndpoints.ListaAsync(db, empresa, situacao, null, parametros.GetValueOrDefault("busca"), CalendarioBrasilia.Hoje(relogio), ct);
+        return new DadosDoRelatorio(Titulo,
+        [
+            new ColunaRelatorio("Nº", Largura: 0.5f),
+            new ColunaRelatorio("Cliente", Largura: 1.8f),
+            new ColunaRelatorio("Vendedor", Largura: 1.2f),
+            new ColunaRelatorio("Saída", TipoColuna.Data, Largura: 0.8f),
+            new ColunaRelatorio("Prazo", TipoColuna.Data, Largura: 0.8f),
+            new ColunaRelatorio("Peças", TipoColuna.Inteiro, Totalizar: true, Largura: 0.5f),
+            new ColunaRelatorio("Valor", TipoColuna.Moeda, Totalizar: true, Largura: 0.8f),
+            new ColunaRelatorio("Situação", Largura: 0.7f),
+        ], lista.Itens.Select(c => (IReadOnlyList<object?>)[c.Numero, c.ClienteNome, c.VendedorNome, c.Data, c.Prazo, c.Pecas, c.Valor, c.Situacao]).ToList(),
+        [
+            new("Situação", situacao),
+            new("Na rua", $"{lista.PecasNaRua} peças · R$ {Dominio.Dinheiro.Formatar(lista.ValorNaRua)} · {lista.Atrasadas} atrasada(s)"),
+        ]);
+    }
+}

@@ -17,11 +17,13 @@ public static class ModuloVendas
     {
         services.AddKamusDbContext<VendasDbContext>(configuration, VendasDbContext.Schema);
         services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<Aplicacao.RegistroDeVendas>();
         services.AddScoped<IRelatorio, RelatorioDeVendas>();
         services.AddScoped<IRelatorio, RelatorioDeComissoes>();
         services.AddScoped<IRelatorio, RelatorioDeVales>();
+        services.AddScoped<IRelatorio, RelatorioDeCondicionais>();
         return services;
     }
 
-    public static IEndpointRouteBuilder MapModuloVendas(this IEndpointRouteBuilder app) => app.MapFormas().MapVendas().MapTrocas().MapVales().MapFechamentos();
+    public static IEndpointRouteBuilder MapModuloVendas(this IEndpointRouteBuilder app) => app.MapFormas().MapVendas().MapTrocas().MapVales().MapFechamentos().MapCondicionais();
 }

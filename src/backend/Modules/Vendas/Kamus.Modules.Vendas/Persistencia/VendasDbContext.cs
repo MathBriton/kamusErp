@@ -23,6 +23,8 @@ public sealed class VendasDbContext(DbContextOptions<VendasDbContext> options, I
     public DbSet<PagamentoDaTroca> PagamentosDaTroca => Set<PagamentoDaTroca>();
     public DbSet<ValeTroca> Vales => Set<ValeTroca>();
     public DbSet<FechamentoDeComissao> Fechamentos => Set<FechamentoDeComissao>();
+    public DbSet<Condicional> Condicionais => Set<Condicional>();
+    public DbSet<ItemDaCondicional> ItensDaCondicional => Set<ItemDaCondicional>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -41,6 +43,7 @@ public sealed class VendasDbContext(DbContextOptions<VendasDbContext> options, I
         modelBuilder.Entity<ConfiguracaoDeVendas>(e =>
         {
             e.ToTable("configuracoes");
+            e.Property(c => c.LimiteCondicionalValor).HasPrecision(14, 2);
             e.HasIndex(c => new { c.TenantId, c.EmpresaId }).IsUnique();
         });
 
@@ -162,6 +165,32 @@ public sealed class VendasDbContext(DbContextOptions<VendasDbContext> options, I
             e.Property(v => v.CanceladoPor).HasMaxLength(150);
             e.HasIndex(v => new { v.TenantId, v.Codigo }).IsUnique();
             e.HasIndex(v => new { v.TenantId, v.ClienteId });
+        });
+
+        modelBuilder.Entity<Condicional>(e =>
+        {
+            e.ToTable("condicionais");
+            e.Property(c => c.ClienteNome).HasMaxLength(150);
+            e.Property(c => c.VendedorNome).HasMaxLength(150);
+            e.Property(c => c.Observacao).HasMaxLength(500);
+            e.Property(c => c.FechadaPor).HasMaxLength(150);
+            e.Property(c => c.RegistradaPor).HasMaxLength(150);
+            e.Ignore(c => c.Pecas);
+            e.Ignore(c => c.Valor);
+            e.Ignore(c => c.PecasVendidas);
+            e.Ignore(c => c.ValorVendido);
+            e.HasIndex(c => new { c.TenantId, c.EmpresaId, c.Numero }).IsUnique();
+            e.HasIndex(c => new { c.TenantId, c.ClienteId, c.Fechada });
+            e.HasMany(c => c.Itens).WithOne().HasForeignKey(i => i.CondicionalId).OnDelete(DeleteBehavior.Cascade);
+            e.Navigation(c => c.Itens).HasField("_itens").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<ItemDaCondicional>(e =>
+        {
+            e.ToTable("itens_da_condicional");
+            e.Property(i => i.Descricao).HasMaxLength(200);
+            e.Property(i => i.PrecoUnitario).HasPrecision(14, 2);
+            e.Property(i => i.CustoUnitario).HasPrecision(14, 4);
         });
 
         modelBuilder.Entity<FechamentoDeComissao>(e =>

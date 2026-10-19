@@ -15,7 +15,8 @@ internal static class FormasEndpoints
 {
     public sealed record FormaRequest(string? Nome, string? Tipo, Guid? ContaId, decimal TaxaAVista, decimal TaxaParcelado, int MaxParcelas, int PrazoDias);
     public sealed record FormaDto(Guid Id, string Nome, string Tipo, Guid? ContaId, decimal TaxaAVista, decimal TaxaParcelado, int MaxParcelas, int PrazoDias, bool Ativa);
-    public sealed record ConfiguracaoDto(bool PermitirEstoqueNegativo, int? PrazoDeTrocaDias = null, int? ValidadeDoValeDias = null);
+    public sealed record ConfiguracaoDto(bool PermitirEstoqueNegativo, int? PrazoDeTrocaDias = null, int? ValidadeDoValeDias = null, int? PrazoCondicionalDias = null,
+        int? LimiteCondicionalPecas = null, decimal? LimiteCondicionalValor = null);
 
     private const string SoGestao = "Só Dono e Gerente configuram as vendas.";
 
@@ -121,7 +122,8 @@ internal static class FormasEndpoints
     {
         if (empresa.EmpresaId is not { } empresaId) return Permissoes.Erro("Escolha uma empresa.");
         var c = await ConfiguracaoAsync(db, empresaId, ct);
-        return Results.Ok(new ConfiguracaoDto(c.PermitirEstoqueNegativo, c.PrazoDeTrocaDias, c.ValidadeDoValeDias));
+        return Results.Ok(new ConfiguracaoDto(c.PermitirEstoqueNegativo, c.PrazoDeTrocaDias, c.ValidadeDoValeDias, c.PrazoCondicionalDias, c.LimiteCondicionalPecas,
+            c.LimiteCondicionalValor));
     }
 
     private static async Task<IResult> DefinirConfiguracao(ConfiguracaoDto r, VendasDbContext db, IEmpresaAtiva empresa, CancellationToken ct)
@@ -136,13 +138,14 @@ internal static class FormasEndpoints
         }
         try
         {
-            configuracao.Definir(r.PermitirEstoqueNegativo, r.PrazoDeTrocaDias, r.ValidadeDoValeDias);
+            configuracao.Definir(r.PermitirEstoqueNegativo, r.PrazoDeTrocaDias, r.ValidadeDoValeDias, r.PrazoCondicionalDias, r.LimiteCondicionalPecas, r.LimiteCondicionalValor);
         }
         catch (ArgumentException ex)
         {
             return Permissoes.Erro(Permissoes.Mensagem(ex));
         }
         await db.SaveChangesAsync(ct);
-        return Results.Ok(new ConfiguracaoDto(configuracao.PermitirEstoqueNegativo, configuracao.PrazoDeTrocaDias, configuracao.ValidadeDoValeDias));
+        return Results.Ok(new ConfiguracaoDto(configuracao.PermitirEstoqueNegativo, configuracao.PrazoDeTrocaDias, configuracao.ValidadeDoValeDias,
+            configuracao.PrazoCondicionalDias, configuracao.LimiteCondicionalPecas, configuracao.LimiteCondicionalValor));
     }
 }

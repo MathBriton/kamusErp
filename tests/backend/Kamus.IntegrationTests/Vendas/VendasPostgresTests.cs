@@ -89,10 +89,29 @@ public sealed class VendasPostgresTests(PostgresFixture db)
         vale.GetProperty("saldo").GetDecimal().ShouldBe(59.90m);
         (await Saldo()).ShouldBe(3);
 
+        // Condicional: abre (peça sai do estoque) e fecha devolvendo tudo
+        var cliente = await client.PostAsJsonAsync(U("/api/pessoas"), new { tipo = "Fisica", nome = $"Cliente {sufixo}", ehCliente = true, ehFornecedor = false, aceitaMarketing = false }, Ct);
+        var clienteId = (await cliente.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(Ct)).GetProperty("id").GetGuid();
+        var aberta = await client.PostAsJsonAsync(U("/api/vendas/condicionais"), new
+        {
+            lojaId = loja.Id,
+            clienteId,
+            clienteNome = $"Cliente {sufixo}",
+            itens = new[] { new { skuId = azulM, quantidade = 1 } },
+            liberar = true,
+        }, Ct);
+        aberta.StatusCode.ShouldBe(HttpStatusCode.Created, await aberta.Content.ReadAsStringAsync(Ct));
+        var condicionalId = (await aberta.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(Ct)).GetProperty("id").GetGuid();
+        (await Saldo()).ShouldBe(2);
+        var fechada = await client.PostAsJsonAsync(U($"/api/vendas/condicionais/{condicionalId}/fechar"),
+            new { devolvidos = new[] { new { skuId = azulM, quantidade = 1 } }, descontoGeral = 0m }, Ct);
+        fechada.StatusCode.ShouldBe(HttpStatusCode.OK, await fechada.Content.ReadAsStringAsync(Ct));
+        (await Saldo()).ShouldBe(3);
+
         await using var conn = new NpgsqlConnection(db.AppConnectionString);
         await conn.OpenAsync(Ct);
         foreach (var tabela in new[] { "formas_de_pagamento", "configuracoes", "vendas", "itens_da_venda", "pagamentos_da_venda", "trocas", "itens_devolvidos",
-            "itens_levados", "pagamentos_da_troca", "vales_troca", "fechamentos_de_comissao" })
+            "itens_levados", "pagamentos_da_troca", "vales_troca", "fechamentos_de_comissao", "condicionais", "itens_da_condicional" })
         {
             await using var cmd = new NpgsqlCommand($"SELECT count(*) FROM vendas.{tabela}", conn);
             ((long)(await cmd.ExecuteScalarAsync(Ct))!).ShouldBe(0, $"RLS em vendas.{tabela}");
