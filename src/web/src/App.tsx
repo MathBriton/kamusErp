@@ -32,6 +32,7 @@ import { ComissoesPage } from './vendas/ComissoesPage'
 import { FormasDePagamentoPage } from './vendas/FormasDePagamentoPage'
 import { TrocasPage } from './vendas/TrocasPage'
 import { ValesPage } from './vendas/ValesPage'
+import { CentralDeRelatoriosPage } from './relatorios/CentralDeRelatoriosPage'
 import { CondicionaisPage } from './vendas/CondicionaisPage'
 import { CrediarioPage } from './crediario/CrediarioPage'
 import { LoginPage } from './pages/LoginPage'
@@ -70,6 +71,7 @@ const PAGINAS_IMPLEMENTADAS: Record<string, ReactNode> = {
   '/vendas/vales-troca': <ValesPage />,
   '/vendas/crediario': <CrediarioPage />,
   '/vendas/condicional': <CondicionaisPage />,
+  '/relatorios': <CentralDeRelatoriosPage />,
 }
 
 const ROTAS_DO_MENU = todasAsRotas(MENU).filter((item) => item.rota !== '/')

@@ -58,7 +58,7 @@ internal sealed class RelatorioDeFluxo(FinanceiroDbContext db, IEmpresaAtiva emp
     public string Area => "Financeiro";
     public string? Descricao => "Realizado até hoje e previsto daqui em diante, dia a dia (ou mês a mês em períodos longos).";
     public IReadOnlyList<ParametroDoRelatorio> Parametros =>
-        [new("periodo", "Período", TipoDeParametro.Periodo, "30dias")];
+        [new("periodo", "Período", TipoDeParametro.Periodo, "proximos30")];
 
     public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
     {

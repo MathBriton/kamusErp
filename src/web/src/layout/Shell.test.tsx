@@ -24,7 +24,7 @@ describe('Shell', () => {
       expect(within(menuLateral()).getByText(modulo)).toBeInTheDocument()
   })
 
-  it('abre o submenu e navega para uma página prevista', async () => {
+  it('navega pelo menu até a central de relatórios', async () => {
     api()
     renderApp()
     await screen.findByText(/Olá, Admin/)
@@ -32,7 +32,7 @@ describe('Shell', () => {
     await userEvent.click(within(menuLateral()).getByRole('link', { name: /Relatórios/ }))
 
     expect(await screen.findByRole('heading', { name: 'Relatórios' })).toBeInTheDocument()
-    expect(screen.getByText(/Previsto para a v0\.20\.0/)).toBeInTheDocument()
+    expect(screen.queryByText(/Previsto para a/)).not.toBeInTheDocument()
   })
 
   it('recolher o menu guarda a preferência', async () => {

@@ -26,7 +26,7 @@ public sealed record DadosDoRelatorio(
     IReadOnlyList<IReadOnlyList<object?>> Linhas,
     IReadOnlyList<FiltroAplicado> Filtros);
 
-/// <summary>Periodo = par de/ate (padrão: "mes", "hoje" ou "30dias"); Opcao = lista fechada; Inteiro e Data = campo simples.</summary>
+/// <summary>Periodo = par de/ate (padrão: "mes", "hoje" ou "proximos30"); Opcao = lista fechada; Inteiro e Data = campo simples.</summary>
 public enum TipoDeParametro
 {
     Periodo,

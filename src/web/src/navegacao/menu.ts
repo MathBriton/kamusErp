@@ -82,9 +82,7 @@ export const MENU: GrupoMenu[] = [
     titulo: 'Relatórios',
     icone: 'file',
     rota: '/relatorios',
-    previstoPara: 'v0.20.0',
-    descricao: 'Relatórios com exportação em PDF e Excel.',
-    perfis: [...GESTAO, 'Financeiro'],
+    descricao: 'Central de relatórios por área, com visualização na tela e exportação em PDF, Excel e CSV.',
   },
   {
     titulo: 'Configurações',
