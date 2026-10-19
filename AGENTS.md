@@ -192,7 +192,7 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 
 **Última atualização:** 2026-10-19
 
-**Releases:** v0.1.0 → **v0.16.0** lançadas (a v0.16.0 trouxe o crediário); **v0.17.0** (condicional) pronta para lançar. Próxima: **v0.18.0** (dashboard, mobile, resumo diário).
+**Releases:** v0.1.0 → **v0.17.0** lançadas (a v0.17.0 trouxe a condicional). Próxima: **v0.18.0** (dashboard real e resumo diário); depois v0.19.0 (app mobile) e v0.20.0 (central de relatórios).
 Plano de releases em `LEVANTAMENTO.md` → Plano de releases (dashboard/mobile v0.18.0, v1.0.0 produção).
 
 **O que existe hoje:**
@@ -228,11 +228,10 @@ Plano de releases em `LEVANTAMENTO.md` → Plano de releases (dashboard/mobile v
 - Testes: 493 backend, 167 web, 10 admin. E2E em localhost (vendedora abre condicional pelo leitor + termo PDF, cliente atrasado recusado, Dono libera
   11 peças, fechamento com venda no PIX, fechamento devolvendo tudo, saldos de estoque conferidos, conversão, ficha do cliente, relatório, tema escuro), 3 execuções.
 
-**Próximo passo — v0.18.0: dashboard real, app mobile e resumo diário** (ver `LEVANTAMENTO.md` 4.6, 4.7.3 e 5.9). Antes: lançar a v0.17.0 se ainda não estiver lançada.
+**Próximo passo — v0.18.0: dashboard real e resumo diário** (ver `LEVANTAMENTO.md` 4.6, 4.7.3 e 5.9).
 1. Dashboard web com números reais (vendas do dia/mês, ticket médio, estoque, contas a pagar/receber, crediário em atraso, condicionais na rua), por empresa e consolidado.
 2. Resumo diário configurável (notificação/sininho): contas vencendo, parcelas do crediário e condicionais vencendo/atrasadas, aniversariantes; lembretes por WhatsApp em 1 clique.
-3. App mobile (Expo) somente leitura para o dono, consumindo os mesmos endpoints do dashboard.
-4. Central de relatórios (menu "Relatórios", hoje "previsto").
+3. Depois: v0.19.0 app mobile (Expo, mesmos endpoints do dashboard) e v0.20.0 central de relatórios (menu "Relatórios", hoje "previsto").
 
 **Pendências conhecidas:** ver "Dúvidas em aberto e débitos técnicos" no `README.md` (lista viva — acrescente lá).
 Também: branch órfã `release-please--branches--main--components--kamus` no GitHub (pode ser apagada pela interface).
