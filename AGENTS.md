@@ -84,8 +84,9 @@ src/backend/Modules/Licenciamento/...         Licença por cliente (/api/licenca
 src/backend/Modules/Cadastros/...             Clientes/fornecedores (/api/pessoas), vendedores, grades, cores e produtos com SKUs (/api/produtos); ICatalogoDeProdutos
 src/backend/Modules/Estoque/...               Lojas, saldos, movimentos/kardex, custo médio, inventário, etiquetas, NF-e (NotasFiscais/LeitorDeNfe) — /api/estoque/...
 src/backend/Modules/Financeiro/...            Contas financeiras, categorias, títulos/parcelas/baixas, movimentos, fluxo de caixa, crediário — /api/financeiro/...
-src/backend/Modules/Vendas/...                Formas de pagamento, vendas, trocas, vales-troca, comissões e fechamentos — /api/vendas/...
-src/web/src                                   auth/, api/, busca/, cadastros/, crediario/, configuracoes/, empresa/, estoque/, financeiro/, layout/, licenca/, navegacao/, notificacoes/, pages/, relatorios/, theme/, vendas/, test/
+src/backend/Modules/Vendas/...                Formas de pagamento, vendas, trocas, vales-troca, comissões, fechamentos, condicionais — /api/vendas/...
+src/backend/Modules/Indicadores/...           Dashboard (/api/indicadores) e resumo diário (preferências, prévia, rotina) — só lê os módulos pelo SharedKernel
+src/web/src                                   auth/, api/, busca/, dashboard/, cadastros/, crediario/, configuracoes/, empresa/, estoque/, financeiro/, layout/, licenca/, navegacao/, notificacoes/, pages/, relatorios/, theme/, vendas/, test/
 src/admin/src                                 Painel Administrativo (operador do SaaS): login SuperAdmin, clientes, pagamentos
 tests/backend/Kamus.UnitTests                 Unitários (domínio puro)
 tests/backend/Kamus.IntegrationTests          API via WebApplicationFactory; InMemory e PostgreSQL (Testcontainers)
@@ -106,7 +107,7 @@ na tela — PDF, Excel, CSV, histórico e segundo plano vêm de graça. **Lembre
 
 **Módulos conversam só pelo SharedKernel** (há teste de arquitetura): `INotificador` (notificar usuários),
 `IRegistradorDeEventos` (eventos no histórico), `IProvedorDeBusca`, `IRelatorio`, `IEmpresaAtiva`
-(id, perfil, nome e CNPJ da empresa ativa), `IUsuarioAtual`, `ICatalogoDeProdutos` e `IDiretorioDeFornecedores` (produtos/SKUs e fornecedores pelo CNPJ, implementados pelo Cadastros), `IDiretorioDeVendedores` (Cadastros), `IContasAPagar` (compras, contas avulsas e cancelamento pela origem), `IContasAReceber` (recebíveis de venda/troca, inclusive crediário) e `ICrediario` (limite e situação do cliente), implementados pelo Financeiro, `IMovimentacaoDeEstoque` (baixa/estorno de venda e devolução de troca, implementado pelo Estoque), `IDiretorioDeClientes` (tenants e Donos) e
+(id, perfil, nome e CNPJ da empresa ativa), `IUsuarioAtual`, `ICatalogoDeProdutos` e `IDiretorioDeFornecedores` (produtos/SKUs e fornecedores pelo CNPJ, implementados pelo Cadastros), `IDiretorioDeVendedores` (Cadastros), `IContasAPagar` (compras, contas avulsas e cancelamento pela origem), `IContasAReceber` (recebíveis de venda/troca, inclusive crediário) e `ICrediario` (limite e situação do cliente), implementados pelo Financeiro, `IMovimentacaoDeEstoque` (baixa/estorno de venda e devolução de troca, implementado pelo Estoque), `IIndicadoresDeVendas`/`IIndicadoresFinanceiros`/`IIndicadoresDeEstoque` (números do dashboard e do resumo diário, cada um no seu módulo), `IDiretorioDeClientes` (tenants, Donos e acessos por usuário) e
 `ICadastroDeClientes` (criar tenant + empresa + Dono) — esses dois implementados pela Identidade.
 Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e chame `TenantContext.Definir(tenantId)`.
 
@@ -185,6 +186,8 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 - Registro de venda (web): leitor e busca ficam desabilitados até as lojas carregarem — nos testes, espere o campo habilitar (`campoLiberado`).
 - Datas "de hoje" no web: `hojeIso()` (financeiro/tipos.ts) usa Brasília (UTC−3), como a API; não use `new Date()` local para datas de negócio.
 - Vendas: estoque, financeiro e venda gravam em DbContexts diferentes (sem transação); o endpoint compensa (estorna estoque e cancela a origem no financeiro) se algo falhar depois da baixa.
+- Resumo diário: a rotina (`RotinaDoResumoDiario`, a cada 5 min) fica desligada nos testes (`Indicadores:RotinaAtiva=false` no `KamusApiFactory`); teste o `GeradorDeResumos.ExecutarAsync(agora)` direto.
+- Dashboard (web): o título dos cartões vem de `dados.periodo` (a resposta), não do botão escolhido — senão aparece o título novo com os números antigos enquanto carrega.
 
 ---
 
@@ -192,8 +195,8 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 
 **Última atualização:** 2026-10-19
 
-**Releases:** v0.1.0 → **v0.17.0** lançadas (a v0.17.0 trouxe a condicional). Próxima: **v0.18.0** (dashboard real e resumo diário); depois v0.19.0 (app mobile) e v0.20.0 (central de relatórios).
-Plano de releases em `LEVANTAMENTO.md` → Plano de releases (dashboard/mobile v0.18.0, v1.0.0 produção).
+**Releases:** v0.1.0 → **v0.17.0** lançadas; **v0.18.0** (dashboard real e resumo diário) pronta para lançar. Próxima: **v0.19.0** (app mobile); depois v0.20.0 (central de relatórios).
+Plano de releases em `LEVANTAMENTO.md` → Plano de releases (mobile v0.19.0, relatórios v0.20.0, v1.0.0 produção).
 
 **O que existe hoje:**
 - Fundação: login (JWT + refresh rotativo), empresa ativa (`X-Empresa-Id`), histórico de alterações, notificações (SignalR),
@@ -216,22 +219,28 @@ Plano de releases em `LEVANTAMENTO.md` → Plano de releases (dashboard/mobile v
     Perfis: Dono/Gerente/Financeiro/Vendedor consultam e recebem. Relatório `inadimplencia`. PDFs em `Aplicacao/DocumentosDoCrediario` (QuestPDF).
   - Web `crediario/CrediarioPage` (carteira, ficha, receber com recibo, carnê, limite, regras); aviso de limite no `EditorDePagamentos` (prop `clienteId`);
     crediário na ficha do cliente (`HistoricoDoCliente`).
-- **Condicional (v0.17.0)** — no módulo Vendas (tabelas com RLS `condicionais`, `itens_da_condicional`; `ConfiguracaoDeVendas` ganhou prazo/limites):
-  - Domínio (`Dominio/Condicional.cs`): `Condicional.Abrir` (junta SKUs), `RegistrarSaida`, `Conferir`/`Fechar` (devolvidas → o que ficou), `Situacao(hoje)`
-    (Aberta/Atrasada/Fechada), `ConferirLimites` (peças e valor em aberto por cliente; 0 = sem limite). Padrões: prazo 2 dias, 10 peças, R$ 1.000.
-  - Estoque: `IMovimentacaoDeEstoque.RegistrarSaidaParaCondicionalAsync` (nunca negativo) e `RegistrarRetornoDeCondicionalAsync`; movimentos `SaidaParaCondicional`/`RetornoDeCondicional`.
-  - Registro de venda extraído para `Aplicacao/RegistroDeVendas` (usado por `POST /api/vendas` e pelo fechamento da condicional).
-  - API `/api/vendas/condicionais`: lista (`situacao`, `clienteId`, `busca`; totais "na rua"), `conversao?de&ate`, `{id}`, `{id}/termo.pdf`, `POST` (cliente obrigatório;
-    atraso/limite só com `liberar` de Dono/Gerente), `POST {id}/fechar` (devolve tudo, vende o que ficou; se a venda é recusada, refaz a saída). Relatório `condicionais`.
-  - Web `vendas/CondicionaisPage` (lista com cartões, nova condicional com leitor/grade e termo, fechar com devolução e pagamentos, conversão por vendedor);
-    `EntradaDeItens` com `semDesconto`; regras da condicional em Formas de pagamento; condicionais abertas na ficha do cliente.
-- Testes: 493 backend, 167 web, 10 admin. E2E em localhost (vendedora abre condicional pelo leitor + termo PDF, cliente atrasado recusado, Dono libera
-  11 peças, fechamento com venda no PIX, fechamento devolvendo tudo, saldos de estoque conferidos, conversão, ficha do cliente, relatório, tema escuro), 3 execuções.
+- **Condicional (v0.17.0)** — no módulo Vendas (`Dominio/Condicional.cs`, `/api/vendas/condicionais`, `vendas/CondicionaisPage`): cliente obrigatório, prazo e limites
+  configuráveis, peças saem do estoque (`SaidaParaCondicional`/`RetornoDeCondicional`), termo PDF, fechamento devolvendo parte e vendendo o resto via `RegistroDeVendas`.
+- **Dashboard e resumo diário (v0.18.0)** — módulo novo `Kamus.Modules.Indicadores` (schema `indicadores`, tabela `preferencias_do_resumo` com RLS):
+  - SharedKernel `Indicadores/`: `IIndicadoresDeVendas` (vendas por período, por dia, por forma/vendedor, mais vendidos; condicionais na rua),
+    `IIndicadoresFinanceiros` (saldos das contas, a pagar/receber hoje/amanhã/7 dias/vencido, crediário em atraso), `IIndicadoresDeEstoque` (peças, valor a custo
+    e a preço de venda, SKUs negativos, quebras de grade). Implementações em `Aplicacao/Indicadores*.cs` de Vendas, Financeiro e Estoque.
+    `IDiretorioDeClientes.AcessosDoTenantAtualAsync` (empresa e perfil de cada usuário ativo).
+  - `Aplicacao/Painel` monta o `/api/indicadores?periodo=hoje|7dias|mes` (cartões com comparação, 30 dias, alertas com link) com blocos por perfil (`Aplicacao/Perfis`).
+  - Resumo diário: `PreferenciasDoResumo` (hora de Brasília, dias em bits, blocos, enviar sem movimento, último envio), `ResumoDiario` (texto por usuário, cada bloco
+    só nas empresas em que o perfil vê), `GeradorDeResumos` (percorre os tenants; padrão ligado às 20h para o Dono) e `RotinaDoResumoDiario`.
+    Endpoints `GET/PUT /api/indicadores/resumo-diario`, `GET .../previa`, `POST .../enviar` (teste).
+  - Web: `pages/DashboardPage` (cartões, gráfico SVG de 30 dias, alertas, saldos, mais vendidos, formas/vendedores, condicionais, estoque, primeiros passos só sem dados)
+    e `dashboard/ResumoDiarioDialogo`; o sininho mostra mensagens com várias linhas. Menu "Relatórios" previsto para a v0.20.0.
+- Testes: 513 backend, 171 web, 10 admin. E2E em localhost (cartões e comparações, troca de período, alerta levando à tela, prévia e envio do resumo ao sininho,
+  visão da vendedora, tema escuro), 3 execuções.
 
-**Próximo passo — v0.18.0: dashboard real e resumo diário** (ver `LEVANTAMENTO.md` 4.6, 4.7.3 e 5.9).
-1. Dashboard web com números reais (vendas do dia/mês, ticket médio, estoque, contas a pagar/receber, crediário em atraso, condicionais na rua), por empresa e consolidado.
-2. Resumo diário configurável (notificação/sininho): contas vencendo, parcelas do crediário e condicionais vencendo/atrasadas, aniversariantes; lembretes por WhatsApp em 1 clique.
-3. Depois: v0.19.0 app mobile (Expo, mesmos endpoints do dashboard) e v0.20.0 central de relatórios (menu "Relatórios", hoje "previsto").
+**Próximo passo — v0.19.0: app mobile somente leitura** (ver `LEVANTAMENTO.md` 4.6):
+1. `src/mobile` com Expo (React Native + TypeScript), login com o mesmo JWT/refresh, seletor de empresa (inclusive consolidado).
+2. Telas de leitura usando `/api/indicadores` (dashboard, alertas) e as listas já existentes (vendas do dia, contas, condicionais, crediário).
+3. Push (Expo Notifications) para o resumo diário e alertas: registrar o token do aparelho por usuário e enviar junto com o sininho.
+4. Testável em localhost (Expo Go / web) sem banco; CI para o app (lint, typecheck, testes).
+Depois: v0.20.0 central de relatórios; v1.0.0 produção (depende de servidor).
 
 **Pendências conhecidas:** ver "Dúvidas em aberto e débitos técnicos" no `README.md` (lista viva — acrescente lá).
 Também: branch órfã `release-please--branches--main--components--kamus` no GitHub (pode ser apagada pela interface).

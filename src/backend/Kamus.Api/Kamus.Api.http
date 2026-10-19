@@ -573,3 +573,28 @@ Content-Type: application/json
 GET {{api}}/api/vendas/condicionais/conversao?de=2026-10-01&ate=2026-10-31
 Authorization: Bearer {{login.response.body.accessToken}}
 X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### --- Dashboard e resumo diário ---
+
+### Dashboard da empresa ativa (periodo: hoje, 7dias ou mes)
+GET {{api}}/api/indicadores?periodo=hoje
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Preferências do resumo diário (às 8h, de segunda a sábado, sem o bloco de estoque)
+PUT {{api}}/api/indicadores/resumo-diario
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "ativo": true, "hora": 8, "dias": [1, 2, 3, 4, 5, 6], "vendas": true, "financeiro": true, "estoque": false, "condicionais": true, "crediario": true, "enviarSemMovimento": false }
+
+### Prévia do resumo de hoje
+GET {{api}}/api/indicadores/resumo-diario/previa
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Enviar o resumo de hoje para o sininho (teste)
+POST {{api}}/api/indicadores/resumo-diario/enviar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}

@@ -137,7 +137,7 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 10 | Painel Admin: só o dono usa ou haverá equipe (suporte, financeiro)? | Provisório e implementado: **só SuperAdmin** |
 | 11 | Troca: prazo padrão e validade do vale-troca | Provisório e implementado (v0.15.0): **30 dias** de prazo (fora dele, só Dono/Gerente) e vale com **90 dias** de validade — ambos configuráveis por empresa |
 | 12 | Condicional: prazo de devolução e limite por cliente | Provisório e implementado (v0.17.0): **2 dias** de prazo, limite de **10 peças** e **R$ 1.000** em aberto por cliente (0 = sem limite) — configuráveis; acima do limite ou com condicional atrasada, só Dono/Gerente liberam |
-| 13 | Resumo diário: blocos ligados por padrão | Em aberto |
+| 13 | Resumo diário: blocos ligados por padrão | Provisório e implementado (v0.18.0): **todos os blocos ligados, às 20h, todos os dias, só para o Dono**; os demais perfis ligam nas preferências (cada um recebe só o que o perfil vê) |
 | 14 | Idioma/moeda: só Brasil? | Assumido **só Brasil** (pt-BR, R$) |
 | 15 | Valor padrão da mensalidade | Provisório: **R$ 199,90** (alterável por cliente no painel) |
 | 16 | Limites de CNPJs/lojas/usuários devem **impedir** cadastros acima do limite? | Implementado: **impedem** (409 `LIMITE_DA_LICENCA`) — CNPJs e usuários na v0.7.0, lojas na v0.11.0 |
@@ -167,7 +167,7 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 40 | Formas de pagamento com taxa e prazo da maquininha (crédito, débito, PIX) | Implementado (v0.14.0): por empresa; dinheiro/PIX entram na hora numa conta; cartões viram contas a receber **líquidas da taxa** (1ª parcela no prazo, demais a cada 30 dias) |
 | 41 | Fluxo de caixa: contas vencidas e não pagas entram na projeção? | Provisório: **não** — aparecem à parte ("em atraso") até serem pagas ou renegociadas |
 | 42 | Quem acessa o financeiro? | Provisório: Dono, Gerente e Financeiro |
-| 43 | Avisos de contas vencendo (sininho) e resumo diário | Previsto com o resumo diário (v0.18.0) |
+| 43 | Avisos de contas vencendo (sininho) e resumo diário | Implementado (v0.18.0): contas vencidas nos alertas do dashboard e contas de amanhã/vencidas no resumo diário (sininho) |
 | 44 | Venda pode ter data retroativa? | Provisório: **sim** (lançar vendas de dias anteriores); data futura é recusada |
 | 45 | Preço na venda: o vendedor pode alterar o preço do item? | Provisório: **não** — o preço vem do cadastro; ajustes só por desconto (no item ou na venda) |
 | 46 | Desconto máximo por perfil (ex.: vendedor até 10%) e motivo do desconto | Em aberto (hoje qualquer desconto até o valor do item/venda) |
@@ -184,11 +184,15 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 57 | Crediário: entrada obrigatória? Juros de parcelamento (preço a prazo maior)? | Provisório: **sem entrada obrigatória e sem juros de parcelamento** (a entrada é outra forma de pagamento na mesma venda) |
 | 58 | Vendedor pode receber parcelas do crediário no balcão? | Provisório: **sim** (consulta, recebe, imprime recibo/carnê); limite e regras só Dono/Gerente |
 | 59 | Comissão de venda no crediário: sobre o faturado ou só quando o cliente paga? | Provisório: **faturado** (igual às demais vendas); "sobre o recebido" fica como opção futura (dúvida 4) |
-| 60 | Cobrança do crediário por WhatsApp em 1 clique e aviso de parcela vencendo | Previsto com o resumo diário (v0.18.0) |
-| 61 | Condicional: aviso de vencendo/atrasada no sininho e lembrete ao cliente por WhatsApp | Previsto com o resumo diário (v0.18.0); hoje a lista destaca as atrasadas e a ficha do cliente mostra as abertas |
+| 60 | Cobrança do crediário por WhatsApp em 1 clique e aviso de parcela vencendo | Crediário em atraso no dashboard e no resumo diário (v0.18.0); cobrança por WhatsApp em 1 clique ainda em aberto |
+| 61 | Condicional: aviso de vencendo/atrasada no sininho e lembrete ao cliente por WhatsApp | Atrasadas no dashboard e no resumo diário (v0.18.0); lembrete ao cliente por WhatsApp ainda em aberto |
 | 62 | Condicional: as peças "em condicional" devem aparecer na posição de estoque (coluna própria)? | Provisório: **não** — saem do disponível (movimento "Saída para condicional" no kardex) e aparecem só na tela de condicionais |
 | 63 | Condicional: a venda gerada no fechamento leva o vendedor da condicional e a data do fechamento — está bom? | Provisório: **sim** (comissão no período do fechamento) |
 | 64 | Condicional: vendedor pode fechar condicional aberta por outro vendedor? | Provisório: **sim** (qualquer perfil que vende); a venda continua com o vendedor da condicional |
+| 65 | Dashboard do Vendedor: só as próprias vendas e as condicionais (sem financeiro nem estoque) — está bom? | Provisório: **sim**; Estoquista vê só o estoque; Dono, Gerente e Financeiro veem tudo |
+| 66 | Vendas do dashboard descontam trocas e cancelamentos? | Provisório: canceladas não contam; **trocas não alteram** o total vendido (a diferença paga na troca não entra) |
+| 67 | Quebra de grade: o que conta como "esgotado"? | Provisório: SKU ativo que **já teve estoque e zerou**, num produto que ainda tem saldo em outro SKU (tamanho nunca comprado não conta) |
+| 68 | Resumo diário por e-mail e push no celular | Previsto: push com o app (v0.19.0); e-mail quando houver servidor de envio |
 
 ### Débitos técnicos
 
@@ -225,6 +229,9 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Fechamento da condicional devolve todas as peças e depois registra a venda das que ficaram (contextos separados); se a venda for recusada, a saída é refeita | Uma falha no meio deixaria as peças no estoque com a condicional aberta (raro; basta fechar de novo) | Junto com a transação compartilhada no PostgreSQL |
 | Condicional não tem edição nem cancelamento (peça a mais/menos depois de aberta) | Erro na abertura se resolve fechando com tudo devolvido e abrindo outra | Avaliar com a loja piloto |
 | Lista e conversão das condicionais calculadas em memória | Lentas com milhares de condicionais | Consultas agregadas no PostgreSQL |
+| Dashboard e resumo diário calculam em memória (várias consultas por abertura: período, anterior, mês, 30 dias) | Lentos com muitos milhares de vendas | Read models / consultas agregadas no PostgreSQL |
+| Rotina do resumo diário roda em cada instância da API | Com várias instâncias, o mesmo usuário pode receber dois resumos (a marcação do dia reduz, mas não elimina) | Ao escalar: rotina única (fila/lock no banco) |
+| Resumo diário limitado a 1000 caracteres (limite da notificação) | Lojas com muitos alertas podem ter o texto cortado | Tela própria do resumo (link na notificação) ou app |
 | Troca não tem cancelamento | Troca lançada errada precisa de ajuste manual (estoque e vale) | Avaliar com a loja piloto |
 | Número da venda (e da troca) calculado pelo maior existente da empresa | Duas vendas simultâneas podem colidir (o índice único recusa uma; basta registrar de novo) | Sequência no banco quando houver PostgreSQL em produção |
 | Lista de vendas e comissões carregam itens e pagamentos **em memória** | Lento com muitos milhares de vendas no período | Projeções/consultas agregadas no PostgreSQL |
