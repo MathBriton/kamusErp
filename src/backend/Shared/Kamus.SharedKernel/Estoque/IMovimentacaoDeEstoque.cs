@@ -28,4 +28,10 @@ public interface IMovimentacaoDeEstoque
 
     /// <summary>Peças devolvidas numa troca voltam ao estoque disponível (movimento "Devolução"). Devolve o id da operação.</summary>
     Task<Guid> RegistrarDevolucaoAsync(DevolucaoDeEstoque devolucao, CancellationToken ct = default);
+
+    /// <summary>Peças que o cliente leva em condicional: saem do disponível (nunca deixa negativo, ignora <c>PermitirNegativo</c>).</summary>
+    Task<SaidaRegistrada> RegistrarSaidaParaCondicionalAsync(SaidaDeEstoque saida, CancellationToken ct = default);
+
+    /// <summary>Peças da condicional voltam ao disponível (no fechamento, antes de a parte que ficou virar venda).</summary>
+    Task<Guid> RegistrarRetornoDeCondicionalAsync(DevolucaoDeEstoque retorno, CancellationToken ct = default);
 }

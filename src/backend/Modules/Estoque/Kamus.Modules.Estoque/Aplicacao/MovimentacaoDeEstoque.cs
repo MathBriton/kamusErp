@@ -10,7 +10,13 @@ namespace Kamus.Modules.Estoque.Aplicacao;
 /// <summary>Baixa de estoque das vendas e devolução no cancelamento (contrato do SharedKernel para o módulo de vendas).</summary>
 internal sealed class MovimentacaoDeEstoque(EstoqueDbContext db, ICatalogoDeProdutos catalogo, IUsuarioAtual usuario, TimeProvider relogio) : IMovimentacaoDeEstoque
 {
-    public async Task<SaidaRegistrada> RegistrarVendaAsync(SaidaDeEstoque saida, CancellationToken ct = default)
+    public Task<SaidaRegistrada> RegistrarVendaAsync(SaidaDeEstoque saida, CancellationToken ct = default) =>
+        SairAsync(saida, TipoDeMovimento.Venda, saida.PermitirNegativo, ct);
+
+    public Task<SaidaRegistrada> RegistrarSaidaParaCondicionalAsync(SaidaDeEstoque saida, CancellationToken ct = default) =>
+        SairAsync(saida, TipoDeMovimento.SaidaParaCondicional, permitirNegativo: false, ct);
+
+    private async Task<SaidaRegistrada> SairAsync(SaidaDeEstoque saida, TipoDeMovimento tipo, bool permitirNegativo, CancellationToken ct)
     {
         var loja = await db.Lojas.SingleOrDefaultAsync(l => l.Id == saida.LojaId && l.EmpresaId == saida.EmpresaId, ct)
             ?? throw new SaidaDeEstoqueRecusadaException("Loja não encontrada nesta empresa.");
@@ -28,11 +34,11 @@ internal sealed class MovimentacaoDeEstoque(EstoqueDbContext db, ICatalogoDeProd
         {
             try
             {
-                movimentos.Add(saldos[item.SkuId].Vender(item.Quantidade, op, saida.PermitirNegativo));
+                movimentos.Add(tipo == TipoDeMovimento.Venda ? saldos[item.SkuId].Vender(item.Quantidade, op, permitirNegativo) : saldos[item.SkuId].Sair(tipo, item.Quantidade, op));
             }
             catch (EstoqueInsuficienteException ex)
             {
-                throw new SaidaDeEstoqueRecusadaException($"{Saldos.Nome(skus[item.SkuId])}: há {ex.Disponivel} em estoque e a venda pede {ex.Pedido}.");
+                throw new SaidaDeEstoqueRecusadaException($"{Saldos.Nome(skus[item.SkuId])}: há {ex.Disponivel} em estoque e {(tipo == TipoDeMovimento.Venda ? "a venda" : "a condicional")} pede {ex.Pedido}.");
             }
         }
         db.Movimentos.AddRange(movimentos);
@@ -65,7 +71,13 @@ internal sealed class MovimentacaoDeEstoque(EstoqueDbContext db, ICatalogoDeProd
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task<Guid> RegistrarDevolucaoAsync(DevolucaoDeEstoque devolucao, CancellationToken ct = default)
+    public Task<Guid> RegistrarDevolucaoAsync(DevolucaoDeEstoque devolucao, CancellationToken ct = default) =>
+        EntrarAsync(devolucao, TipoDeMovimento.Devolucao, "Troca", ct);
+
+    public Task<Guid> RegistrarRetornoDeCondicionalAsync(DevolucaoDeEstoque retorno, CancellationToken ct = default) =>
+        EntrarAsync(retorno, TipoDeMovimento.RetornoDeCondicional, "Retorno de condicional", ct);
+
+    private async Task<Guid> EntrarAsync(DevolucaoDeEstoque devolucao, TipoDeMovimento tipo, string motivo, CancellationToken ct)
     {
         var loja = await db.Lojas.SingleOrDefaultAsync(l => l.Id == devolucao.LojaId && l.EmpresaId == devolucao.EmpresaId, ct)
             ?? throw new SaidaDeEstoqueRecusadaException("Loja não encontrada nesta empresa.");
@@ -74,9 +86,9 @@ internal sealed class MovimentacaoDeEstoque(EstoqueDbContext db, ICatalogoDeProd
         if (devolucao.Itens.Any(i => !skus.ContainsKey(i.SkuId))) throw new SaidaDeEstoqueRecusadaException("Há itens que não existem no catálogo.");
 
         var saldos = await Saldos.DaLojaAsync(db, loja.Id, skus.Values, ct);
-        var op = new Operacao(Guid.NewGuid(), relogio.GetUtcNow(), usuario.Id, usuario.Nome, "Troca", devolucao.Documento, null, null);
+        var op = new Operacao(Guid.NewGuid(), relogio.GetUtcNow(), usuario.Id, usuario.Nome, motivo, devolucao.Documento, null, null);
         foreach (var item in devolucao.Itens)
-            db.Movimentos.Add(saldos[item.SkuId].Entrar(TipoDeMovimento.Devolucao, item.Quantidade, item.CustoUnitario, op));
+            db.Movimentos.Add(saldos[item.SkuId].Entrar(tipo, item.Quantidade, item.CustoUnitario, op));
         await db.SaveChangesAsync(ct);
         return op.Id;
     }

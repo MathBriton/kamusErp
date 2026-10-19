@@ -126,6 +126,30 @@ public sealed class ContratosDeVendaTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Estoque_SaidaParaCondicionalNuncaNegativa_RetornoVoltaComOCusto()
+    {
+        var client = await Entrar(_api);
+        var empresa = await EmpresaCentro();
+        var camiseta = await CriarCamiseta(client);
+        var loja = (await Lojas(client)).Single();
+        var azulM = Sku(camiseta, "Azul", "M").Id;
+        await Entrada(client, loja.Id, new { skuId = azulM, quantidade = 2, custoUnitario = 30m });
+
+        await using var escopo = Escopo();
+        var estoque = escopo.ServiceProvider.GetRequiredService<IMovimentacaoDeEstoque>();
+        (await Should.ThrowAsync<SaidaDeEstoqueRecusadaException>(() =>
+            estoque.RegistrarSaidaParaCondicionalAsync(new SaidaDeEstoque(empresa, loja.Id, "Condicional nº 1", [new ItemDeSaida(azulM, 3)], PermitirNegativo: true), Ct)))
+            .Message.ShouldContain("há 2");
+        var saida = await estoque.RegistrarSaidaParaCondicionalAsync(new SaidaDeEstoque(empresa, loja.Id, "Condicional nº 1", [new ItemDeSaida(azulM, 2)], true), Ct);
+        saida.Itens.Single().ShouldBe(new ItemSaido(azulM, 2, 30m, 0));
+        await estoque.RegistrarRetornoDeCondicionalAsync(new DevolucaoDeEstoque(empresa, loja.Id, "Condicional nº 1", [new ItemDevolvidoAoEstoque(azulM, 2, 30m)]), Ct);
+
+        (await Saldo(client, camiseta.Id, azulM)).ShouldBe(2);
+        (await client.GetFromJsonAsync<List<MovimentoDto>>(U($"/api/estoque/kardex?skuId={azulM}"), Ct))!.Take(2)
+            .ShouldBe([new MovimentoDto("RetornoDeCondicional", 2, "Condicional nº 1"), new MovimentoDto("SaidaParaCondicional", -2, "Condicional nº 1")]);
+    }
+
+    [Fact]
     public async Task Financeiro_ContaAPagarAvulsa_CancelaSoSemPagamento()
     {
         var client = await Entrar(_api);
