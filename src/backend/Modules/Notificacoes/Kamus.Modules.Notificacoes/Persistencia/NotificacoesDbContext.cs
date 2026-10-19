@@ -13,6 +13,7 @@ public sealed class NotificacoesDbContext(DbContextOptions<NotificacoesDbContext
     public const string Schema = "notificacoes";
 
     public DbSet<Notificacao> Notificacoes => Set<Notificacao>();
+    public DbSet<Dispositivo> Dispositivos => Set<Dispositivo>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -25,6 +26,14 @@ public sealed class NotificacoesDbContext(DbContextOptions<NotificacoesDbContext
             e.Property(n => n.Mensagem).HasMaxLength(1000);
             e.Property(n => n.Link).HasMaxLength(300);
             e.HasIndex(n => new { n.UsuarioId, n.LidaEm, n.CriadaEm });
+        });
+        modelBuilder.Entity<Dispositivo>(e =>
+        {
+            e.ToTable("dispositivos");
+            e.Property(d => d.Token).HasMaxLength(Dispositivo.TamanhoMaximoDoToken);
+            e.Property(d => d.Plataforma).HasMaxLength(20);
+            e.HasIndex(d => new { d.TenantId, d.Token }).IsUnique();
+            e.HasIndex(d => d.UsuarioId);
         });
         base.OnModelCreating(modelBuilder);
     }

@@ -51,7 +51,52 @@ internal static class AutenticacaoEndpoints
             .Produces<MeResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
 
+        var mobile = grupo.MapGroup("/mobile");
+        mobile.MapPost("/login", LoginMobile)
+            .AllowAnonymous()
+            .RequireRateLimiting(PoliticaDeLimiteDoLogin)
+            .WithSummary("[App mobile] Entrar: devolve o token de sessão no corpo (sem cookie), sempre \"manter conectado\"")
+            .Produces<SessaoMobileResponse>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status423Locked);
+        mobile.MapPost("/refresh", RenovarMobile)
+            .AllowAnonymous()
+            .WithSummary("[App mobile] Renovar com o token de sessão (que é trocado a cada uso)")
+            .Produces<SessaoMobileResponse>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+        mobile.MapPost("/logout", SairMobile)
+            .AllowAnonymous()
+            .WithSummary("[App mobile] Encerrar a sessão do aparelho")
+            .Produces(StatusCodes.Status204NoContent);
+
         return app;
+    }
+
+    private static SessaoMobileResponse Mobile(SessaoEmitida s) =>
+        new(s.Resposta.AccessToken, s.Resposta.ExpiraEm, s.Resposta.Usuario, s.Resposta.Empresas, s.TokenDeSessao, s.SessaoExpiraEm);
+
+    private static async Task<IResult> LoginMobile(LoginRequest request, AutenticacaoService auth, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Senha))
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Dados incompletos", detail: "Informe e-mail e senha.");
+
+        return await auth.LoginAsync(request with { ManterConectado = true }, ct) switch
+        {
+            ResultadoLogin.Sucesso s => Results.Ok(Mobile(s.Sessao)),
+            ResultadoLogin.Bloqueado b => UsuarioBloqueado(b.Ate),
+            _ => CredenciaisInvalidas(),
+        };
+    }
+
+    private static async Task<IResult> RenovarMobile(TokenDeSessaoRequest request, AutenticacaoService auth, CancellationToken ct) =>
+        await auth.RenovarAsync(request.TokenDeSessao, ct) is { } sessao
+            ? Results.Ok(Mobile(sessao))
+            : Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Sessão expirada", detail: "Faça login novamente.");
+
+    private static async Task<IResult> SairMobile(TokenDeSessaoRequest request, AutenticacaoService auth, CancellationToken ct)
+    {
+        await auth.SairAsync(request.TokenDeSessao, ct);
+        return Results.NoContent();
     }
 
     private static async Task<IResult> Login(LoginRequest request, AutenticacaoService auth, HttpContext http, CancellationToken ct)
@@ -62,10 +107,7 @@ internal static class AutenticacaoEndpoints
         return await auth.LoginAsync(request, ct) switch
         {
             ResultadoLogin.Sucesso s => ComCookie(http, s.Sessao),
-            ResultadoLogin.Bloqueado b => Results.Problem(
-                statusCode: StatusCodes.Status423Locked,
-                title: "Usuário bloqueado",
-                detail: $"Usuário bloqueado temporariamente por excesso de tentativas. Tente novamente em {Math.Max(1, (int)Math.Ceiling((b.Ate - DateTimeOffset.UtcNow).TotalMinutes))} minuto(s)."),
+            ResultadoLogin.Bloqueado b => UsuarioBloqueado(b.Ate),
             _ => CredenciaisInvalidas(),
         };
     }
@@ -104,6 +146,12 @@ internal static class AutenticacaoEndpoints
         var me = await auth.ObterUsuarioAtualAsync(usuarioId, ct);
         return me is null ? Results.Unauthorized() : Results.Ok(me);
     }
+
+    private static IResult UsuarioBloqueado(DateTimeOffset ate) =>
+        Results.Problem(
+            statusCode: StatusCodes.Status423Locked,
+            title: "Usuário bloqueado",
+            detail: $"Usuário bloqueado temporariamente por excesso de tentativas. Tente novamente em {Math.Max(1, (int)Math.Ceiling((ate - DateTimeOffset.UtcNow).TotalMinutes))} minuto(s).");
 
     private static IResult CredenciaisInvalidas() =>
         Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Login inválido", detail: "E-mail ou senha inválidos.");

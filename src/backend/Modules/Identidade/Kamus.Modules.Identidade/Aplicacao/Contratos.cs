@@ -14,6 +14,12 @@ public sealed record SessaoResponse(string AccessToken, DateTimeOffset ExpiraEm,
 public sealed record MeResponse(UsuarioDto Usuario, IReadOnlyList<EmpresaDto> Empresas);
 
 /// <summary>Sessão emitida: resposta para o cliente + token de renovação (vai no cookie).</summary>
+/// <summary>Sessão do app mobile: o token de sessão (renovação) vai no corpo, para o app guardar no armazenamento seguro do aparelho.</summary>
+public sealed record SessaoMobileResponse(string AccessToken, DateTimeOffset ExpiraEm, UsuarioDto Usuario, IReadOnlyList<EmpresaDto> Empresas, string TokenDeSessao,
+    DateTimeOffset SessaoExpiraEm);
+
+public sealed record TokenDeSessaoRequest(string? TokenDeSessao);
+
 internal sealed record SessaoEmitida(SessaoResponse Resposta, string TokenDeSessao, DateTimeOffset SessaoExpiraEm, bool ManterConectado);
 
 internal abstract record ResultadoLogin

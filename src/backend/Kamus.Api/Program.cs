@@ -23,6 +23,7 @@ builder.Services.AddKamusImportacao();
 builder.Services.AddKamusHealthChecks(builder.Configuration);
 builder.Services.AddKamusDocumentacaoApi();
 builder.Services.AddProblemDetails();
+builder.Services.AddKamusCors(builder.Configuration);
 builder.Services.AddModuloIdentidade(builder.Configuration);
 builder.Services.AddModuloNotificacoes(builder.Configuration);
 builder.Services.AddModuloLicenciamento(builder.Configuration);
@@ -34,6 +35,7 @@ builder.Services.AddModuloIndicadores(builder.Configuration);
 
 var app = builder.Build();
 
+app.UseKamusCors();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseKamusMultiTenancy();

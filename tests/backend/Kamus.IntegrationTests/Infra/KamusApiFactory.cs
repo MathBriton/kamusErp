@@ -23,6 +23,8 @@ public sealed class KamusApiFactory(
         builder.UseSetting("Seed:SenhaSuperAdmin", SenhaSuperAdminDeTeste);
         // A rotina do resumo diário roda pelo relógio real; os testes chamam o GeradorDeResumos com a hora que quiserem.
         builder.UseSetting("Indicadores:RotinaAtiva", "false");
+        // Sem internet nos testes: o push fica desligado (os testes de push trocam o IEnvioDePush por um falso).
+        builder.UseSetting("Push:Habilitado", "false");
         foreach (var (chave, valor) in configuracoes ?? new Dictionary<string, string>())
             builder.UseSetting(chave, valor);
     }

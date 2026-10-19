@@ -23,6 +23,53 @@ namespace Kamus.Modules.Notificacoes.Persistencia.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Kamus.Modules.Notificacoes.Dominio.Dispositivo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Plataforma")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("plataforma");
+
+                    b.Property<DateTimeOffset>("RegistradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("registrado_em");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("token");
+
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("usuario_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dispositivos");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_dispositivos_tenant_id");
+
+                    b.HasIndex("UsuarioId")
+                        .HasDatabaseName("ix_dispositivos_usuario_id");
+
+                    b.HasIndex("TenantId", "Token")
+                        .IsUnique()
+                        .HasDatabaseName("ix_dispositivos_tenant_id_token");
+
+                    b.ToTable("dispositivos", "notificacoes");
+                });
+
             modelBuilder.Entity("Kamus.Modules.Notificacoes.Dominio.Notificacao", b =>
                 {
                     b.Property<Guid>("Id")
