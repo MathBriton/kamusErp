@@ -678,7 +678,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.16.0 | 5 | Crediário próprio: limite por cliente, venda a prazo (forma "Crediário"), bloqueio por atraso, recebimento com multa/juros, carnê e recibo em PDF, carteira por faixa de atraso | ✅ lançada |
 | v0.17.0 | 5 | Condicional (malinha): cliente cadastrado, prazo e limites por cliente, peças saem do estoque disponível, termo em PDF, fechamento com devolução e venda das peças que ficaram, atrasadas e liberação por gerente, conversão por vendedor | ✅ lançada |
 | v0.18.0 | 6 | Dashboard real (vendas, financeiro, estoque, crediário e condicionais, com comparação e alertas) e resumo diário no sininho, configurável por usuário | ✅ lançada |
-| v0.19.0 | 6 | App mobile (Expo) somente leitura: login, empresa ativa (inclusive consolidado), dashboard, vendas de hoje, contas de 7 dias, avisos; push de toda notificação (inclusive o resumo diário) | ⏳ |
+| v0.19.0 | 6 | App mobile (Expo) somente leitura: login, empresa ativa (inclusive consolidado), dashboard, vendas de hoje, contas de 7 dias, avisos; push de toda notificação (inclusive o resumo diário) | ✅ lançada |
 | v0.20.0 | 6 | Central de relatórios (DRE gerencial, vendas por período/produto/cor/tamanho, produtos sem giro) | ⏳ |
 | v1.0.0 | 7 | Produção e primeira loja piloto | ⏳ depende de servidor |
 
