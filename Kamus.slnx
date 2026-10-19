@@ -16,6 +16,9 @@
   <Folder Name="/src/backend/Modules/Identidade/">
     <Project Path="src/backend/Modules/Identidade/Kamus.Modules.Identidade/Kamus.Modules.Identidade.csproj" />
   </Folder>
+  <Folder Name="/src/backend/Modules/Indicadores/">
+    <Project Path="src/backend/Modules/Indicadores/Kamus.Modules.Indicadores/Kamus.Modules.Indicadores.csproj" />
+  </Folder>
   <Folder Name="/src/backend/Modules/Licenciamento/">
     <Project Path="src/backend/Modules/Licenciamento/Kamus.Modules.Licenciamento/Kamus.Modules.Licenciamento.csproj" />
   </Folder>

@@ -42,6 +42,15 @@ internal sealed class DiretorioDeClientes(IdentidadeDbContext db, IServiceScopeF
             .Select(u => new UsuarioDoCliente(u.Id, u.Nome, u.Email, u.Ativo)).ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<AcessoDoUsuario>> AcessosDoTenantAtualAsync(CancellationToken ct = default)
+    {
+        var ativos = db.Usuarios.AsNoTracking().Where(u => u.Ativo).Select(u => u.Id);
+        var acessos = await db.AcessosEmpresa.AsNoTracking().Where(a => ativos.Contains(a.UsuarioId)).ToListAsync(ct);
+        var empresas = await db.Empresas.AsNoTracking().ToDictionaryAsync(e => e.Id, e => e.NomeFantasia, ct);
+        return acessos.Where(a => empresas.ContainsKey(a.EmpresaId))
+            .Select(a => new AcessoDoUsuario(a.UsuarioId, a.EmpresaId, empresas[a.EmpresaId], a.Perfil.ToString())).ToList();
+    }
+
     private async Task<IReadOnlyList<Guid>> DonosAsync(Guid tenantId, CancellationToken ct)
     {
         await using var escopo = escopos.CreateAsyncScope();

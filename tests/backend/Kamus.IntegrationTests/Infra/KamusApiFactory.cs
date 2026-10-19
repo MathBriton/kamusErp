@@ -21,6 +21,8 @@ public sealed class KamusApiFactory(
         builder.UseSetting("Jwt:Chave", ChaveJwtDeTeste);
         // Fixa a senha do SuperAdmin de demonstração (no PostgreSQL compartilhado, quem cria primeiro decide).
         builder.UseSetting("Seed:SenhaSuperAdmin", SenhaSuperAdminDeTeste);
+        // A rotina do resumo diário roda pelo relógio real; os testes chamam o GeradorDeResumos com a hora que quiserem.
+        builder.UseSetting("Indicadores:RotinaAtiva", "false");
         foreach (var (chave, valor) in configuracoes ?? new Dictionary<string, string>())
             builder.UseSetting(chave, valor);
     }

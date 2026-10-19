@@ -23,6 +23,7 @@ public static class ModuloEstoque
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<Lojas>();
         services.AddScoped<IMovimentacaoDeEstoque, MovimentacaoDeEstoque>();
+        services.AddScoped<Kamus.SharedKernel.Indicadores.IIndicadoresDeEstoque, IndicadoresDeEstoque>();
         services.AddScoped<IRelatorio, RelatorioDePosicao>();
         services.AddScoped<IRelatorio, RelatorioDeInventario>();
         services.AddScoped<IImportador, ImportadorDeEstoqueInicial>();

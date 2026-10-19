@@ -9,6 +9,7 @@ using Kamus.Modules.Cadastros;
 using Kamus.Modules.Estoque;
 using Kamus.Modules.Financeiro;
 using Kamus.Modules.Identidade;
+using Kamus.Modules.Indicadores;
 using Kamus.Modules.Licenciamento;
 using Kamus.Modules.Notificacoes;
 using Kamus.Modules.Vendas;
@@ -29,6 +30,7 @@ builder.Services.AddModuloCadastros(builder.Configuration);
 builder.Services.AddModuloEstoque(builder.Configuration);
 builder.Services.AddModuloFinanceiro(builder.Configuration);
 builder.Services.AddModuloVendas(builder.Configuration);
+builder.Services.AddModuloIndicadores(builder.Configuration);
 
 var app = builder.Build();
 
@@ -53,6 +55,7 @@ app.MapModuloCadastros();
 app.MapModuloEstoque();
 app.MapModuloFinanceiro();
 app.MapModuloVendas();
+app.MapModuloIndicadores();
 
 await app.AplicarMigracoesKamusAsync();
 await app.InicializarModuloIdentidadeAsync();

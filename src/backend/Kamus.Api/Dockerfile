@@ -12,6 +12,7 @@ COPY src/backend/Modules/Cadastros/Kamus.Modules.Cadastros/Kamus.Modules.Cadastr
 COPY src/backend/Modules/Estoque/Kamus.Modules.Estoque/Kamus.Modules.Estoque.csproj src/backend/Modules/Estoque/Kamus.Modules.Estoque/
 COPY src/backend/Modules/Financeiro/Kamus.Modules.Financeiro/Kamus.Modules.Financeiro.csproj src/backend/Modules/Financeiro/Kamus.Modules.Financeiro/
 COPY src/backend/Modules/Vendas/Kamus.Modules.Vendas/Kamus.Modules.Vendas.csproj src/backend/Modules/Vendas/Kamus.Modules.Vendas/
+COPY src/backend/Modules/Indicadores/Kamus.Modules.Indicadores/Kamus.Modules.Indicadores.csproj src/backend/Modules/Indicadores/Kamus.Modules.Indicadores/
 RUN dotnet restore src/backend/Kamus.Api/Kamus.Api.csproj
 COPY src/backend/ src/backend/
 # Versão e commit informados pelo workflow de release (expostos em /api/versao)
