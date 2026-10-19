@@ -545,3 +545,31 @@ X-Empresa-Id: {{login.response.body.empresas[0].id}}
 Content-Type: application/json
 
 { "multaPercentual": 2, "jurosMensalPercentual": 1, "diasParaBloquear": 15 }
+
+### --- Condicional ---
+
+### Condicionais abertas (inclui atrasadas) com peças e valor "na rua"
+GET {{api}}/api/vendas/condicionais?situacao=abertas
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Abrir condicional (troque os ids pelos da loja, do cliente e do SKU; "liberar" só vale para Dono/Gerente)
+POST {{api}}/api/vendas/condicionais
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "lojaId": "00000000-0000-0000-0000-000000000000", "clienteId": "00000000-0000-0000-0000-000000000000", "clienteNome": "Maria Souza", "prazo": "2026-10-21", "liberar": false, "itens": [{ "skuId": "00000000-0000-0000-0000-000000000000", "quantidade": 2 }] }
+
+### Fechar: devolveu 1, ficou com 1 (vira venda paga no PIX)
+POST {{api}}/api/vendas/condicionais/00000000-0000-0000-0000-000000000000/fechar
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "devolvidos": [{ "skuId": "00000000-0000-0000-0000-000000000000", "quantidade": 1 }], "pagamentos": [{ "formaId": "00000000-0000-0000-0000-000000000000", "valor": 59.9, "parcelas": 1 }], "descontoGeral": 0 }
+
+### Conversão por vendedor no mês
+GET {{api}}/api/vendas/condicionais/conversao?de=2026-10-01&ate=2026-10-31
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}

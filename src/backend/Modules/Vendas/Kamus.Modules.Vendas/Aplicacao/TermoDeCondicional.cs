@@ -39,8 +39,9 @@ internal static class TermoDeCondicional
                 });
                 t.Header(h =>
                 {
-                    foreach (var titulo in Colunas)
-                        h.Cell().BorderBottom(1).PaddingVertical(3).Text(titulo).Bold();
+                    h.Cell().BorderBottom(1).PaddingVertical(3).Text(Colunas[0]).Bold();
+                    foreach (var titulo in Colunas.Skip(1))
+                        h.Cell().BorderBottom(1).PaddingVertical(3).AlignRight().Text(titulo).Bold();
                 });
                 foreach (var i in c.Itens)
                 {

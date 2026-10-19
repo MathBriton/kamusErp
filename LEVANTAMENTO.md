@@ -676,7 +676,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.14.0 | 4 | Vendas: registro no backoffice (leitor ou grade, descontos, vários pagamentos, troco), formas de pagamento com taxa/prazo, baixa de estoque, caixa e recebíveis, cancelamento, comissão por venda e relatório de comissões | ✅ lançada |
 | v0.15.0 | 4 | Trocas vinculadas à venda, vale-troca como crédito do cliente (e forma de pagamento), fechamento de comissões com conta a pagar, compras na ficha do cliente | ✅ lançada |
 | v0.16.0 | 5 | Crediário próprio: limite por cliente, venda a prazo (forma "Crediário"), bloqueio por atraso, recebimento com multa/juros, carnê e recibo em PDF, carteira por faixa de atraso | ✅ lançada |
-| v0.17.0 | 5 | Condicional (malinha) | ⏳ |
+| v0.17.0 | 5 | Condicional (malinha): cliente cadastrado, prazo e limites por cliente, peças saem do estoque disponível, termo em PDF, fechamento com devolução e venda das peças que ficaram, atrasadas e liberação por gerente, conversão por vendedor | ⏳ |
 | v0.18.0 | 6 | Dashboard real, app mobile, resumo diário | ⏳ |
 | v1.0.0 | 7 | Produção e primeira loja piloto | ⏳ depende de servidor |
 
@@ -843,6 +843,8 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | 2026-10-17 | Cancelamento de venda (Dono/Gerente, motivo obrigatório) devolve o estoque (movimento "Cancelamento de venda") e estorna o financeiro (baixas estornadas e títulos cancelados); nada é apagado | Aceita |
 | 2026-10-17 | Comissão = % do vendedor (do cadastro, gravado na venda) sobre o total da venda concluída; vendas sem vendedor aparecem como "Sem vendedor" | Aceita (provisória — ver dúvida 4 do README) |
 | 2026-10-18 | Crediário e condicional divididos: v0.16.0 crediário, v0.17.0 condicional; dashboard/mobile passa a v0.18.0 | Aceita |
+| 2026-10-19 | Condicional (v0.17.0) no módulo Vendas: exige cliente cadastrado; prazo (padrão 2 dias) e limites por cliente em peças (10) e valor (R$ 1.000) configuráveis em Formas de pagamento → Regras; cliente com condicional atrasada ou acima do limite só abre outra com liberação de Dono/Gerente | Aceita (provisória) |
+| 2026-10-19 | Peças da condicional saem do estoque disponível pelo `IMovimentacaoDeEstoque` (movimentos "Saída para condicional" e "Retorno de condicional", nunca negativo); no fechamento todas voltam e as que o cliente ficou viram uma venda comum (mesmo registro de venda, inclusive crediário), com o vendedor da condicional | Aceita |
 | 2026-10-18 | Crediário (v0.16.0) no módulo Financeiro: títulos a receber marcados como crediário (dívida do cliente), limite por cliente (Dono/Gerente) somando todas as empresas, bloqueio manual ou por atraso acima do configurado; venda usa a forma "Crediário" (sem taxa/conta, até 10x, 1ª parcela em 30 dias e as demais no mesmo dia dos meses seguintes) e consulta `ICrediario` | Aceita |
 | 2026-10-18 | Recebimento do crediário: multa (até 2%, uma vez) e juros ao mês pro rata dia sugeridos pelo sistema e ajustáveis; Vendedor também recebe; recibo e carnê em PDF | Aceita (provisória) |
 | 2026-10-18 | Troca (v0.15.0) sempre vinculada à venda: a peça devolvida vale o que o cliente pagou (desconto da venda rateado por SKU; devolver tudo devolve exatamente o pago); destino "volta ao estoque" (custo da venda original) ou "avariada" (não volta); diferença a maior é paga como numa venda, a menor vira vale-troca | Aceita (provisória) |

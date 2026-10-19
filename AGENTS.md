@@ -190,9 +190,9 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 
 ## 10. Estado atual e próximo passo (ATUALIZE AO TERMINAR)
 
-**Última atualização:** 2026-10-18
+**Última atualização:** 2026-10-19
 
-**Releases:** v0.1.0 → **v0.16.0** lançadas (a v0.16.0 trouxe o crediário). Próxima: **v0.17.0** (condicional).
+**Releases:** v0.1.0 → **v0.16.0** lançadas (a v0.16.0 trouxe o crediário); **v0.17.0** (condicional) pronta para lançar. Próxima: **v0.18.0** (dashboard, mobile, resumo diário).
 Plano de releases em `LEVANTAMENTO.md` → Plano de releases (dashboard/mobile v0.18.0, v1.0.0 produção).
 
 **O que existe hoje:**
@@ -216,15 +216,23 @@ Plano de releases em `LEVANTAMENTO.md` → Plano de releases (dashboard/mobile v
     Perfis: Dono/Gerente/Financeiro/Vendedor consultam e recebem. Relatório `inadimplencia`. PDFs em `Aplicacao/DocumentosDoCrediario` (QuestPDF).
   - Web `crediario/CrediarioPage` (carteira, ficha, receber com recibo, carnê, limite, regras); aviso de limite no `EditorDePagamentos` (prop `clienteId`);
     crediário na ficha do cliente (`HistoricoDoCliente`).
-- Testes: 486 backend, 162 web, 10 admin. E2E em localhost (liberar limite pela tela, venda no crediário 3x com aviso de disponível, cliente bloqueado por atraso,
-  vendedora recebendo com multa/juros + recibo e carnê em PDF, ficha do cliente, contas a receber, relatório de inadimplência, tema escuro), 3 execuções.
+- **Condicional (v0.17.0)** — no módulo Vendas (tabelas com RLS `condicionais`, `itens_da_condicional`; `ConfiguracaoDeVendas` ganhou prazo/limites):
+  - Domínio (`Dominio/Condicional.cs`): `Condicional.Abrir` (junta SKUs), `RegistrarSaida`, `Conferir`/`Fechar` (devolvidas → o que ficou), `Situacao(hoje)`
+    (Aberta/Atrasada/Fechada), `ConferirLimites` (peças e valor em aberto por cliente; 0 = sem limite). Padrões: prazo 2 dias, 10 peças, R$ 1.000.
+  - Estoque: `IMovimentacaoDeEstoque.RegistrarSaidaParaCondicionalAsync` (nunca negativo) e `RegistrarRetornoDeCondicionalAsync`; movimentos `SaidaParaCondicional`/`RetornoDeCondicional`.
+  - Registro de venda extraído para `Aplicacao/RegistroDeVendas` (usado por `POST /api/vendas` e pelo fechamento da condicional).
+  - API `/api/vendas/condicionais`: lista (`situacao`, `clienteId`, `busca`; totais "na rua"), `conversao?de&ate`, `{id}`, `{id}/termo.pdf`, `POST` (cliente obrigatório;
+    atraso/limite só com `liberar` de Dono/Gerente), `POST {id}/fechar` (devolve tudo, vende o que ficou; se a venda é recusada, refaz a saída). Relatório `condicionais`.
+  - Web `vendas/CondicionaisPage` (lista com cartões, nova condicional com leitor/grade e termo, fechar com devolução e pagamentos, conversão por vendedor);
+    `EntradaDeItens` com `semDesconto`; regras da condicional em Formas de pagamento; condicionais abertas na ficha do cliente.
+- Testes: 493 backend, 167 web, 10 admin. E2E em localhost (vendedora abre condicional pelo leitor + termo PDF, cliente atrasado recusado, Dono libera
+  11 peças, fechamento com venda no PIX, fechamento devolvendo tudo, saldos de estoque conferidos, conversão, ficha do cliente, relatório, tema escuro), 3 execuções.
 
-**Próximo passo — v0.17.0: condicional (malinha)** (ver `LEVANTAMENTO.md` 4.7.7):
-1. Condicional exige cliente cadastrado, limite por cliente (valor e/ou peças) e prazo de devolução configurável; as peças saem do estoque disponível para
-   "em condicional" (novo tipo de movimento/local via `IMovimentacaoDeEstoque`), com termo de responsabilidade em PDF.
-2. Retorno: peças devolvidas voltam ao estoque; as que o cliente ficou viram venda (reaproveitar `POST /api/vendas` com as peças da condicional, inclusive crediário).
-3. Alertas de condicional vencendo/atrasada, bloqueio de nova condicional com atraso (liberação por gerente), relatórios (valor "na rua", conversão por vendedor).
-4. Ficha do cliente com condicionais abertas.
+**Próximo passo — v0.18.0: dashboard real, app mobile e resumo diário** (ver `LEVANTAMENTO.md` 4.6, 4.7.3 e 5.9). Antes: lançar a v0.17.0 se ainda não estiver lançada.
+1. Dashboard web com números reais (vendas do dia/mês, ticket médio, estoque, contas a pagar/receber, crediário em atraso, condicionais na rua), por empresa e consolidado.
+2. Resumo diário configurável (notificação/sininho): contas vencendo, parcelas do crediário e condicionais vencendo/atrasadas, aniversariantes; lembretes por WhatsApp em 1 clique.
+3. App mobile (Expo) somente leitura para o dono, consumindo os mesmos endpoints do dashboard.
+4. Central de relatórios (menu "Relatórios", hoje "previsto").
 
 **Pendências conhecidas:** ver "Dúvidas em aberto e débitos técnicos" no `README.md` (lista viva — acrescente lá).
 Também: branch órfã `release-please--branches--main--components--kamus` no GitHub (pode ser apagada pela interface).

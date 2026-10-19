@@ -136,7 +136,7 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 9 | Período de teste (trial) de cliente novo | Provisório e implementado: **14 dias** (ajustável ao criar) |
 | 10 | Painel Admin: só o dono usa ou haverá equipe (suporte, financeiro)? | Provisório e implementado: **só SuperAdmin** |
 | 11 | Troca: prazo padrão e validade do vale-troca | Provisório e implementado (v0.15.0): **30 dias** de prazo (fora dele, só Dono/Gerente) e vale com **90 dias** de validade — ambos configuráveis por empresa |
-| 12 | Condicional: prazo de devolução e limite por cliente | Em aberto |
+| 12 | Condicional: prazo de devolução e limite por cliente | Provisório e implementado (v0.17.0): **2 dias** de prazo, limite de **10 peças** e **R$ 1.000** em aberto por cliente (0 = sem limite) — configuráveis; acima do limite ou com condicional atrasada, só Dono/Gerente liberam |
 | 13 | Resumo diário: blocos ligados por padrão | Em aberto |
 | 14 | Idioma/moeda: só Brasil? | Assumido **só Brasil** (pt-BR, R$) |
 | 15 | Valor padrão da mensalidade | Provisório: **R$ 199,90** (alterável por cliente no painel) |
@@ -185,6 +185,10 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 58 | Vendedor pode receber parcelas do crediário no balcão? | Provisório: **sim** (consulta, recebe, imprime recibo/carnê); limite e regras só Dono/Gerente |
 | 59 | Comissão de venda no crediário: sobre o faturado ou só quando o cliente paga? | Provisório: **faturado** (igual às demais vendas); "sobre o recebido" fica como opção futura (dúvida 4) |
 | 60 | Cobrança do crediário por WhatsApp em 1 clique e aviso de parcela vencendo | Previsto com o resumo diário (v0.18.0) |
+| 61 | Condicional: aviso de vencendo/atrasada no sininho e lembrete ao cliente por WhatsApp | Previsto com o resumo diário (v0.18.0); hoje a lista destaca as atrasadas e a ficha do cliente mostra as abertas |
+| 62 | Condicional: as peças "em condicional" devem aparecer na posição de estoque (coluna própria)? | Provisório: **não** — saem do disponível (movimento "Saída para condicional" no kardex) e aparecem só na tela de condicionais |
+| 63 | Condicional: a venda gerada no fechamento leva o vendedor da condicional e a data do fechamento — está bom? | Provisório: **sim** (comissão no período do fechamento) |
+| 64 | Condicional: vendedor pode fechar condicional aberta por outro vendedor? | Provisório: **sim** (qualquer perfil que vende); a venda continua com o vendedor da condicional |
 
 ### Débitos técnicos
 
@@ -207,7 +211,7 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Sem "esqueci minha senha" por e-mail | Quem esquece depende do Dono redefinir | Quando houver envio de e-mail |
 | Busca e aniversariantes de clientes filtram **em memória** | Lento com dezenas de milhares de clientes | Com PostgreSQL em produção: `unaccent`/`pg_trgm` e consulta por mês/dia |
 | Modelos de mensagem do WhatsApp fixos no código | A loja não personaliza o texto | Configurações de mensagens (junto com o resumo diário) |
-| Ficha do cliente com compras, vales e crediário (v0.16.0), ainda sem condicionais, ticket médio e frequência | Visão 360° incompleta | Condicional (v0.17.0) e dashboard (v0.18.0) |
+| Ficha do cliente com compras, vales, crediário e condicionais abertas (v0.17.0), ainda sem ticket médio e frequência | Visão 360° incompleta | Dashboard (v0.18.0) |
 | Sem busca de endereço por CEP | Digitação manual | Integração com serviço de CEP (ViaCEP) |
 | Busca de produtos em memória | Lenta com catálogos grandes | `pg_trgm` e índice por código de barras no PostgreSQL |
 | Grade em uso não pode ganhar tamanho novo | Para um tamanho novo é preciso criar outra grade | Permitir acrescentar tamanhos ao produto |
@@ -218,6 +222,9 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Troca: se falhar depois da devolução ao estoque, a compensação desfaz a saída das peças levadas e o financeiro, mas não a devolução | Peça devolvida ficaria no estoque sem a troca registrada (raro) | Junto com a transação compartilhada no PostgreSQL |
 | Carnê e recibo do crediário sem logotipo nem código de barras/PIX para pagamento | Cliente paga só na loja | Gateway de boleto/PIX (pós-piloto) |
 | Carteira do crediário calculada em memória (todos os títulos de crediário) | Lenta com milhares de clientes no crediário | Consulta agregada no PostgreSQL |
+| Fechamento da condicional devolve todas as peças e depois registra a venda das que ficaram (contextos separados); se a venda for recusada, a saída é refeita | Uma falha no meio deixaria as peças no estoque com a condicional aberta (raro; basta fechar de novo) | Junto com a transação compartilhada no PostgreSQL |
+| Condicional não tem edição nem cancelamento (peça a mais/menos depois de aberta) | Erro na abertura se resolve fechando com tudo devolvido e abrindo outra | Avaliar com a loja piloto |
+| Lista e conversão das condicionais calculadas em memória | Lentas com milhares de condicionais | Consultas agregadas no PostgreSQL |
 | Troca não tem cancelamento | Troca lançada errada precisa de ajuste manual (estoque e vale) | Avaliar com a loja piloto |
 | Número da venda (e da troca) calculado pelo maior existente da empresa | Duas vendas simultâneas podem colidir (o índice único recusa uma; basta registrar de novo) | Sequência no banco quando houver PostgreSQL em produção |
 | Lista de vendas e comissões carregam itens e pagamentos **em memória** | Lento com muitos milhares de vendas no período | Projeções/consultas agregadas no PostgreSQL |

@@ -580,22 +580,20 @@ function FecharCondicional({ linha, onFechar, onFechada }: { linha: LinhaDeCondi
           {excede && <p className="text-sm font-semibold text-danger">A devolução não pode passar do que o cliente levou.</p>}
 
           {vende ? (
-            <div className="grid gap-4 rounded-xl bg-surface-2 p-4 md:grid-cols-2">
-              <div className="space-y-3">
-                <p className="font-semibold">{`O cliente ficou com ${pecas(pecasQueFicaram)}: ${moeda(valorQueFicou)}`}</p>
-                <EditorDePagamentos formas={formas} total={total} linhas={linhasDePagamento} onLinhas={setPagamentos} clienteId={condicional.clienteId} />
-              </div>
-              <div className="space-y-3">
+            <div className="space-y-3 rounded-xl bg-surface-2 p-4">
+              <p className="font-semibold">{`O cliente ficou com ${pecas(pecasQueFicaram)}: ${moeda(valorQueFicou)}`}</p>
+              <EditorDePagamentos formas={formas} total={total} linhas={linhasDePagamento} onLinhas={setPagamentos} clienteId={condicional.clienteId} />
+              <div className="grid gap-3 sm:grid-cols-2">
                 <Campo rotulo="Desconto na venda (R$)">
                   <input value={descontoGeral} onChange={(e) => setDescontoGeral(e.target.value)} inputMode="decimal" placeholder="0,00" className={estilos.campo} />
                 </Campo>
                 <Campo rotulo="Nota externa (opcional)">
                   <input value={notaExterna} onChange={(e) => setNotaExterna(e.target.value)} maxLength={60} placeholder="Ex.: NFC-e 1234" className={estilos.campo} />
                 </Campo>
-                <p className="text-lg font-bold">{`Total da venda: ${moeda(total)}`}</p>
-                {falta > 0 && <p className="font-semibold text-danger">{`Falta: ${moeda(falta)}`}</p>}
-                {falta < 0 && <p className="font-semibold text-success">{`Troco: ${moeda(-falta)}`}</p>}
               </div>
+              <p className="text-lg font-bold">{`Total da venda: ${moeda(total)}`}</p>
+              {falta > 0 && <p className="font-semibold text-danger">{`Falta: ${moeda(falta)}`}</p>}
+              {falta < 0 && <p className="font-semibold text-success">{`Troco: ${moeda(-falta)}`}</p>}
             </div>
           ) : (
             <p className="rounded-xl bg-surface-2 p-4 text-sm">Todas as peças voltam ao estoque; nenhuma venda será registrada.</p>
