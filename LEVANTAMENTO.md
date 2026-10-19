@@ -679,7 +679,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.17.0 | 5 | Condicional (malinha): cliente cadastrado, prazo e limites por cliente, peças saem do estoque disponível, termo em PDF, fechamento com devolução e venda das peças que ficaram, atrasadas e liberação por gerente, conversão por vendedor | ✅ lançada |
 | v0.18.0 | 6 | Dashboard real (vendas, financeiro, estoque, crediário e condicionais, com comparação e alertas) e resumo diário no sininho, configurável por usuário | ✅ lançada |
 | v0.19.0 | 6 | App mobile (Expo) somente leitura: login, empresa ativa (inclusive consolidado), dashboard, vendas de hoje, contas de 7 dias, avisos; push de toda notificação (inclusive o resumo diário) | ✅ lançada |
-| v0.20.0 | 6 | Central de relatórios: catálogo por área e perfil, visualização na tela com totais, vendas agrupadas (produto/SKU/cor/tamanho/vendedor/dia, com custo e lucro bruto), curva ABC, produtos sem giro e DRE gerencial por competência | ⏳ |
+| v0.20.0 | 6 | Central de relatórios: catálogo por área e perfil, visualização na tela com totais, vendas agrupadas (produto/SKU/cor/tamanho/vendedor/dia, com custo e lucro bruto), curva ABC, produtos sem giro e DRE gerencial por competência | ✅ lançada |
 | v0.21.0 | 7 | Segurança para produção: 2FA do SuperAdmin, "esqueci minha senha" por e-mail, revogação do token do painel, licença obrigatória para todos os clientes | ⏳ |
 | v0.22.0 | 7 | Robustez dos dados: venda/troca/condicional/NF-e gravando tudo de uma vez (transação ou outbox), numeração pelo banco, consultas pesadas agregadas no PostgreSQL | ⏳ |
 | v0.23.0 | 7 | App nas lojas (com o dono): projeto EAS, push testado em aparelho, ícone/nome, publicação no Google Play e App Store | ⏳ depende do dono |
