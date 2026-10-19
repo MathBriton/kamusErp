@@ -598,3 +598,25 @@ X-Empresa-Id: {{login.response.body.empresas[0].id}}
 POST {{api}}/api/indicadores/resumo-diario/enviar
 Authorization: Bearer {{login.response.body.accessToken}}
 X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### --- App mobile ---
+
+### Login do app: o token de sessão vem no corpo (o app guarda no armazenamento seguro)
+# @name loginMobile
+POST {{api}}/api/auth/mobile/login
+Content-Type: application/json
+
+{ "email": "admin@kamus.local", "senha": "Kamus@Dev123" }
+
+### Renovar a sessão do app (o token de sessão é trocado a cada uso)
+POST {{api}}/api/auth/mobile/refresh
+Content-Type: application/json
+
+{ "tokenDeSessao": "{{loginMobile.response.body.tokenDeSessao}}" }
+
+### Registrar o aparelho para receber push (token do Expo)
+PUT {{api}}/api/notificacoes/dispositivos
+Authorization: Bearer {{loginMobile.response.body.accessToken}}
+Content-Type: application/json
+
+{ "token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]", "plataforma": "android" }

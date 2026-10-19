@@ -32,7 +32,7 @@ O `CLAUDE.md` apenas importa este arquivo. **Ao terminar uma tarefa, atualize a 
 | Testes backend | xUnit v3 (**Microsoft Testing Platform**) + Shouldly + Testcontainers + NetArchTest |
 | Testes web | Vitest + Testing Library (jsdom) |
 | CI/Release | GitHub Actions; release por botão (script próprio em `.github/scripts/release`) |
-| Mobile | React Native (Expo) — ainda não iniciado |
+| Mobile | React Native + Expo SDK 58 (`src/mobile`), testes com jest-expo + Testing Library (RNTL 14) |
 
 ## 4. Comandos
 
@@ -41,6 +41,7 @@ O `CLAUDE.md` apenas importa este arquivo. **Ao terminar uma tarefa, atualize a 
 dotnet run --project src/backend/Kamus.Api        # API http://localhost:5249 (abre /scalar)
 cd src/web && npm install && npm run dev          # Web http://localhost:5173 (proxy /api e /health → 5249)
 cd src/admin && npm install && npm run dev        # Painel Administrativo http://localhost:5174 (proxy /admin-api → 5249)
+cd src/mobile && npm install && npm run web       # App mobile no navegador http://localhost:8081 (chama a API em :5249; CORS liberado em dev)
 # Login de teste: admin@kamus.local / Kamus@Dev123  (tenant "Loja Demo", 2 CNPJs)
 # Painel: superadmin@kamus.local / Kamus@Admin123
 
@@ -55,6 +56,7 @@ dotnet build Kamus.slnx -c Release                # TreatWarningsAsErrors = true
 # Web e Painel (o CI roda exatamente isto, em cada pasta)
 cd src/web && npm ci && npm run lint && npm run typecheck && npm test && npm run build
 cd src/admin && npm ci && npm run lint && npm run typecheck && npm test && npm run build
+cd src/mobile && npm ci && npm run lint && npm run typecheck && npm test && EXPO_OFFLINE=1 npx expo export --platform web --output-dir dist
 
 # Script de release
 node --test .github/scripts/release/*.test.mjs    # (Node 22 exige o caminho do arquivo, não a pasta)
@@ -88,10 +90,11 @@ src/backend/Modules/Vendas/...                Formas de pagamento, vendas, troca
 src/backend/Modules/Indicadores/...           Dashboard (/api/indicadores) e resumo diário (preferências, prévia, rotina) — só lê os módulos pelo SharedKernel
 src/web/src                                   auth/, api/, busca/, dashboard/, cadastros/, crediario/, configuracoes/, empresa/, estoque/, financeiro/, layout/, licenca/, navegacao/, notificacoes/, pages/, relatorios/, theme/, vendas/, test/
 src/admin/src                                 Painel Administrativo (operador do SaaS): login SuperAdmin, clientes, pagamentos
+src/mobile                                    App Expo: App.tsx, src/auth (Sessao, armazenamento seguro), src/api, src/telas (Login, Principal com abas, Início, Vendas, Contas, Avisos), src/push.ts, src/tema.ts, src/test
 tests/backend/Kamus.UnitTests                 Unitários (domínio puro)
 tests/backend/Kamus.IntegrationTests          API via WebApplicationFactory; InMemory e PostgreSQL (Testcontainers)
 tests/backend/Kamus.ArchitectureTests         Regras de dependência entre camadas
-.github/workflows                             backend-ci, web-ci, admin-ci, scripts-ci, pr-title, release
+.github/workflows                             backend-ci, web-ci, admin-ci, mobile-ci, scripts-ci, pr-title, release
 docs/                                         mockups, RELEASES.md
 ```
 
@@ -188,6 +191,12 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 - Vendas: estoque, financeiro e venda gravam em DbContexts diferentes (sem transação); o endpoint compensa (estorna estoque e cancela a origem no financeiro) se algo falhar depois da baixa.
 - Resumo diário: a rotina (`RotinaDoResumoDiario`, a cada 5 min) fica desligada nos testes (`Indicadores:RotinaAtiva=false` no `KamusApiFactory`); teste o `GeradorDeResumos.ExecutarAsync(agora)` direto.
 - Dashboard (web): o título dos cartões vem de `dados.periodo` (a resposta), não do botão escolhido — senão aparece o título novo com os números antigos enquanto carrega.
+- Mobile: o proxy deste ambiente bloqueia docs.expo.dev e a API de versões do Expo — use `EXPO_OFFLINE=1 npx expo install <pacote>` (versões do SDK instalado)
+  e consulte os tipos em `node_modules` (e `node_modules/@testing-library/react-native/docs`). Expo muda a cada SDK: não confie na memória.
+- Mobile/testes: RNTL 14 tem `render`/`fireEvent`/`act` assíncronos (`await render(...)`); módulos nativos (secure-store, notifications, device, constants,
+  safe-area) são substituídos em `src/test/setup.ts`; `src/test/mockApi.ts` casa "MÉTODO /caminho?query" como no web.
+- Push: `Push:Habilitado=false` no `KamusApiFactory` (sem internet nos testes); para testar o envio, troque o `IEnvioDePush` com `ConfigureTestServices`.
+  No aparelho, o token só sai com `extra.eas.projectId` no app.json (projeto EAS) e, no Android, num development build (o Expo Go não recebe push).
 
 ---
 
@@ -195,8 +204,8 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 
 **Última atualização:** 2026-10-19
 
-**Releases:** v0.1.0 → **v0.18.0** lançadas (a v0.18.0 trouxe o dashboard real e o resumo diário). Próxima: **v0.19.0** (app mobile); depois v0.20.0 (central de relatórios).
-Plano de releases em `LEVANTAMENTO.md` → Plano de releases (mobile v0.19.0, relatórios v0.20.0, v1.0.0 produção).
+**Releases:** v0.1.0 → **v0.18.0** lançadas; **v0.19.0** (app mobile) pronta para lançar. Próxima: **v0.20.0** (central de relatórios).
+Plano de releases em `LEVANTAMENTO.md` → Plano de releases (relatórios v0.20.0, v1.0.0 produção).
 
 **O que existe hoje:**
 - Fundação: login (JWT + refresh rotativo), empresa ativa (`X-Empresa-Id`), histórico de alterações, notificações (SignalR),
@@ -232,15 +241,22 @@ Plano de releases em `LEVANTAMENTO.md` → Plano de releases (mobile v0.19.0, re
     Endpoints `GET/PUT /api/indicadores/resumo-diario`, `GET .../previa`, `POST .../enviar` (teste).
   - Web: `pages/DashboardPage` (cartões, gráfico SVG de 30 dias, alertas, saldos, mais vendidos, formas/vendedores, condicionais, estoque, primeiros passos só sem dados)
     e `dashboard/ResumoDiarioDialogo`; o sininho mostra mensagens com várias linhas. Menu "Relatórios" previsto para a v0.20.0.
-- Testes: 513 backend, 171 web, 10 admin. E2E em localhost (cartões e comparações, troca de período, alerta levando à tela, prévia e envio do resumo ao sininho,
-  visão da vendedora, tema escuro), 3 execuções.
+- **App mobile (v0.19.0)** — `src/mobile` (Expo SDK 58), somente leitura:
+  - Backend: `/api/auth/mobile/login|refresh|logout` (token de sessão no corpo, sempre "manter conectado"); CORS só para `Cors:Origens`
+    (Development: http://localhost:8081); `Dispositivo` no módulo Notificações (tabela `dispositivos` com RLS, `PUT/DELETE /api/notificacoes/dispositivos`)
+    e `IEnvioDePush` (`EnvioDePushExpo` → Expo Push API) chamado pelo `Notificador` a cada notificação; tokens `DeviceNotRegistered` saem da lista.
+  - App: `auth/Sessao` (token de acesso em memória, token de sessão no SecureStore/localStorage no web, renova uma vez no 401), empresa ativa com "Todas
+    as empresas" para quem é Dono em todas, abas por perfil (Início = `/api/indicadores`; Vendas de hoje; Contas a pagar/receber de 7 dias; Avisos com
+    contador), `push.ts` (permissão + token do Expo → registra o aparelho), tema claro/escuro com os tokens da web. CI `mobile-ci`.
+- Testes: 531 backend, 171 web, 10 admin, 7 mobile. E2E do app no navegador (login, períodos, consolidado, abas, marcar avisos, recarregar mantendo a sessão,
+  sair, vendedora no tema escuro), 3 execuções.
 
-**Próximo passo — v0.19.0: app mobile somente leitura** (ver `LEVANTAMENTO.md` 4.6):
-1. `src/mobile` com Expo (React Native + TypeScript), login com o mesmo JWT/refresh, seletor de empresa (inclusive consolidado).
-2. Telas de leitura usando `/api/indicadores` (dashboard, alertas) e as listas já existentes (vendas do dia, contas, condicionais, crediário).
-3. Push (Expo Notifications) para o resumo diário e alertas: registrar o token do aparelho por usuário e enviar junto com o sininho.
-4. Testável em localhost (Expo Go / web) sem banco; CI para o app (lint, typecheck, testes).
-Depois: v0.20.0 central de relatórios; v1.0.0 produção (depende de servidor).
+**Próximo passo — v0.20.0: central de relatórios** (menu "Relatórios", hoje "previsto"; ver `LEVANTAMENTO.md` 4.6 e plano de releases):
+1. Tela única com os relatórios por área (vendas por período/produto/cor/tamanho/vendedor, produtos sem giro, DRE gerencial, estoque, financeiro),
+   reaproveitando o `IRelatorio` e o `BotaoExportar` (PDF/Excel/CSV, segundo plano).
+2. DRE gerencial simples (receitas por categoria, CMV pelo custo das vendas, despesas por categoria) a partir do Financeiro e das vendas.
+3. Produtos sem giro (sem venda há N dias, com estoque) e curva ABC de produtos.
+Depois: v1.0.0 produção (depende de servidor); com o dono: projeto EAS para push real e publicação do app.
 
 **Pendências conhecidas:** ver "Dúvidas em aberto e débitos técnicos" no `README.md` (lista viva — acrescente lá).
 Também: branch órfã `release-please--branches--main--components--kamus` no GitHub (pode ser apagada pela interface).

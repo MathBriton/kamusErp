@@ -678,7 +678,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | v0.16.0 | 5 | Crediário próprio: limite por cliente, venda a prazo (forma "Crediário"), bloqueio por atraso, recebimento com multa/juros, carnê e recibo em PDF, carteira por faixa de atraso | ✅ lançada |
 | v0.17.0 | 5 | Condicional (malinha): cliente cadastrado, prazo e limites por cliente, peças saem do estoque disponível, termo em PDF, fechamento com devolução e venda das peças que ficaram, atrasadas e liberação por gerente, conversão por vendedor | ✅ lançada |
 | v0.18.0 | 6 | Dashboard real (vendas, financeiro, estoque, crediário e condicionais, com comparação e alertas) e resumo diário no sininho, configurável por usuário | ✅ lançada |
-| v0.19.0 | 6 | App mobile (Expo) somente leitura para o dono, com push dos alertas e do resumo diário | ⏳ |
+| v0.19.0 | 6 | App mobile (Expo) somente leitura: login, empresa ativa (inclusive consolidado), dashboard, vendas de hoje, contas de 7 dias, avisos; push de toda notificação (inclusive o resumo diário) | ⏳ |
 | v0.20.0 | 6 | Central de relatórios (DRE gerencial, vendas por período/produto/cor/tamanho, produtos sem giro) | ⏳ |
 | v1.0.0 | 7 | Produção e primeira loja piloto | ⏳ depende de servidor |
 
@@ -845,6 +845,8 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | 2026-10-17 | Cancelamento de venda (Dono/Gerente, motivo obrigatório) devolve o estoque (movimento "Cancelamento de venda") e estorna o financeiro (baixas estornadas e títulos cancelados); nada é apagado | Aceita |
 | 2026-10-17 | Comissão = % do vendedor (do cadastro, gravado na venda) sobre o total da venda concluída; vendas sem vendedor aparecem como "Sem vendedor" | Aceita (provisória — ver dúvida 4 do README) |
 | 2026-10-18 | Crediário e condicional divididos: v0.16.0 crediário, v0.17.0 condicional; dashboard/mobile passa a v0.18.0 | Aceita |
+| 2026-10-19 | App mobile (v0.19.0) em `src/mobile` com Expo, navegação própria por abas (sem Expo Router, por ser só leitura), mesmos tokens de cor da web; login próprio (`/api/auth/mobile/*`) com o token de sessão no corpo, guardado no armazenamento seguro do aparelho; CORS só para o Expo web em desenvolvimento | Aceita |
+| 2026-10-19 | Push pelo Expo Push: o app registra o aparelho por usuário e toda notificação do sininho também sai como push; aparelho desinstalado sai da lista; desligável com `Push:Habilitado=false` | Aceita |
 | 2026-10-19 | Dashboard (v0.18.0) num módulo próprio (Indicadores) que só lê os módulos pelo SharedKernel (`IIndicadoresDeVendas`, `IIndicadoresFinanceiros`, `IIndicadoresDeEstoque`); blocos por perfil (Vendedor: só as próprias vendas e as condicionais; Estoquista: estoque); períodos hoje/7 dias/mês comparados com o período anterior do mesmo tamanho | Aceita |
 | 2026-10-19 | Resumo diário (v0.18.0) no sininho: preferências por usuário (horário de Brasília, dias, blocos, enviar sem movimento), padrão ligado às 20h só para o Dono, no máximo um por dia; push e e-mail ficam para o app e o servidor | Aceita (provisória) |
 | 2026-10-19 | v0.18.0 dividida: v0.18.0 dashboard real + resumo diário (sininho), v0.19.0 app mobile, v0.20.0 central de relatórios | Aceita |

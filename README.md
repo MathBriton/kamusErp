@@ -12,7 +12,8 @@ SaaS de gestão para lojas de roupas: estoque em grade (cor × tamanho), finance
 |---|---|
 | Backend | .NET 10 (ASP.NET Core), EF Core, PostgreSQL 17 |
 | Web | React 19 + TypeScript + Tailwind CSS 4 (Vite) |
-| Testes | xUnit v3 + Shouldly + Testcontainers · Vitest + Testing Library |
+| Mobile | React Native + Expo (SDK 58), somente leitura para o dono |
+| Testes | xUnit v3 + Shouldly + Testcontainers · Vitest + Testing Library · jest-expo |
 | Infra | Docker Compose · GitHub Actions |
 
 ## Pré-requisitos
@@ -31,7 +32,13 @@ Precisa apenas do .NET SDK 10 e do Node.js.
 dotnet run --project src/backend/Kamus.Api   # API em http://localhost:5249 (abre a tela de testes)
 cd src/web && npm install && npm run dev     # web em http://localhost:5173 (proxy para a API)
 cd src/admin && npm install && npm run dev   # Painel Administrativo em http://localhost:5174 (opcional)
+cd src/mobile && npm install && npm run web  # App mobile no navegador em http://localhost:8081 (opcional)
 ```
+
+**App mobile no celular** (opcional): instale o **Expo Go**, deixe o celular na mesma rede Wi-Fi do computador e rode
+`dotnet run --project src/backend/Kamus.Api --urls http://0.0.0.0:5249` e, em `src/mobile`,
+`EXPO_PUBLIC_API_URL=http://<IP-do-computador>:5249 npx expo start` (leia o QR code com a câmera/Expo Go).
+O push no celular precisa de um projeto EAS (`npx eas-cli init`) e, no Android, de um *development build* (o Expo Go não recebe push).
 
 **Logins de teste** (senha `Kamus@Dev123`, cliente "Loja Demo" com 2 CNPJs):
 - `admin@kamus.local` — perfil Dono nas duas empresas (vê tudo, inclusive a visão consolidada)
@@ -50,9 +57,9 @@ Sem banco, os dados ficam **em memória**: são recriados a cada vez que a API s
 | **Tela para testar a API** (Scalar) | http://localhost:5249/scalar |
 | Documento OpenAPI | http://localhost:5249/openapi/v1.json |
 | Saúde | http://localhost:5249/health → `Degraded` sem banco (normal neste modo) |
-| Autenticação | `POST /api/auth/login`, `/refresh`, `/logout` e `GET /api/auth/me` |
+| Autenticação | `POST /api/auth/login`, `/refresh`, `/logout` e `GET /api/auth/me` · app mobile: `/api/auth/mobile/login`, `/refresh`, `/logout` (token de sessão no corpo) |
 | Histórico de alterações | `GET /api/auditoria` · tela em Configurações → Histórico de alterações |
-| Notificações | `GET /api/notificacoes` · tempo real em `/hubs/notificacoes` · `POST /api/notificacoes/teste` dispara uma de teste |
+| Notificações | `GET /api/notificacoes` · tempo real em `/hubs/notificacoes` · `POST /api/notificacoes/teste` dispara uma de teste · aparelhos para push: `PUT/DELETE /api/notificacoes/dispositivos` |
 | Pesquisa global | `GET /api/busca?q=...` · **Ctrl+K** na aplicação web |
 | Exportação | `GET /api/relatorios/historico-de-alteracoes.pdf` (ou `.xlsx`, `.csv`) · botão **Exportar** no histórico |
 | Licença do cliente | `GET /api/licenca` e `/api/licenca/pagamentos` · tela em Configurações → Licença e assinatura |
@@ -93,6 +100,7 @@ Para o `npm run dev` usar a API do Compose: `KAMUS_API_URL=http://localhost:8080
 dotnet test --solution Kamus.slnx   # backend
 cd src/web && npm test              # frontend
 cd src/admin && npm test            # Painel Administrativo
+cd src/mobile && npm test           # App mobile
 ```
 
 Os testes que precisam de PostgreSQL usam Testcontainers (Docker). **Sem Docker na máquina eles são pulados com aviso** e o restante roda normalmente; no CI (`CI=true`) eles são obrigatórios e a falta de Docker é erro.
@@ -109,9 +117,10 @@ Versionamento semântico calculado a partir de [Conventional Commits](https://ww
 src/backend/Kamus.Api                    API (ponto de entrada)
 src/backend/Shared/Kamus.SharedKernel    Tipos de domínio compartilhados (sem dependências de framework)
 src/backend/Shared/Kamus.Infrastructure  EF Core, multi-tenancy (filtro global + Row Level Security)
-src/backend/Modules/                     Módulos: Identidade, Notificacoes, Licenciamento (+ API do painel), Cadastros
+src/backend/Modules/                     Módulos: Identidade, Notificacoes, Licenciamento (+ API do painel), Cadastros, Estoque, Financeiro, Vendas, Indicadores
 src/web                                  Frontend React (cliente)
 src/admin                                Painel Administrativo (operador do SaaS)
+src/mobile                               App mobile (Expo) somente leitura para o dono
 tests/backend/                           Testes unitários, de integração e de arquitetura
 docker/                                  Scripts de inicialização dos containers
 ```
@@ -192,7 +201,9 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 65 | Dashboard do Vendedor: só as próprias vendas e as condicionais (sem financeiro nem estoque) — está bom? | Provisório: **sim**; Estoquista vê só o estoque; Dono, Gerente e Financeiro veem tudo |
 | 66 | Vendas do dashboard descontam trocas e cancelamentos? | Provisório: canceladas não contam; **trocas não alteram** o total vendido (a diferença paga na troca não entra) |
 | 67 | Quebra de grade: o que conta como "esgotado"? | Provisório: SKU ativo que **já teve estoque e zerou**, num produto que ainda tem saldo em outro SKU (tamanho nunca comprado não conta) |
-| 68 | Resumo diário por e-mail e push no celular | Previsto: push com o app (v0.19.0); e-mail quando houver servidor de envio |
+| 69 | App mobile: o que mais o dono quer ver no celular (estoque por produto, crediário, condicionais em lista)? | Provisório (v0.19.0): Início (dashboard), vendas de hoje, contas a pagar/receber de 7 dias e avisos; o resto pelo web |
+| 70 | Publicação nas lojas (Google Play / App Store), nome e ícone do app | Em aberto: precisa de conta de desenvolvedor e projeto EAS; hoje roda pelo Expo Go / navegador |
+| 68 | Resumo diário por e-mail e push no celular | Push implementado (v0.19.0): toda notificação do sininho, inclusive o resumo, vai para os aparelhos do usuário; e-mail quando houver servidor de envio |
 
 ### Débitos técnicos
 
@@ -232,6 +243,9 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Dashboard e resumo diário calculam em memória (várias consultas por abertura: período, anterior, mês, 30 dias) | Lentos com muitos milhares de vendas | Read models / consultas agregadas no PostgreSQL |
 | Rotina do resumo diário roda em cada instância da API | Com várias instâncias, o mesmo usuário pode receber dois resumos (a marcação do dia reduz, mas não elimina) | Ao escalar: rotina única (fila/lock no banco) |
 | Resumo diário limitado a 1000 caracteres (limite da notificação) | Lojas com muitos alertas podem ter o texto cortado | Tela própria do resumo (link na notificação) ou app |
+| Push enviado na hora de cada notificação (dentro da mesma requisição/rotina), sem fila nem nova tentativa | Se o serviço do Expo cair, o push daquela notificação se perde (o sininho continua com ela) | Fila/outbox quando houver servidor |
+| App mobile sem build nativo no CI (só lint, testes e pacote web) e sem projeto EAS | Push real e publicação nas lojas ainda não testados num aparelho | Criar projeto EAS e build de desenvolvimento (com o dono) |
+| App mobile no navegador guarda o token de sessão no localStorage | Aceitável só para testar em localhost (no aparelho vai no armazenamento seguro) | — (decisão consciente) |
 | Troca não tem cancelamento | Troca lançada errada precisa de ajuste manual (estoque e vale) | Avaliar com a loja piloto |
 | Número da venda (e da troca) calculado pelo maior existente da empresa | Duas vendas simultâneas podem colidir (o índice único recusa uma; basta registrar de novo) | Sequência no banco quando houver PostgreSQL em produção |
 | Lista de vendas e comissões carregam itens e pagamentos **em memória** | Lento com muitos milhares de vendas no período | Projeções/consultas agregadas no PostgreSQL |
