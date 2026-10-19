@@ -56,6 +56,7 @@ public sealed class CentralDeRelatoriosTests : IAsyncDisposable
         var categorias = (await client.GetFromJsonAsync<List<CategoriaDto>>(U("/api/financeiro/categorias"), Ct))!;
         await Despesa(client, "Aluguel do mês", categorias.Single(x => x.Nome == "Aluguel").Id, 1500m);
         await Despesa(client, "Reposição de estoque", categorias.Single(x => x.Nome == "Compra de mercadorias").Id, 500m);
+        await Despesa(client, "Conserto da vitrine", null, 100m);
         return c;
     }
 
@@ -72,7 +73,7 @@ public sealed class CentralDeRelatoriosTests : IAsyncDisposable
         r.StatusCode.ShouldBe(HttpStatusCode.Created, await r.Content.ReadAsStringAsync(Ct));
     }
 
-    private static async Task Despesa(HttpClient client, string descricao, Guid categoriaId, decimal valor)
+    private static async Task Despesa(HttpClient client, string descricao, Guid? categoriaId, decimal valor)
     {
         var r = await client.PostAsJsonAsync(U("/api/financeiro/titulos"),
             new { tipo = "Pagar", descricao, categoriaId, competencia = Hoje, parcelas = new[] { new { vencimento = Hoje.AddDays(5), valor } } }, Ct);
@@ -169,7 +170,8 @@ public sealed class CentralDeRelatoriosTests : IAsyncDisposable
         Valor("(−) Custo das mercadorias vendidas").ShouldBe(-80m);
         Valor("(=) Lucro bruto").ShouldBe(159.60m);
         Valor("Ocupação · Aluguel").ShouldBe(-1500m);
-        Valor("(=) Resultado do período").ShouldBe(-1340.40m);
+        Valor("Sem categoria").ShouldBe(-100m);
+        Valor("(=) Resultado do período").ShouldBe(-1440.40m);
         dre.Linhas.ShouldNotContain(l => l[0].GetString()!.Contains("Compra de mercadorias", StringComparison.Ordinal));
         Linha(0).ShouldBe("Receita bruta de vendas");
         dre.Linhas.Single(l => l[0].GetString() == "(=) Lucro bruto")[2].GetDecimal().ShouldBe(66.6m);

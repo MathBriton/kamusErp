@@ -97,7 +97,7 @@ internal sealed class RelatorioDre(IIndicadoresDeVendas vendas, IIndicadoresFina
         foreach (var o in outras) Linha($"Outras receitas · {o.Nome}", o.Valor);
         var despesas = lancamentos.Where(l => l.Tipo == "Despesa").GroupBy(l => (l.Grupo, l.Categoria)).Select(g => (g.Key.Grupo, g.Key.Categoria, Valor: g.Sum(l => l.Valor)))
             .OrderBy(x => x.Grupo, StringComparer.CurrentCulture).ThenBy(x => x.Categoria, StringComparer.CurrentCulture).ToList();
-        foreach (var d in despesas) Linha($"{d.Grupo} · {d.Categoria}", -d.Valor);
+        foreach (var d in despesas) Linha(d.Grupo == d.Categoria ? d.Categoria : $"{d.Grupo} · {d.Categoria}", -d.Valor);
         Linha("(=) Resultado do período", lucroBruto + outras.Sum(o => o.Valor) - despesas.Sum(d => d.Valor));
 
         return new DadosDoRelatorio(Titulo,
