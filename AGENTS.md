@@ -76,7 +76,7 @@ src/backend/Shared/Kamus.SharedKernel         Tipos de domínio sem dependência
 src/backend/Shared/Kamus.Infrastructure       KamusDbContext (isolamento por tenant), RLS, persistência, middleware de tenant
 src/backend/Shared/Kamus.Infrastructure/Auditoria  Histórico de alterações (interceptor, schema auditoria, /api/auditoria)
 src/backend/Shared/Kamus.Infrastructure/Busca      Pesquisa global (/api/busca) — junta os IProvedorDeBusca dos módulos
-src/backend/Shared/Kamus.Infrastructure/Relatorios Exportação PDF/Excel/CSV (/api/relatorios/{codigo}.{formato}) + segundo plano
+src/backend/Shared/Kamus.Infrastructure/Relatorios Central (/api/relatorios = catálogo, /{codigo}/dados = tela) e exportação PDF/Excel/CSV (/{codigo}.{formato}) + segundo plano
 src/backend/Shared/Kamus.Infrastructure/Planilhas  Leitura de .xlsx/.csv (LeitorDePlanilha, ValoresDaPlanilha) e modelos (ModeloDePlanilha)
 src/backend/Shared/Kamus.Infrastructure/Importacao Importação genérica (/api/importacoes): IImportador, sessões, confirmação e segundo plano
 src/backend/Shared/Kamus.Infrastructure/Etiquetas  Código de barras em SVG (EAN-13/8, ITF-14) e PDF de etiquetas (A4 3×10 e térmica 40×25)
@@ -104,7 +104,7 @@ auditoria, RLS e registra as migrations para `AplicarMigracoesKamusAsync`), sche
 `AddModulo<Nome>()` / `MapModulo<Nome>()` chamados no `Program.cs`. Para importar por planilha, registre um `IImportador`
 (`Kamus.Infrastructure.Importacao`; recebe `ContextoDaImportacao` com usuário e empresa). Para aparecer na pesquisa global,
 registre um `IProvedorDeBusca`. Para ter relatório exportável, registre um `IRelatorio` (código, título,
-perfis e `GerarAsync` devolvendo `DadosDoRelatorio`) e use `<BotaoExportar relatorio="codigo" parametros={filtros}/>`
+perfis e `GerarAsync` devolvendo `DadosDoRelatorio`; para a central, também `Area`, `Descricao` e `Parametros` — ou `NaCentral => false`) e use `<BotaoExportar relatorio="codigo" parametros={filtros}/>`
 na tela — PDF, Excel, CSV, histórico e segundo plano vêm de graça. **Lembre de adicionar o `.csproj` novo no `src/backend/Kamus.Api/Dockerfile`**
 (o restore copia os projetos um a um) e de incluir o assembly nos testes de arquitetura.
 
@@ -204,8 +204,8 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 
 **Última atualização:** 2026-10-19
 
-**Releases:** v0.1.0 → **v0.19.0** lançadas (a v0.19.0 trouxe o app mobile). Próxima: **v0.20.0** (central de relatórios).
-Plano de releases em `LEVANTAMENTO.md` → Plano de releases (relatórios v0.20.0, v1.0.0 produção).
+**Releases:** v0.1.0 → **v0.19.0** lançadas; **v0.20.0** (central de relatórios) pronta para lançar. Próxima: **v0.21.0** (segurança para produção).
+Plano de releases em `LEVANTAMENTO.md` → Plano de releases (v0.21.0 segurança, v0.22.0 robustez, v0.23.0 app nas lojas, v1.0.0 produção).
 
 **O que existe hoje:**
 - Fundação: login (JWT + refresh rotativo), empresa ativa (`X-Empresa-Id`), histórico de alterações, notificações (SignalR),
@@ -248,15 +248,20 @@ Plano de releases em `LEVANTAMENTO.md` → Plano de releases (relatórios v0.20.
   - App: `auth/Sessao` (token de acesso em memória, token de sessão no SecureStore/localStorage no web, renova uma vez no 401), empresa ativa com "Todas
     as empresas" para quem é Dono em todas, abas por perfil (Início = `/api/indicadores`; Vendas de hoje; Contas a pagar/receber de 7 dias; Avisos com
     contador), `push.ts` (permissão + token do Expo → registra o aparelho), tema claro/escuro com os tokens da web. CI `mobile-ci`.
-- Testes: 531 backend, 171 web, 10 admin, 7 mobile. E2E do app no navegador (login, períodos, consolidado, abas, marcar avisos, recarregar mantendo a sessão,
-  sair, vendedora no tema escuro), 3 execuções.
+- **Central de relatórios (v0.20.0)** — `IRelatorio` ganhou membros padrão `Area`, `Descricao`, `Parametros` (`ParametroDoRelatorio`: Periodo → `de`/`ate`
+  com padrão mes|hoje|proximos30, Opcao, Inteiro, Data) e `NaCentral`. `RelatoriosEndpoints`: `GET /api/relatorios` (catálogo do perfil) e
+  `GET /api/relatorios/{codigo}/dados` (até 500 linhas + `TotalDeLinhas`). Novos: `vendas-agrupadas` e `curva-abc` (Vendas, `Relatorios/RelatoriosDeGestao.cs`,
+  usam `ICatalogoDeProdutos` para cor/tamanho/referência e `Venda.ValoresPagosPorSku` para o desconto rateado), `produtos-sem-giro` e `dre` (Indicadores,
+  com os contratos novos `IIndicadoresDeVendas.ResultadoAsync/UltimaVendaPorProdutoAsync`, `IIndicadoresDeEstoque.PorProdutoAsync`,
+  `IIndicadoresFinanceiros.PorCategoriaAsync`). Web `relatorios/CentralDeRelatoriosPage` (lista por área, filtros dinâmicos, tabela com totais, exportar).
+- Testes: 541 backend, 175 web, 10 admin, 7 mobile. E2E da central em localhost (áreas, vendas por tamanho + Excel, curva ABC, sem giro, DRE + PDF,
+  vendedora, tema escuro), 3 execuções.
 
-**Próximo passo — v0.20.0: central de relatórios** (menu "Relatórios", hoje "previsto"; ver `LEVANTAMENTO.md` 4.6 e plano de releases):
-1. Tela única com os relatórios por área (vendas por período/produto/cor/tamanho/vendedor, produtos sem giro, DRE gerencial, estoque, financeiro),
-   reaproveitando o `IRelatorio` e o `BotaoExportar` (PDF/Excel/CSV, segundo plano).
-2. DRE gerencial simples (receitas por categoria, CMV pelo custo das vendas, despesas por categoria) a partir do Financeiro e das vendas.
-3. Produtos sem giro (sem venda há N dias, com estoque) e curva ABC de produtos.
-Depois: v1.0.0 produção (depende de servidor); com o dono: projeto EAS para push real e publicação do app.
+**Próximo passo — v0.21.0: segurança para produção** (ver `README.md` → débitos "antes de ir para produção"):
+1. 2FA (TOTP) para o SuperAdmin do Painel Administrativo; revogação do token do painel (sair invalida no servidor) e renovação curta.
+2. "Esqueci minha senha" por e-mail (link de uso único com validade); envio de e-mail por abstração (`IEnvioDeEmail`) com implementação de log em dev.
+3. Licença obrigatória: tenant sem licença passa a ser tratado como trial/bloqueado conforme regra a definir; script para criar licença dos existentes.
+Depois: v0.22.0 robustez dos dados (transação/outbox, numeração pelo banco, consultas agregadas), v0.23.0 app nas lojas (com o dono), v1.0.0 produção.
 
 **Pendências conhecidas:** ver "Dúvidas em aberto e débitos técnicos" no `README.md` (lista viva — acrescente lá).
 Também: branch órfã `release-please--branches--main--components--kamus` no GitHub (pode ser apagada pela interface).

@@ -620,3 +620,20 @@ Authorization: Bearer {{loginMobile.response.body.accessToken}}
 Content-Type: application/json
 
 { "token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]", "plataforma": "android" }
+
+### --- Central de relatórios ---
+
+### Catálogo: relatórios que o perfil pode gerar, com área, descrição e filtros
+GET {{api}}/api/relatorios
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Vendas do mês por tamanho (dados para a tela)
+GET {{api}}/api/relatorios/vendas-agrupadas/dados?de=2026-10-01&ate=2026-10-31&agrupamento=tamanho
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### DRE gerencial do mês em PDF
+GET {{api}}/api/relatorios/dre.pdf?de=2026-10-01&ate=2026-10-31
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}

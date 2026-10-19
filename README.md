@@ -61,7 +61,7 @@ Sem banco, os dados ficam **em memória**: são recriados a cada vez que a API s
 | Histórico de alterações | `GET /api/auditoria` · tela em Configurações → Histórico de alterações |
 | Notificações | `GET /api/notificacoes` · tempo real em `/hubs/notificacoes` · `POST /api/notificacoes/teste` dispara uma de teste · aparelhos para push: `PUT/DELETE /api/notificacoes/dispositivos` |
 | Pesquisa global | `GET /api/busca?q=...` · **Ctrl+K** na aplicação web |
-| Exportação | `GET /api/relatorios/historico-de-alteracoes.pdf` (ou `.xlsx`, `.csv`) · botão **Exportar** no histórico |
+| Relatórios | Central em **Relatórios** (menu) · `GET /api/relatorios` (catálogo do perfil), `/api/relatorios/{codigo}/dados` (tela), `/api/relatorios/{codigo}.pdf\|xlsx\|csv` (exportação) |
 | Licença do cliente | `GET /api/licenca` e `/api/licenca/pagamentos` · tela em Configurações → Licença e assinatura |
 | Empresas e usuários | `/api/empresas`, `/api/usuarios`, `POST /api/auth/trocar-senha` · Configurações → Empresas / Usuários e permissões (perfil Dono) |
 | Produtos | `/api/grades`, `/api/cores` (com `/padrao`), `/api/produtos` (SKUs, `/por-codigo/{ean}`, `/sugestoes`) · Cadastros → Produtos (matriz cor × tamanho) / Grades e cores · relatório `produtos` |
@@ -201,6 +201,8 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 65 | Dashboard do Vendedor: só as próprias vendas e as condicionais (sem financeiro nem estoque) — está bom? | Provisório: **sim**; Estoquista vê só o estoque; Dono, Gerente e Financeiro veem tudo |
 | 66 | Vendas do dashboard descontam trocas e cancelamentos? | Provisório: canceladas não contam; **trocas não alteram** o total vendido (a diferença paga na troca não entra) |
 | 67 | Quebra de grade: o que conta como "esgotado"? | Provisório: SKU ativo que **já teve estoque e zerou**, num produto que ainda tem saldo em outro SKU (tamanho nunca comprado não conta) |
+| 71 | DRE: compra de mercadoria lançada à mão (grupo "Mercadorias") fica fora, e o custo entra pelo CMV das vendas — está certo para a loja? Despesas sem categoria aparecem como "Sem categoria" | Provisório (v0.20.0); validar com o contador |
+| 72 | Curva ABC (80% / 95%) e "sem giro" a partir de 60 dias — bons cortes para moda? | Provisório (v0.20.0); os dias do sem giro são escolhidos na tela |
 | 69 | App mobile: o que mais o dono quer ver no celular (estoque por produto, crediário, condicionais em lista)? | Provisório (v0.19.0): Início (dashboard), vendas de hoje, contas a pagar/receber de 7 dias e avisos; o resto pelo web |
 | 70 | Publicação nas lojas (Google Play / App Store), nome e ícone do app | Em aberto: precisa de conta de desenvolvedor e projeto EAS; hoje roda pelo Expo Go / navegador |
 | 68 | Resumo diário por e-mail e push no celular | Push implementado (v0.19.0): toda notificação do sininho, inclusive o resumo, vai para os aparelhos do usuário; e-mail quando houver servidor de envio |
@@ -246,6 +248,8 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Push enviado na hora de cada notificação (dentro da mesma requisição/rotina), sem fila nem nova tentativa | Se o serviço do Expo cair, o push daquela notificação se perde (o sininho continua com ela) | Fila/outbox quando houver servidor |
 | App mobile sem build nativo no CI (só lint, testes e pacote web) e sem projeto EAS | Push real e publicação nas lojas ainda não testados num aparelho | Criar projeto EAS e build de desenvolvimento (com o dono) |
 | App mobile no navegador guarda o token de sessão no localStorage | Aceitável só para testar em localhost (no aparelho vai no armazenamento seguro) | — (decisão consciente) |
+| Relatórios de gestão (vendas agrupadas, ABC, sem giro, DRE) calculam em memória a partir das vendas e títulos do período | Lentos com muitos milhares de vendas | Consultas agregadas no PostgreSQL (v0.22.0) |
+| Histórico de alterações na central sem filtro de período (o filtro `ate` da API considera o início do dia) | Exporta os últimos 50 mil registros | Corrigir o filtro de data do histórico e expor o período na central |
 | Troca não tem cancelamento | Troca lançada errada precisa de ajuste manual (estoque e vale) | Avaliar com a loja piloto |
 | Número da venda (e da troca) calculado pelo maior existente da empresa | Duas vendas simultâneas podem colidir (o índice único recusa uma; basta registrar de novo) | Sequência no banco quando houver PostgreSQL em produção |
 | Lista de vendas e comissões carregam itens e pagamentos **em memória** | Lento com muitos milhares de vendas no período | Projeções/consultas agregadas no PostgreSQL |
