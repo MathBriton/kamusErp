@@ -663,3 +663,54 @@ X-Empresa-Id: {{login.response.body.empresas[0].id}}
 GET {{api}}/api/relatorios/dre.pdf?de=2026-10-01&ate=2026-10-31
 Authorization: Bearer {{login.response.body.accessToken}}
 X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### ---------- Grades (padrão das telas de lista) ----------
+### Toda lista aceita pagina/tamanho e devolve { itens, total, pagina, tamanho } (sem "pagina" devolve tudo, no formato antigo).
+### Relatórios aceitam ids=a,b,c (só as linhas selecionadas). Situação em lote: POST .../situacao { "ids": [...], "ativo": false } → { alterados }
+### (pessoas, vendedores, produtos, vendas/formas, financeiro/categorias, financeiro/contas, estoque/lojas, usuarios).
+
+### Clientes paginados
+GET {{api}}/api/pessoas?papel=cliente&situacao=ativos&pagina=1&tamanho=20
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Vendedores em lote
+POST {{api}}/api/vendedores/situacao
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "ids": ["00000000-0000-0000-0000-000000000000"], "ativo": false }
+
+### Contas a pagar paginadas (totais sobre todas as linhas filtradas)
+GET {{api}}/api/financeiro/titulos?tipo=pagar&situacao=abertas&pagina=1&tamanho=20
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Pagar/Receber selecionadas (saldo inteiro, sem encargos; falhas voltam com o motivo)
+POST {{api}}/api/financeiro/parcelas/baixas-em-lote
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "parcelaIds": ["00000000-0000-0000-0000-000000000000"], "contaId": "00000000-0000-0000-0000-000000000000" }
+
+### Vendas paginadas ("total" = valor vendido; "registros" = quantidade de vendas)
+GET {{api}}/api/vendas?de=2026-10-01&ate=2026-10-31&pagina=1&tamanho=20
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Notas de entrada (situacao=pendentes|lancadas|descartadas|todas, busca, de/ate da emissão)
+GET {{api}}/api/estoque/notas?situacao=todas&pagina=1&tamanho=20
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Usuários (busca, situacao, empresaId, perfil)
+GET {{api}}/api/usuarios?situacao=ativos&pagina=1&tamanho=20
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Exportar só as vendas selecionadas
+GET {{api}}/api/relatorios/vendas.csv?ids=00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}

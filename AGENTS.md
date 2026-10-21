@@ -147,8 +147,12 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 - **Padrão de tela de cadastro/consulta (web):** use `src/web/src/components/grade/` — `CabecalhoDaPagina` (seção, título, ações
   "Exportar" + "Novo"), `BarraDeFiltros` ("Limpar filtros"), `GradeDeRegistros` (colunas, seleção de linhas com `acoesEmLote`, `acoes` por linha
   com `AcaoDaLinha`, total de registros, paginação manual 20/50/100 — a API recebe `pagina`/`tamanho` e devolve `itens`/`total`) e `Confirmacao`
-  (inativar/excluir). Filtro novo volta à página 1 e limpa a seleção. `BotaoExportar` recebe `selecionados` (vai `?ids=` para o relatório, que
-  precisa aceitar esse parâmetro). Referência: `cadastros/ProdutosPage.tsx`.
+  (inativar/excluir); estado e busca com `useGrade(FILTROS)` + `useListaPaginada(url, versao, atraso)` (`components/grade/useGrade.ts`). Filtro novo
+  volta à página 1 e limpa a seleção. `BotaoExportar` recebe `selecionados` (vai `?ids=` para o relatório, que lê com `ParametrosDoRelatorio.Ids` e
+  mostra `ParametrosDoRelatorio.Selecionados`). Backend: `Paginar(pagina, tamanho).Converter(...)` e `SituacaoEmLoteRequest/Response`
+  (`Kamus.SharedKernel.Consultas`). **Regra de compatibilidade:** lista sem `pagina` devolve tudo no formato antigo (app mobile, selects e consultas
+  de outras telas dependem disso); só a grade manda `pagina`/`tamanho`. Atenção: em `GET /api/vendas` o `total` é o valor vendido e a contagem é
+  `registros` (o app lê `total`); na carteira do crediário idem. Referência: `cadastros/ProdutosPage.tsx`.
 - **Respostas de erro da API:** `Results.Problem(...)` (ProblemDetails) com `detail` em português, pronto para exibir.
 - **Documentação da API** (`/scalar`, `/openapi/v1.json`) só em Development; requisições prontas em
   `src/backend/Kamus.Api/Kamus.Api.http`.
@@ -272,11 +276,15 @@ Plano de releases em `LEVANTAMENTO.md` → Plano de releases (v0.21.0 segurança
   todos os `IProgressoDaImplantacao` — um por módulo: Cadastros, Estoque, Financeiro, Vendas) e `Compromissos.ParcelasProximosSeteDias`. Web:
   `pages/DashboardPage` + `dashboard/` (`Grafico`, `PrimeirosPassos`, `UltimosMarcos` — lê `/api/auditoria`, tira logins e registros filhos e agrupa
   repetições —, `AtendimentoWhatsApp`, `suporte.ts` com `VITE_SUPORTE_WHATSAPP`); atualiza a cada 60 s; logo do menu leva a `/`; relógio na topbar.
-- Testes: 547 backend, 196 web, 10 admin, 7 mobile. E2E em localhost (dashboard vazio e com dados, ações rápidas, Nova venda, logo, tema escuro,
-  vendedora, celular), 3 execuções.
-
-**Antes da v0.21.0 (pedido do dono):** levar o padrão de grade às demais telas de cadastro/consulta (Clientes, Fornecedores, Vendedores, Contas a
-pagar/receber, Vendas realizadas...), uma por vez, com o relatório de cada uma aceitando `ids`.
+- **Todas as telas do menu no padrão de grade (em `main`):** Cadastros (clientes, fornecedores, vendedores, grades e cores), Estoque (posição, notas XML,
+  inventários, lojas), Financeiro (contas a pagar/receber com "Pagar/Receber selecionadas" = `POST /api/financeiro/parcelas/baixas-em-lote`, categorias,
+  contas financeiras), Vendas (realizadas, vales, condicionais, trocas, formas, fechamentos de comissão, carteira do crediário) e Administrativo (usuários,
+  empresas, histórico). Situação em lote: pessoas, vendedores, formas, categorias, contas, lojas, usuários (`POST .../situacao`). Relatórios novos
+  para exportar das grades: vendedores, grades, cores, trocas, formas-de-pagamento, fechamentos-de-comissao, categorias-financeiras, contas-financeiras,
+  lojas, notas-de-entrada, inventarios, usuarios, empresas; os existentes aceitam `ids`. Telas que não são lista (registrar venda, entrada/ajuste/
+  transferência/etiquetas, importar planilha, fluxo de caixa, licença) só usam o cabeçalho padrão.
+- Testes: 581 backend (296 unit, 281 integração, 4 arquitetura), 227 web, 10 admin, 7 mobile. E2E em localhost: as 23 telas em grade (total, paginação,
+  filtros, seleção, exportar), CSV só dos selecionados, formas desativadas em lote, pagar selecionadas, histórico paginado, tema escuro — 3 execuções.
 
 **Próximo passo — v0.21.0: segurança para produção** (ver `README.md` → débitos "antes de ir para produção"):
 1. 2FA (TOTP) para o SuperAdmin do Painel Administrativo; revogação do token do painel (sair invalida no servidor) e renovação curta.
