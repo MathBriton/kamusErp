@@ -199,7 +199,7 @@ function FormularioDeProduto({ produto, onFechar, onSalvo }: { produto: Produto 
     e.preventDefault()
     setEnviando(true)
     setErro(null)
-    const corpo = { ...form, precoVenda: preco ?? 0, precoCusto: custo, corIds }
+    const corpo = { ...form, gradeId: form.gradeId || null, precoVenda: preco ?? 0, precoCusto: custo, corIds }
     try {
       onSalvo(produto ? await enviar<Produto>('PUT', `/api/produtos/${produto.id}`, corpo) : await enviar<Produto>('POST', '/api/produtos', corpo))
     } catch (falha) {

@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import { corpo, empresaAtivaHandler, json, mockApi, sessaoDemo, sessaoVendedor } from '../test/mockApi'
+import { corpo, empresaAtivaHandler, json, mockApi, problema, sessaoDemo, sessaoVendedor } from '../test/mockApi'
 import { renderApp } from '../test/renderApp'
 
 const grades = [{ id: 'g1', nome: 'PP ao GG', tamanhos: ['P', 'M', 'G'], emUso: false }]
@@ -72,6 +72,27 @@ describe('Cadastros → Produtos', () => {
 
     expect(enviado).toMatchObject({ referencia: 'CAM-001', descricao: 'Camiseta Básica Gola V', precoVenda: 59.9, precoCusto: 24, gradeId: 'g1', corIds: ['c1', 'c2'] })
     expect(await screen.findByRole('table', { name: 'Grade de Camiseta Básica Gola V' })).toBeInTheDocument()
+  })
+
+  it('novo produto sem grade envia gradeId nulo e mostra a mensagem da API', async () => {
+    let enviado: Record<string, unknown> | null = null
+    api({
+      'POST /api/produtos': (init) => {
+        enviado = corpo(init)
+        return problema(400, 'Escolha uma grade de tamanhos.')
+      },
+    })
+    renderApp('/cadastros/produtos')
+    await screen.findByText('CAM-001')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Novo produto' }))
+    const dialogo = screen.getByRole('dialog', { name: 'Novo produto' })
+    await userEvent.type(within(dialogo).getByLabelText('Referência'), 'CAM-002')
+    await userEvent.type(within(dialogo).getByLabelText('Descrição'), 'Sem grade')
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Salvar' }))
+
+    expect(await within(dialogo).findByRole('alert')).toHaveTextContent('Escolha uma grade de tamanhos.')
+    expect(enviado).toMatchObject({ gradeId: null })
   })
 
   it('detalhe: matriz cor × tamanho com preço próprio e combinação desativada', async () => {

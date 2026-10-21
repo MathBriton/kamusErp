@@ -35,6 +35,7 @@ builder.Services.AddModuloIndicadores(builder.Configuration);
 
 var app = builder.Build();
 
+app.UseKamusRequisicaoInvalida();
 app.UseKamusCors();
 app.UseRateLimiter();
 app.UseAuthentication();

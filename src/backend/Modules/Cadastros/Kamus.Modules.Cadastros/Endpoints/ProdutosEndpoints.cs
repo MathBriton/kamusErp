@@ -15,7 +15,7 @@ internal static class ProdutosEndpoints
 {
     public sealed record ProdutoRequest(
         string? Referencia, string? Descricao, string? Marca, string? Categoria, string? Colecao, string? ReferenciaDoFornecedor,
-        Guid? FornecedorId, decimal PrecoVenda, decimal? PrecoCusto, Guid GradeId, IReadOnlyList<Guid>? CorIds);
+        Guid? FornecedorId, decimal PrecoVenda, decimal? PrecoCusto, Guid? GradeId, IReadOnlyList<Guid>? CorIds);
     public sealed record SkuRequest(string? CodigoDeBarras, decimal? PrecoVenda, bool Ativo);
     public sealed record SkuDto(Guid Id, Guid CorId, string Tamanho, int OrdemTamanho, string CodigoDeBarras, decimal? PrecoVenda, decimal Preco, bool Ativo);
     public sealed record ProdutoDto(

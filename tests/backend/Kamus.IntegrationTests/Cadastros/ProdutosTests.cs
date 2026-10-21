@@ -129,6 +129,34 @@ public sealed class ProdutosTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Criar_SemGrade400ComMensagem()
+    {
+        var client = await Entrar();
+        var (_, cores) = await Padroes(client);
+
+        var semGrade = await client.PostAsJsonAsync(U("/api/produtos"),
+            new { referencia = "SG-1", descricao = "Sem grade", precoVenda = 10m, gradeId = (Guid?)null, corIds = new[] { cores[0].Id } }, Ct);
+
+        semGrade.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await Detalhe(semGrade)).ShouldBe("Escolha uma grade de tamanhos.");
+    }
+
+    [Fact]
+    public async Task Criar_CampoEmFormatoInvalido400ComMensagemEmPortugues()
+    {
+        var client = await Entrar();
+
+        using var corpo = new StringContent("""{"referencia":"X","descricao":"Y","precoVenda":10,"gradeId":"","corIds":[]}""", System.Text.Encoding.UTF8, "application/json");
+        var resposta = await client.PostAsync(U("/api/produtos"), corpo, Ct);
+
+        resposta.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await Detalhe(resposta)).ShouldBe("Os dados enviados estão em formato inválido. Confira os campos e tente de novo.");
+    }
+
+    private static async Task<string?> Detalhe(HttpResponseMessage resposta) =>
+        JsonDocument.Parse(await resposta.Content.ReadAsStringAsync(Ct)).RootElement.GetProperty("detail").GetString();
+
+    [Fact]
     public async Task AlterarSku_EanDoFornecedorPrecoProprioEDesativar()
     {
         var client = await Entrar();
