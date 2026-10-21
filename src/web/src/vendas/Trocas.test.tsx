@@ -218,7 +218,7 @@ describe('Clientes → ficha com compras e vales', () => {
       criadoEm: '2026-10-01T12:00:00Z', anonimizadoEm: null,
     }
     api({
-      'GET /api/pessoas?papel=cliente&situacao=ativos': () => json({ itens: [maria], total: 1, pagina: 1, tamanho: 50 }),
+      'GET /api/pessoas?papel=cliente&situacao=ativos&pagina=1&tamanho=20': () => json({ itens: [maria], total: 1, pagina: 1, tamanho: 20 }),
       'GET /api/pessoas/aniversariantes?periodo=semana': () => json([]),
       'GET /api/vendas?status=todas&clienteId=p1': () => json(listaDaVenda),
       'GET /api/vendas/vales?situacao=todos&clienteId=p1': () => json({ itens: [vale], saldoAtivo: 54.51, saldoVencido: 0 }),

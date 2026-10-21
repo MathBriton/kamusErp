@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { corpo, empresaAtivaHandler, json, mockApi, sessaoDemo } from '../test/mockApi'
@@ -26,11 +26,60 @@ describe('Cadastros → Grades e cores', () => {
     api()
     renderApp('/cadastros/grades')
 
-    const grade = (await screen.findByText('PP ao GG')).closest('li')!
+    const tabela = await screen.findByRole('table', { name: 'Grades de tamanho' })
+    const grade = (await within(tabela).findByText('PP ao GG')).closest('tr')!
     expect(within(grade).getByText('PP · P · M · G · GG')).toBeInTheDocument()
     expect(within(grade).getByText('Em uso')).toBeInTheDocument()
-    expect(within(grade).queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument()
-    expect(screen.getByText('Azul')).toBeInTheDocument()
+    expect(within(grade).queryByRole('button', { name: 'Editar PP ao GG' })).not.toBeInTheDocument()
+    expect(within(tabela.closest('section')!).getByText('2 registros')).toBeInTheDocument()
+    expect(within(tabela).getByRole('button', { name: 'Editar Único' })).toBeInTheDocument()
+    const cores = screen.getByRole('table', { name: 'Cores' })
+    expect(within(cores).getByText('Azul')).toBeInTheDocument()
+    expect(within(cores).getByText('#1D4ED8')).toBeInTheDocument()
+  })
+
+  it('busca filtra grades e cores na tela; seleção exporta só as marcadas', async () => {
+    const fetch = api({
+      'GET /api/relatorios/cores.csv?ids=c2': () => new Response('csv', { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=cores.csv' } }),
+    })
+    URL.createObjectURL = (() => 'blob:x') as typeof URL.createObjectURL
+    URL.revokeObjectURL = () => {}
+    renderApp('/cadastros/grades')
+    await screen.findByText('PP ao GG')
+
+    await userEvent.type(screen.getByLabelText('Buscar'), 'pret')
+    const cores = screen.getByRole('table', { name: 'Cores' })
+    expect(within(cores).queryByText('Azul')).not.toBeInTheDocument()
+    expect(within(cores).getByText('Preto')).toBeInTheDocument()
+    expect(within(screen.getByRole('table', { name: 'Grades de tamanho' })).getByText('Nenhuma grade encontrada.')).toBeInTheDocument()
+
+    await userEvent.click(within(cores).getByRole('checkbox', { name: 'Selecionar Preto' }))
+    const secao = cores.closest('section')!
+    await userEvent.click(within(secao).getByRole('button', { name: /Exportar/ }))
+    await userEvent.click(within(within(secao).getByRole('menu', { name: 'Exportar' })).getByRole('menuitem', { name: /CSV/ }))
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => url === '/api/relatorios/cores.csv?ids=c2')).toBe(true))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    expect(within(cores).getByText('Azul')).toBeInTheDocument()
+  })
+
+  it('editar cor pela ação da linha', async () => {
+    let enviado: Record<string, unknown> | null = null
+    api({
+      'PUT /api/cores/c1': (init) => {
+        enviado = corpo(init)
+        return json(cores[0])
+      },
+    })
+    renderApp('/cadastros/grades')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Editar Azul' }))
+    const dialogo = screen.getByRole('dialog', { name: 'Editar cor' })
+    await userEvent.clear(within(dialogo).getByLabelText('Nome'))
+    await userEvent.type(within(dialogo).getByLabelText('Nome'), 'Azul royal')
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Salvar' }))
+
+    expect(enviado).toMatchObject({ nome: 'Azul royal' })
   })
 
   it('sem nada cadastrado oferece os padrões', async () => {
@@ -87,7 +136,7 @@ describe('Cadastros → Grades e cores', () => {
       },
     })
     renderApp('/cadastros/grades')
-    await screen.findByText('Azul')
+    await screen.findByText('#1D4ED8')
 
     await userEvent.click(screen.getByRole('button', { name: 'Nova cor' }))
     const dialogo = screen.getByRole('dialog', { name: 'Nova cor' })

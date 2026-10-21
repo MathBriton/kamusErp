@@ -1,10 +1,17 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useApi } from '../api/useApi'
 import { ErroDeApi } from '../auth/api'
 import { Campo } from '../components/Campo'
 import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { Confirmacao } from '../components/grade/Confirmacao'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade, useListaPaginada } from '../components/grade/useGrade'
 import { Icone } from '../components/Icone'
+import { BotaoExportar } from '../relatorios/BotaoExportar'
+import { formatarTelefone } from './tipos'
 
 interface Vendedor {
   id: string
@@ -24,108 +31,145 @@ interface Usuario {
 
 const percentual = (valor: number) => `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(valor)}%`
 
+const FILTROS = { situacao: 'ativos', busca: '' }
+
+type Janela =
+  | { tipo: 'formulario'; vendedor: Vendedor | null }
+  | { tipo: 'mudarSituacao'; vendedor: Vendedor }
+  | { tipo: 'mudarSelecionados'; ativo: boolean }
+  | null
+
+/** Vendedores no padrão das telas de cadastro: filtros, grade paginada com seleção, ações por linha e em lote, exportação. */
 export function VendedoresPage() {
   const { getJson, enviar } = useApi()
-  const [vendedores, setVendedores] = useState<Vendedor[] | null>(null)
+  const grade = useGrade(FILTROS)
+  const [versao, setVersao] = useState(0)
+  const { dados, erro } = useListaPaginada<{ itens: Vendedor[]; total: number }>(`/api/vendedores?${grade.consulta}`, versao, grade.filtros.busca ? 250 : 0)
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
-  const [erro, setErro] = useState<string | null>(null)
-  const [edicao, setEdicao] = useState<{ vendedor: Vendedor | null } | null>(null)
-
-  const carregar = useCallback(async () => {
-    try {
-      const [v, u] = await Promise.all([getJson<Vendedor[]>('/api/vendedores'), getJson<Usuario[]>('/api/vendedores/usuarios')])
-      setVendedores(v)
-      setUsuarios(u)
-    } catch (falha) {
-      setErro(falha instanceof ErroDeApi ? falha.message : 'Não foi possível carregar os vendedores.')
-    }
-  }, [getJson])
+  const [janela, setJanela] = useState<Janela>(null)
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void carregar(), 0)
-    return () => window.clearTimeout(timer)
-  }, [carregar])
+    const controle = new AbortController()
+    getJson<Usuario[]>('/api/vendedores/usuarios', controle.signal).then(setUsuarios).catch(() => {})
+    return () => controle.abort()
+  }, [getJson, versao])
 
-  async function mudar(v: Vendedor) {
-    setErro(null)
-    try {
-      await enviar('POST', `/api/vendedores/${v.id}/${v.ativo ? 'inativar' : 'reativar'}`)
-      await carregar()
-    } catch (falha) {
-      setErro(falha instanceof ErroDeApi ? falha.message : 'Não foi possível concluir.')
-    }
+  const recarregar = () => {
+    setJanela(null)
+    setVersao((v) => v + 1)
   }
 
+  const colunas: Coluna<Vendedor>[] = [
+    { titulo: 'Nome', celula: (v) => <span className="font-semibold">{v.nome}</span> },
+    { titulo: 'Comissão', celula: (v) => percentual(v.comissaoPercentual), alinhar: 'direita' },
+    { titulo: 'Telefone', celula: (v) => <span className="tabular-nums">{formatarTelefone(v.telefone)}</span> },
+    { titulo: 'Login', celula: (v) => (v.usuarioNome ? `vinculado: ${v.usuarioNome}` : 'sem login') },
+    {
+      titulo: 'Situação',
+      celula: (v) => (
+        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${v.ativo ? 'bg-success-soft text-success' : 'bg-surface-2 text-muted'}`}>
+          {v.ativo ? 'Ativo' : 'Inativo'}
+        </span>
+      ),
+    },
+  ]
+  const quantos = grade.selecionados.size
+
   return (
-    <div className="mx-auto max-w-5xl">
-      <p className="text-xs text-muted">Cadastros</p>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">Vendedores</h1>
-          <p className="mt-1 text-sm text-muted">Comissão padrão de cada vendedor. Vincule a um usuário para ele ver as próprias vendas.</p>
-        </div>
-        <button type="button" onClick={() => setEdicao({ vendedor: null })} className={estilos.botaoPrimario}>
-          Novo vendedor
-        </button>
-      </div>
+    <div className="mx-auto max-w-7xl">
+      <CabecalhoDaPagina
+        secao="Cadastros"
+        titulo="Vendedores"
+        descricao="Comissão padrão de cada vendedor. Vincule a um usuário para ele ver as próprias vendas."
+        acoes={
+          <>
+            <BotaoExportar relatorio="vendedores" parametros={grade.parametros} selecionados={[...grade.selecionados]} />
+            <button type="button" onClick={() => setJanela({ tipo: 'formulario', vendedor: null })} className={estilos.botaoPrimario}>
+              <Icone nome="plus" />
+              Novo vendedor
+            </button>
+          </>
+        }
+      />
+
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
+        <label className="min-w-60 flex-1 text-sm">
+          <span className="mb-1 block font-semibold">Buscar</span>
+          <input value={grade.filtros.busca} onChange={(e) => grade.filtrar({ busca: e.target.value })} placeholder="Nome ou telefone" className={estilos.campo} />
+        </label>
+        <label className="w-40 text-sm">
+          <span className="mb-1 block font-semibold">Situação</span>
+          <select value={grade.filtros.situacao} onChange={(e) => grade.filtrar({ situacao: e.target.value })} className={estilos.campo}>
+            <option value="ativos">Ativos</option>
+            <option value="inativos">Inativos</option>
+            <option value="todos">Todos</option>
+          </select>
+        </label>
+      </BarraDeFiltros>
 
       {erro && (
-        <p role="alert" className={`mt-5 flex items-center gap-2 ${estilos.erro}`}>
+        <p role="alert" className={`mt-4 flex items-center gap-2 ${estilos.erro}`}>
           <Icone nome="alert" />
           {erro}
         </p>
       )}
 
-      {vendedores && (
-        <div className="mt-5 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-          {vendedores.length === 0 ? (
-            <p className="p-8 text-center text-sm text-muted">Nenhum vendedor cadastrado.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-left text-xs text-muted uppercase">
-                <tr>
-                  <th className="px-4 py-2">Nome</th>
-                  <th className="px-4 py-2">Comissão</th>
-                  <th className="px-4 py-2">Login</th>
-                  <th className="px-4 py-2">Situação</th>
-                  <th className="px-4 py-2 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {vendedores.map((v) => (
-                  <tr key={v.id} className={v.ativo ? '' : 'text-muted'}>
-                    <td className="px-4 py-2.5 font-semibold">{v.nome}</td>
-                    <td className="px-4 py-2.5 tabular-nums">{percentual(v.comissaoPercentual)}</td>
-                    <td className="px-4 py-2.5">{v.usuarioNome ? `vinculado: ${v.usuarioNome}` : 'sem login'}</td>
-                    <td className="px-4 py-2.5">{v.ativo ? 'Ativo' : 'Inativo'}</td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex justify-end gap-2">
-                        <button type="button" onClick={() => setEdicao({ vendedor: v })} className={estilos.botao}>
-                          Editar
-                        </button>
-                        <button type="button" onClick={() => void mudar(v)} className={estilos.botao}>
-                          {v.ativo ? 'Inativar' : 'Reativar'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+      <GradeDeRegistros
+        rotulo="Vendedores"
+        colunas={colunas}
+        itens={dados?.itens ?? (erro ? [] : null)}
+        chave={(v) => v.id}
+        nome={(v) => v.nome}
+        total={dados?.total ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
+        apagada={(v) => !v.ativo}
+        vazio="Nenhum vendedor encontrado com esses filtros."
+        acoes={(v) => (
+          <>
+            <AcaoDaLinha rotulo={`Editar ${v.nome}`} icone="pencil" onClick={() => setJanela({ tipo: 'formulario', vendedor: v })} />
+            <AcaoDaLinha rotulo={`${v.ativo ? 'Inativar' : 'Reativar'} ${v.nome}`} icone="power" perigo={v.ativo} onClick={() => setJanela({ tipo: 'mudarSituacao', vendedor: v })} />
+          </>
+        )}
+        acoesEmLote={
+          <>
+            <button type="button" onClick={() => setJanela({ tipo: 'mudarSelecionados', ativo: false })} className={estilos.botao}>Inativar selecionados</button>
+            <button type="button" onClick={() => setJanela({ tipo: 'mudarSelecionados', ativo: true })} className={estilos.botao}>Reativar selecionados</button>
+          </>
+        }
+      />
 
-      {edicao && (
-        <FormularioDeVendedor
-          vendedor={edicao.vendedor}
-          usuarios={usuarios}
-          onFechar={() => setEdicao(null)}
-          onSalvo={() => {
-            setEdicao(null)
-            void carregar()
+      {janela?.tipo === 'formulario' && (
+        <FormularioDeVendedor vendedor={janela.vendedor} usuarios={usuarios} onFechar={() => setJanela(null)} onSalvo={recarregar} />
+      )}
+      {janela?.tipo === 'mudarSituacao' && (
+        <Confirmacao
+          titulo={janela.vendedor.ativo ? 'Inativar vendedor' : 'Reativar vendedor'}
+          rotulo={janela.vendedor.ativo ? 'Inativar' : 'Reativar'}
+          onCancelar={() => setJanela(null)}
+          onConfirmar={async () => {
+            await enviar('POST', `/api/vendedores/${janela.vendedor.id}/${janela.vendedor.ativo ? 'inativar' : 'reativar'}`)
+            recarregar()
           }}
-        />
+        >
+          {janela.vendedor.ativo
+            ? <p>{`"${janela.vendedor.nome}" deixa de aparecer no registro de vendas e nas condicionais. As vendas e comissões continuam guardadas e dá para reativar depois.`}</p>
+            : <p>{`"${janela.vendedor.nome}" volta a aparecer no registro de vendas e nas condicionais.`}</p>}
+        </Confirmacao>
+      )}
+      {janela?.tipo === 'mudarSelecionados' && (
+        <Confirmacao
+          titulo={janela.ativo ? 'Reativar vendedores' : 'Inativar vendedores'}
+          rotulo={janela.ativo ? 'Reativar' : 'Inativar'}
+          onCancelar={() => setJanela(null)}
+          onConfirmar={async () => {
+            await enviar('POST', '/api/vendedores/situacao', { ids: [...grade.selecionados], ativo: janela.ativo })
+            grade.limparSelecao()
+            recarregar()
+          }}
+        >
+          <p>{`${janela.ativo ? 'Reativar' : 'Inativar'} ${quantos === 1 ? 'o vendedor selecionado' : `os ${quantos} vendedores selecionados`}?`}</p>
+        </Confirmacao>
       )}
     </div>
   )

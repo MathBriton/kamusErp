@@ -31,6 +31,9 @@ public static class ModuloCadastros
         services.AddScoped<IRelatorio, RelatorioDeClientes>();
         services.AddScoped<IRelatorio, RelatorioDeFornecedores>();
         services.AddScoped<IRelatorio, RelatorioDeProdutos>();
+        services.AddScoped<IRelatorio, RelatorioDeVendedores>();
+        services.AddScoped<IRelatorio, RelatorioDeGrades>();
+        services.AddScoped<IRelatorio, RelatorioDeCores>();
         services.AddScoped<IImportador, ImportadorDeClientes>();
         services.AddScoped<IImportador, ImportadorDeFornecedores>();
         services.AddScoped<IImportador, ImportadorDeProdutos>();

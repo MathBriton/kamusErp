@@ -296,6 +296,27 @@ public sealed class ProdutosTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task RelatoriosDeGradesECores_TodasOuSoAsSelecionadas()
+    {
+        var client = await Entrar();
+        var (grades, cores) = await Padroes(client);
+        var ppAoGg = grades.Single(g => g.Nome == "PP ao GG");
+        var azul = cores.Single(c => c.Nome == "Azul");
+
+        var todas = await client.GetStringAsync(U("/api/relatorios/grades.csv"), Ct);
+        todas.ShouldContain("PP ao GG");
+        todas.ShouldContain("Único");
+        var soUma = await client.GetStringAsync(U($"/api/relatorios/grades.csv?ids={ppAoGg.Id}"), Ct);
+        soUma.ShouldContain("PP, P, M, G, GG");
+        soUma.ShouldNotContain("Único");
+
+        var corCsv = await client.GetStringAsync(U($"/api/relatorios/cores.csv?ids={azul.Id}"), Ct);
+        corCsv.ShouldContain("Azul");
+        corCsv.ShouldNotContain("Preto");
+        (await client.GetStringAsync(U("/api/relatorios/cores.csv?busca=pre"), Ct)).ShouldContain("Preto");
+    }
+
+    [Fact]
     public async Task SituacaoEmLote_InativaEReativaVarios_VendedorNao()
     {
         var client = await Entrar();

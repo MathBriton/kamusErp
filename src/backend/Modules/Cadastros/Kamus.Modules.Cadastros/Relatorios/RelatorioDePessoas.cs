@@ -6,7 +6,7 @@ using Kamus.SharedKernel.Relatorios;
 namespace Kamus.Modules.Cadastros.Relatorios;
 
 /// <summary>Lista de clientes ou de fornecedores, com os mesmos filtros da tela (busca, situacao).</summary>
-internal abstract class RelatorioDePessoas(CadastrosDbContext db, IEmpresaAtiva empresa, string papel) : IRelatorio
+internal abstract class RelatorioDePessoas(CadastrosDbContext db, IEmpresaAtiva empresa, string papel, string singular) : IRelatorio
 {
     public abstract string Codigo { get; }
     public abstract string Titulo { get; }
@@ -18,7 +18,11 @@ internal abstract class RelatorioDePessoas(CadastrosDbContext db, IEmpresaAtiva 
     {
         var busca = parametros.GetValueOrDefault("busca");
         var situacao = parametros.GetValueOrDefault("situacao");
-        var pessoas = await PessoasEndpoints.FiltrarAsync(db, empresa.Perfil, papel, situacao, busca, ct);
+        // "ids" = linhas selecionadas na grade: exporta só elas, ignorando os demais filtros.
+        var ids = ParametrosDoRelatorio.Ids(parametros);
+        var pessoas = ids.Count > 0
+            ? [.. (await PessoasEndpoints.FiltrarAsync(db, empresa.Perfil, papel, "todos", null, ct)).Where(p => ids.Contains(p.Id))]
+            : await PessoasEndpoints.FiltrarAsync(db, empresa.Perfil, papel, situacao, busca, ct);
 
         var linhas = pessoas.Select(p => (IReadOnlyList<object?>)
         [
@@ -28,8 +32,12 @@ internal abstract class RelatorioDePessoas(CadastrosDbContext db, IEmpresaAtiva 
         ]).ToList();
 
         var filtros = new List<FiltroAplicado>();
-        if (!string.IsNullOrWhiteSpace(busca)) filtros.Add(new FiltroAplicado("Busca", busca));
-        filtros.Add(new FiltroAplicado("Situação", situacao switch { "inativos" => "Inativos", "todos" => "Todos", _ => "Ativos" }));
+        if (ids.Count > 0) filtros.Add(ParametrosDoRelatorio.Selecionados(pessoas.Count, singular, Titulo.ToLowerInvariant()));
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(busca)) filtros.Add(new FiltroAplicado("Busca", busca));
+            filtros.Add(new FiltroAplicado("Situação", situacao switch { "inativos" => "Inativos", "todos" => "Todos", _ => "Ativos" }));
+        }
 
         return new DadosDoRelatorio(Titulo,
         [
@@ -46,14 +54,14 @@ internal abstract class RelatorioDePessoas(CadastrosDbContext db, IEmpresaAtiva 
     }
 }
 
-internal sealed class RelatorioDeClientes(CadastrosDbContext db, IEmpresaAtiva empresa) : RelatorioDePessoas(db, empresa, "cliente")
+internal sealed class RelatorioDeClientes(CadastrosDbContext db, IEmpresaAtiva empresa) : RelatorioDePessoas(db, empresa, "cliente", "cliente")
 {
     public override string Codigo => "clientes";
     public override string Titulo => "Clientes";
     public override IReadOnlyCollection<string> Perfis => Permissoes.Clientes;
 }
 
-internal sealed class RelatorioDeFornecedores(CadastrosDbContext db, IEmpresaAtiva empresa) : RelatorioDePessoas(db, empresa, "fornecedor")
+internal sealed class RelatorioDeFornecedores(CadastrosDbContext db, IEmpresaAtiva empresa) : RelatorioDePessoas(db, empresa, "fornecedor", "fornecedor")
 {
     public override string Codigo => "fornecedores";
     public override string Titulo => "Fornecedores";

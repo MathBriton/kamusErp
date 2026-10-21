@@ -1,6 +1,8 @@
 using Kamus.Modules.Cadastros.Dominio;
 using Kamus.Modules.Cadastros.Persistencia;
+using Kamus.SharedKernel.Busca;
 using Kamus.SharedKernel.Clientes;
+using Kamus.SharedKernel.Consultas;
 using Kamus.SharedKernel.MultiTenancy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -18,7 +20,9 @@ internal static class VendedoresEndpoints
     public static IEndpointRouteBuilder MapVendedores(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/vendedores").RequireAuthorization().WithTags("Vendedores");
-        g.MapGet("", Listar).WithSummary("Vendedores (todos os perfis veem; só Dono/Gerente alteram)").Produces<IReadOnlyList<VendedorDto>>();
+        g.MapGet("", Listar)
+            .WithSummary("Vendedores (todos os perfis veem; só Dono/Gerente alteram). Sem pagina: lista inteira; com pagina/tamanho: { itens, total, pagina, tamanho }")
+            .Produces<IReadOnlyList<VendedorDto>>().Produces<PaginaDeRegistros<VendedorDto>>();
         g.MapGet("/usuarios", Usuarios).WithSummary("Usuários ativos que podem ser vinculados a um vendedor (Dono/Gerente)").Produces<IReadOnlyList<UsuarioDto>>();
         g.MapPost("", Criar).WithSummary("Cadastrar vendedor").Produces<VendedorDto>(StatusCodes.Status201Created);
         g.MapPut("/{id:guid}", Editar).WithSummary("Alterar vendedor").Produces<VendedorDto>();
@@ -26,21 +30,40 @@ internal static class VendedoresEndpoints
             .WithSummary("Inativar vendedor").Produces(StatusCodes.Status204NoContent);
         g.MapPost("/{id:guid}/reativar", (Guid id, IEmpresaAtiva e, CadastrosDbContext db, CancellationToken ct) => Mudar(id, e, db, v => v.Reativar(), ct))
             .WithSummary("Reativar vendedor").Produces(StatusCodes.Status204NoContent);
+        g.MapPost("/situacao", MudarEmLote).WithSummary("Inativar ou reativar vários vendedores de uma vez (seleção da grade)").Produces<SituacaoEmLoteResponse>();
         return app;
     }
 
     private static IResult Invalido(string detalhe) => Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Dados inválidos", detail: detalhe);
     private static IResult NaoEncontrado() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Não encontrado", detail: "Vendedor não encontrado.");
 
-    private static async Task<IResult> Listar(CadastrosDbContext db, IDiretorioDeClientes diretorio, CancellationToken ct)
+    /// <summary>Vendedores filtrados por busca (nome ou telefone) e situação (ativos|inativos|todos; sem situação = todos), ativos primeiro.</summary>
+    internal static async Task<List<VendedorDto>> FiltrarAsync(CadastrosDbContext db, IDiretorioDeClientes diretorio, string? busca, string? situacao, CancellationToken ct)
     {
         var usuarios = (await diretorio.UsuariosDoTenantAtualAsync(ct)).ToDictionary(u => u.Id, u => u.Nome);
-        var vendedores = await db.Vendedores.AsNoTracking().ToListAsync(ct);
-        return Results.Ok(vendedores
+        var consulta = db.Vendedores.AsNoTracking();
+        consulta = situacao?.ToLowerInvariant() switch
+        {
+            "ativos" => consulta.Where(v => v.Ativo),
+            "inativos" => consulta.Where(v => !v.Ativo),
+            _ => consulta,
+        };
+        IEnumerable<Vendedor> vendedores = await consulta.ToListAsync(ct);
+        if (!string.IsNullOrWhiteSpace(busca))
+            vendedores = vendedores.Where(v => TextoParaBusca.Contem(v.Nome, busca) || TextoParaBusca.ContemDigitos(v.Telefone, busca));
+        return vendedores
             .OrderByDescending(v => v.Ativo).ThenBy(v => v.Nome, StringComparer.CurrentCulture)
             .Select(v => new VendedorDto(v.Id, v.Nome, v.ComissaoPercentual, v.UsuarioId,
                 v.UsuarioId is { } u && usuarios.TryGetValue(u, out var nome) ? nome : null, v.Telefone, v.Ativo))
-            .ToList());
+            .ToList();
+    }
+
+    /// <summary>Sem <c>pagina</c> devolve a lista inteira (seletores de venda, condicional e comissões); com ela, a página da grade.</summary>
+    private static async Task<IResult> Listar(CadastrosDbContext db, IDiretorioDeClientes diretorio, CancellationToken ct,
+        string? busca = null, string? situacao = null, int? pagina = null, int tamanho = Paginacao.TamanhoPadrao)
+    {
+        var vendedores = await FiltrarAsync(db, diretorio, busca, situacao, ct);
+        return pagina is { } p ? Results.Ok(vendedores.Paginar(p, tamanho)) : Results.Ok(vendedores);
     }
 
     private static async Task<IResult> Usuarios(IEmpresaAtiva empresa, IDiretorioDeClientes diretorio, CancellationToken ct)
@@ -92,5 +115,20 @@ internal static class VendedoresEndpoints
         acao(vendedor);
         await db.SaveChangesAsync(ct);
         return Results.NoContent();
+    }
+
+    private static async Task<IResult> MudarEmLote(SituacaoEmLoteRequest r, IEmpresaAtiva empresa, CadastrosDbContext db, CancellationToken ct)
+    {
+        if (!Permissoes.Gestao.Contains(empresa.Perfil)) return Permissoes.Negado();
+        var ids = (r.Ids ?? []).Distinct().ToList();
+        if (ids.Count == 0) return Invalido("Selecione pelo menos um vendedor.");
+        var vendedores = await db.Vendedores.Where(v => ids.Contains(v.Id) && v.Ativo != r.Ativo).ToListAsync(ct);
+        foreach (var vendedor in vendedores)
+        {
+            if (r.Ativo) vendedor.Reativar();
+            else vendedor.Inativar();
+        }
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(new SituacaoEmLoteResponse(vendedores.Count));
     }
 }

@@ -245,4 +245,54 @@ public sealed class PessoasTests : IAsyncDisposable
         csv.ShouldContain("Maria Silva");
         csv.ShouldContain("529.982.247-25");
     }
+
+    [Fact]
+    public async Task Listar_PaginaComTotal()
+    {
+        var client = await Entrar();
+        await Criar(client, Cliente("Ana Costa", cpf: "111.444.777-35"));
+        await Criar(client, Cliente());
+
+        var pagina = (await client.GetFromJsonAsync<JsonElement>(U("/api/pessoas?papel=cliente&pagina=2&tamanho=1"), Ct))!;
+
+        pagina.GetProperty("total").GetInt32().ShouldBe(2);
+        pagina.GetProperty("pagina").GetInt32().ShouldBe(2);
+        pagina.GetProperty("tamanho").GetInt32().ShouldBe(1);
+        pagina.GetProperty("itens").EnumerateArray().Single().GetProperty("nome").GetString().ShouldBe("Maria Silva");
+    }
+
+    [Fact]
+    public async Task Relatorio_SoOsSelecionados()
+    {
+        var client = await Entrar();
+        var ana = await Criar(client, Cliente("Ana Costa", cpf: "111.444.777-35"));
+        await Criar(client, Cliente());
+
+        var csv = await client.GetStringAsync(U($"/api/relatorios/clientes.csv?ids={ana.Id}&busca=maria"), Ct);
+
+        csv.ShouldContain("Ana Costa");
+        csv.ShouldNotContain("Maria Silva");
+        var dados = await client.GetFromJsonAsync<JsonElement>(U($"/api/relatorios/clientes/dados?ids={ana.Id},{Guid.NewGuid()}"), Ct);
+        dados.GetProperty("filtros")[0].GetProperty("valor").GetString().ShouldBe("1 cliente");
+    }
+
+    [Fact]
+    public async Task SituacaoEmLote_InativaEReativaVarios_VendedorNao()
+    {
+        var admin = await Entrar();
+        var ana = await Criar(admin, Cliente("Ana Costa", cpf: "111.444.777-35"));
+        var maria = await Criar(admin, Cliente());
+
+        var inativar = await admin.PostAsJsonAsync(U("/api/pessoas/situacao"), new { ids = new[] { ana.Id, maria.Id }, ativo = false }, Ct);
+        inativar.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await inativar.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("alterados").GetInt32().ShouldBe(2);
+        (await admin.GetFromJsonAsync<PaginaDto>(U("/api/pessoas?papel=cliente&situacao=inativos"), Ct))!.Total.ShouldBe(2);
+
+        (await admin.PostAsJsonAsync(U("/api/pessoas/situacao"), new { ids = new[] { ana.Id }, ativo = true }, Ct)).EnsureSuccessStatusCode();
+        (await admin.GetFromJsonAsync<PaginaDto>(U("/api/pessoas?papel=cliente"), Ct))!.Itens.Single().Id.ShouldBe(ana.Id);
+        (await admin.PostAsJsonAsync(U("/api/pessoas/situacao"), new { ids = Array.Empty<Guid>(), ativo = true }, Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var vendedor = await Entrar("vendedor@kamus.local");
+        (await vendedor.PostAsJsonAsync(U("/api/pessoas/situacao"), new { ids = new[] { ana.Id }, ativo = false }, Ct)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
 }

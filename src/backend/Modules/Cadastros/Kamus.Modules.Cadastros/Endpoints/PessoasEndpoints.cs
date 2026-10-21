@@ -1,6 +1,7 @@
 using Kamus.Modules.Cadastros.Dominio;
 using Kamus.Modules.Cadastros.Persistencia;
 using Kamus.SharedKernel.Busca;
+using Kamus.SharedKernel.Consultas;
 using Kamus.SharedKernel.MultiTenancy;
 using Kamus.SharedKernel.Tempo;
 using Microsoft.AspNetCore.Builder;
@@ -28,14 +29,13 @@ internal static class PessoasEndpoints
             p.ConsentimentoMarketingEm is not null, p.ConsentimentoMarketingEm, p.Ativo, p.CriadoEm, p.AnonimizadoEm);
     }
 
-    public sealed record PaginaDto(IReadOnlyList<PessoaDto> Itens, int Total, int Pagina, int Tamanho);
     public sealed record AniversarianteDto(Guid Id, string Nome, DateOnly DataNascimento, int Idade, string? WhatsApp, bool AceitaMarketing);
 
     public static IEndpointRouteBuilder MapPessoas(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/pessoas").RequireAuthorization().WithTags("Clientes e fornecedores");
         g.MapGet("", Listar).WithSummary("Clientes e/ou fornecedores (papel=cliente|fornecedor, busca sem acento, situacao=ativos|inativos|todos)")
-            .Produces<PaginaDto>();
+            .Produces<PaginaDeRegistros<PessoaDto>>();
         g.MapGet("/aniversariantes", Aniversariantes).WithSummary("Clientes ativos que fazem aniversário (periodo=hoje|semana|mes)")
             .Produces<IReadOnlyList<AniversarianteDto>>();
         g.MapGet("/{id:guid}", Obter).WithSummary("Ficha completa").Produces<PessoaDto>();
@@ -44,10 +44,15 @@ internal static class PessoasEndpoints
         g.MapPut("/{id:guid}", Editar).WithSummary("Alterar a ficha").Produces<PessoaDto>();
         g.MapPost("/{id:guid}/inativar", Inativar).WithSummary("Inativar (Dono/Gerente)").Produces(StatusCodes.Status204NoContent);
         g.MapPost("/{id:guid}/reativar", Reativar).WithSummary("Reativar (Dono/Gerente)").Produces(StatusCodes.Status204NoContent);
+        g.MapPost("/situacao", MudarEmLote).WithSummary("Inativar ou reativar vários cadastros de uma vez (seleção da grade; Dono/Gerente)")
+            .Produces<SituacaoEmLoteResponse>();
         g.MapPost("/{id:guid}/anonimizar", Anonimizar).WithSummary("LGPD: apagar dados pessoais mantendo o registro (Dono)")
             .Produces(StatusCodes.Status204NoContent);
         return app;
     }
+
+    /// <summary>Sem <c>tamanho</c>, 50 por página: os campos de busca de cliente (venda, condicional, crediário, contas) usam o padrão.</summary>
+    private const int TamanhoPadrao = 50;
 
     private static IResult Invalido(string detalhe) => Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Dados inválidos", detail: detalhe);
     private static IResult NaoEncontrada() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Não encontrado", detail: "Cadastro não encontrado.");
@@ -79,16 +84,13 @@ internal static class PessoasEndpoints
     }
 
     private static async Task<IResult> Listar(IEmpresaAtiva empresa, CadastrosDbContext db, CancellationToken ct,
-        string? papel = null, string? busca = null, string? situacao = null, int pagina = 1, int tamanho = 50)
+        string? papel = null, string? busca = null, string? situacao = null, int pagina = 1, int tamanho = TamanhoPadrao)
     {
         if (papel?.ToLowerInvariant() == "cliente" && !Permissoes.PodeClientes(empresa.Perfil)) return Permissoes.Negado();
         if (papel?.ToLowerInvariant() == "fornecedor" && !Permissoes.PodeFornecedores(empresa.Perfil)) return Permissoes.Negado();
 
         var todas = await FiltrarAsync(db, empresa.Perfil, papel, situacao, busca, ct);
-        pagina = Math.Max(1, pagina);
-        tamanho = Math.Clamp(tamanho, 1, 200);
-        var itens = todas.Skip((pagina - 1) * tamanho).Take(tamanho).Select(PessoaDto.De).ToList();
-        return Results.Ok(new PaginaDto(itens, todas.Count, pagina, tamanho));
+        return Results.Ok(todas.Paginar(pagina, tamanho).Converter(PessoaDto.De));
     }
 
     private static async Task<IResult> Obter(Guid id, IEmpresaAtiva empresa, CadastrosDbContext db, CancellationToken ct)
@@ -187,6 +189,22 @@ internal static class PessoasEndpoints
 
     private static Task<IResult> Reativar(Guid id, IEmpresaAtiva empresa, CadastrosDbContext db, CancellationToken ct) =>
         Mudar(id, empresa, db, Permissoes.Gestao, p => p.Reativar(), ct);
+
+    private static async Task<IResult> MudarEmLote(SituacaoEmLoteRequest r, IEmpresaAtiva empresa, CadastrosDbContext db, CancellationToken ct)
+    {
+        if (!Permissoes.Gestao.Contains(empresa.Perfil)) return Permissoes.Negado();
+        var ids = (r.Ids ?? []).Distinct().ToList();
+        if (ids.Count == 0) return Invalido("Selecione pelo menos um cadastro.");
+        // Anonimizados não voltam (regra do domínio): ficam de fora da reativação em lote.
+        var pessoas = await db.Pessoas.Where(p => ids.Contains(p.Id) && p.Ativo != r.Ativo && (!r.Ativo || p.AnonimizadoEm == null)).ToListAsync(ct);
+        foreach (var pessoa in pessoas)
+        {
+            if (r.Ativo) pessoa.Reativar();
+            else pessoa.Inativar();
+        }
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(new SituacaoEmLoteResponse(pessoas.Count));
+    }
 
     private static Task<IResult> Anonimizar(Guid id, IEmpresaAtiva empresa, CadastrosDbContext db, TimeProvider relogio, CancellationToken ct) =>
         Mudar(id, empresa, db, ["Dono"], p => p.Anonimizar(relogio.GetUtcNow()), ct);

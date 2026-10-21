@@ -19,7 +19,7 @@ describe('Cadastros → Fornecedores', () => {
       'POST /api/auth/refresh': () => json(sessaoDemo),
       'GET /api/empresas/ativa': empresaAtivaHandler(),
       'GET /health': () => new Response('Healthy'),
-      'GET /api/pessoas?papel=fornecedor&situacao=ativos': () => json({ itens: [malharia], total: 1, pagina: 1, tamanho: 50 }),
+      'GET /api/pessoas?papel=fornecedor&situacao=ativos&pagina=1&tamanho=20': () => json({ itens: [malharia], total: 1, pagina: 1, tamanho: 20 }),
       'POST /api/pessoas': (init) => {
         enviado = corpo(init)
         return json(malharia, 201)
@@ -27,7 +27,10 @@ describe('Cadastros → Fornecedores', () => {
     })
     renderApp('/cadastros/fornecedores')
 
-    expect(await screen.findByRole('cell', { name: 'Malharia Sul' })).toBeInTheDocument()
+    const linha = (await screen.findByText('Malharia Sul')).closest('tr')!
+    expect(within(linha).getByText('Malharia Sul LTDA')).toBeInTheDocument()
+    expect(within(linha).getByText('11.222.333/0001-81')).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Fornecedores' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Aniversariantes da semana' })).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Novo fornecedor' }))
