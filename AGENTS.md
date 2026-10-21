@@ -196,6 +196,7 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 - Vendas: estoque, financeiro e venda gravam em DbContexts diferentes (sem transação); o endpoint compensa (estorna estoque e cancela a origem no financeiro) se algo falhar depois da baixa.
 - Resumo diário: a rotina (`RotinaDoResumoDiario`, a cada 5 min) fica desligada nos testes (`Indicadores:RotinaAtiva=false` no `KamusApiFactory`); teste o `GeradorDeResumos.ExecutarAsync(agora)` direto.
 - Dashboard (web): o título dos cartões vem de `dados.periodo` (a resposta), não do botão escolhido — senão aparece o título novo com os números antigos enquanto carrega.
+  O cabeçalho da página é `div` (não `header`): a topbar já é o `banner`. Etapa nova dos primeiros passos = código em `EtapasDaImplantacao` + `IProgressoDaImplantacao` no módulo + item em `dashboard/PrimeirosPassos`.
 - Mobile: o proxy deste ambiente bloqueia docs.expo.dev e a API de versões do Expo — use `EXPO_OFFLINE=1 npx expo install <pacote>` (versões do SDK instalado)
   e consulte os tipos em `node_modules` (e `node_modules/@testing-library/react-native/docs`). Expo muda a cada SDK: não confie na memória.
 - Mobile/testes: RNTL 14 tem `render`/`fireEvent`/`act` assíncronos (`await render(...)`); módulos nativos (secure-store, notifications, device, constants,
@@ -207,7 +208,7 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 
 ## 10. Estado atual e próximo passo (ATUALIZE AO TERMINAR)
 
-**Última atualização:** 2026-10-21
+**Última atualização:** 2026-10-21 (tarde)
 
 **Releases:** v0.1.0 → **v0.20.0** lançadas (a v0.20.0 trouxe a central de relatórios). Próxima: **v0.21.0** (segurança para produção).
 Plano de releases em `LEVANTAMENTO.md` → Plano de releases (v0.21.0 segurança, v0.22.0 robustez, v0.23.0 app nas lojas, v1.0.0 produção).
@@ -266,8 +267,13 @@ Plano de releases em `LEVANTAMENTO.md` → Plano de releases (v0.21.0 segurança
 - **Padrão de grade (em `main`):** componentes `components/grade` (ver seção 7) aplicados em **Produtos** (filtros busca/situação/categoria/coleção,
   ver/editar/inativar por linha, inativar/reativar em lote via `POST /api/produtos/situacao`, exportar selecionados via `ids` no relatório `produtos`).
   Tema só Claro/Escuro (`theme.ts`: sem escolha salva segue o SO); Relatórios é o último item do menu.
-- Testes: 546 backend, 188 web, 10 admin, 7 mobile. E2E em localhost (grade de produtos com 25 itens, filtros, seleção, CSV/PDF, lote, tema, ordem
-  do menu), 3 execuções.
+- **Dashboard novo + design system (em `main`):** tokens "Sartorial Modernist" em `index.css` (primária verde, `accent` ocre, `whatsapp`, fonte
+  Plus Jakarta Sans via `@fontsource-variable/plus-jakarta-sans`). API: `Dashboard.PrimeirosPassos` (códigos de `EtapasDaImplantacao`, juntados de
+  todos os `IProgressoDaImplantacao` — um por módulo: Cadastros, Estoque, Financeiro, Vendas) e `Compromissos.ParcelasProximosSeteDias`. Web:
+  `pages/DashboardPage` + `dashboard/` (`Grafico`, `PrimeirosPassos`, `UltimosMarcos` — lê `/api/auditoria`, tira logins e registros filhos e agrupa
+  repetições —, `AtendimentoWhatsApp`, `suporte.ts` com `VITE_SUPORTE_WHATSAPP`); atualiza a cada 60 s; logo do menu leva a `/`; relógio na topbar.
+- Testes: 547 backend, 196 web, 10 admin, 7 mobile. E2E em localhost (dashboard vazio e com dados, ações rápidas, Nova venda, logo, tema escuro,
+  vendedora, celular), 3 execuções.
 
 **Antes da v0.21.0 (pedido do dono):** levar o padrão de grade às demais telas de cadastro/consulta (Clientes, Fornecedores, Vendedores, Contas a
 pagar/receber, Vendas realizadas...), uma por vez, com o relatório de cada uma aceitando `ids`.
