@@ -35,6 +35,24 @@ describe('Shell', () => {
     expect(screen.queryByText(/Previsto para a/)).not.toBeInTheDocument()
   })
 
+  it('abrir outro grupo e navegar por ele não fecha os grupos já abertos', async () => {
+    api()
+    renderApp('/cadastros/produtos')
+    await screen.findByRole('link', { name: 'Grades e cores' })
+    const grupo = (nome: string) => within(menuLateral()).getByRole('button', { name: nome })
+    expect(grupo('Cadastros')).toHaveAttribute('aria-expanded', 'true')
+
+    await userEvent.click(grupo('Estoque'))
+    await userEvent.click(within(menuLateral()).getByRole('link', { name: 'Ajustes' }))
+
+    expect(grupo('Estoque')).toHaveAttribute('aria-expanded', 'true')
+    expect(grupo('Cadastros')).toHaveAttribute('aria-expanded', 'true')
+
+    await userEvent.click(grupo('Cadastros'))
+    expect(grupo('Cadastros')).toHaveAttribute('aria-expanded', 'false')
+    expect(grupo('Estoque')).toHaveAttribute('aria-expanded', 'true')
+  })
+
   it('recolher o menu guarda a preferência', async () => {
     api()
     renderApp()

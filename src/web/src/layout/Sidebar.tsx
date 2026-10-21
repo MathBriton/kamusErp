@@ -16,13 +16,24 @@ const itemBase = 'flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm font-m
 export function Sidebar({ menu, recolhido, onAlternarRecolhido, onNavegar }: Props) {
   const { pathname } = useLocation()
   const grupoDaRota = menu.find((g) => g.itens?.some((i) => pathname.startsWith(i.rota)))?.titulo
-  const [alternados, setAlternados] = useState<Set<string>>(new Set())
-  // O grupo da página atual abre sozinho (inclusive ao chegar por link/notificação); o usuário pode fechá-lo.
-  const estaAberto = (titulo: string) => (titulo === grupoDaRota) !== alternados.has(titulo)
+  // Cada grupo abre/fecha só pelo clique do usuário. A rota atual abre o seu grupo (inclusive ao chegar por
+  // link/notificação), mas nunca fecha os outros que o usuário deixou abertos.
+  const [abertos, setAbertos] = useState<Set<string>>(() => new Set(grupoDaRota ? [grupoDaRota] : []))
+  const [grupoVisto, setGrupoVisto] = useState(grupoDaRota)
+  if (grupoDaRota !== grupoVisto) {
+    setGrupoVisto(grupoDaRota)
+    if (grupoDaRota && !abertos.has(grupoDaRota)) setAbertos(new Set(abertos).add(grupoDaRota))
+  }
+  const estaAberto = (titulo: string) => abertos.has(titulo)
 
   const alternarGrupo = (titulo: string) => {
-    if (recolhido) onAlternarRecolhido()
-    setAlternados((atual) => {
+    if (recolhido) {
+      // Com o menu recolhido, clicar no ícone expande o menu com o grupo aberto.
+      onAlternarRecolhido()
+      setAbertos((atual) => new Set(atual).add(titulo))
+      return
+    }
+    setAbertos((atual) => {
       const novo = new Set(atual)
       if (novo.has(titulo)) novo.delete(titulo)
       else novo.add(titulo)
