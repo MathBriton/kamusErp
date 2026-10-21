@@ -15,8 +15,9 @@ public sealed record BlocoDeVendas(Cartao Periodo, Cartao Mes, IReadOnlyList<Ven
 public sealed record Alerta(string Tipo, string Gravidade, string Titulo, string Detalhe, string Link);
 
 /// <summary>Blocos nulos = o perfil não vê.</summary>
+/// <param name="PrimeirosPassos">Etapas da implantação já concluídas (códigos de <see cref="EtapasDaImplantacao"/>).</param>
 public sealed record Dashboard(string Periodo, DateOnly De, DateOnly Ate, BlocoDeVendas? Vendas, ResumoFinanceiro? Financeiro, ResumoDeEstoque? Estoque,
-    CondicionaisNaRua? Condicionais, IReadOnlyList<Alerta> Alertas);
+    CondicionaisNaRua? Condicionais, IReadOnlyList<Alerta> Alertas, IReadOnlyList<string> PrimeirosPassos);
 
 /// <summary>Período escolhido no dashboard e o período anterior do mesmo tamanho, para comparar.</summary>
 public sealed record Periodo(string Codigo, DateOnly De, DateOnly Ate, DateOnly AnteriorDe, DateOnly AnteriorAte)
@@ -42,7 +43,8 @@ public sealed record Periodo(string Codigo, DateOnly De, DateOnly Ate, DateOnly 
 }
 
 /// <summary>Monta o dashboard juntando os indicadores dos módulos (vendas, financeiro, estoque) e os alertas.</summary>
-public sealed class Painel(IIndicadoresDeVendas vendas, IIndicadoresFinanceiros financeiro, IIndicadoresDeEstoque estoque)
+public sealed class Painel(IIndicadoresDeVendas vendas, IIndicadoresFinanceiros financeiro, IIndicadoresDeEstoque estoque,
+    IEnumerable<IProgressoDaImplantacao> progresso)
 {
     private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
 
@@ -74,8 +76,11 @@ public sealed class Painel(IIndicadoresDeVendas vendas, IIndicadoresFinanceiros 
         var condicionais = Perfis.Condicionais.Contains(perfil) ? await vendas.CondicionaisAsync(empresaIds, hoje, ct) : null;
         var verCrediario = Perfis.Crediario.Contains(perfil);
 
+        var etapas = new List<string>();
+        foreach (var modulo in progresso) etapas.AddRange(await modulo.EtapasConcluidasAsync(empresaIds, ct));
+
         return new Dashboard(periodo.Codigo, periodo.De, periodo.Ate, blocoDeVendas, resumoFinanceiro, resumoDeEstoque, condicionais,
-            Alertas(resumoFinanceiro, resumoDeEstoque, condicionais, verCrediario));
+            Alertas(resumoFinanceiro, resumoDeEstoque, condicionais, verCrediario), etapas.Distinct().ToList());
     }
 
     private static Cartao Cartao(ResumoDeVendas atual, ResumoDeVendas anterior) =>

@@ -25,7 +25,7 @@ public sealed class IndicadoresTests : IAsyncDisposable
     private sealed record MaisVendidoDto(Guid SkuId, string Descricao, int Pecas, decimal Total);
     private sealed record VendasDto(CartaoDto Periodo, CartaoDto Mes, List<DiaDto> Ultimos30Dias, List<NomeDto> PorForma, List<NomeDto> PorVendedor,
         List<MaisVendidoDto> MaisVendidos, bool SomenteAsMinhas);
-    private sealed record CompromissosDto(decimal Hoje, decimal Amanha, decimal ProximosSeteDias, decimal Vencido, int ParcelasVencidas);
+    private sealed record CompromissosDto(decimal Hoje, decimal Amanha, decimal ProximosSeteDias, decimal Vencido, int ParcelasVencidas, int ParcelasProximosSeteDias);
     private sealed record SaldoDto(Guid Id, string Nome, string Tipo, decimal Saldo);
     private sealed record FinanceiroDto(List<SaldoDto> Contas, decimal SaldoTotal, CompromissosDto AReceber, CompromissosDto APagar, decimal CrediarioEmAtraso,
         int ClientesEmAtraso);
@@ -34,7 +34,7 @@ public sealed class IndicadoresTests : IAsyncDisposable
     private sealed record CondicionaisDto(int Abertas, int Atrasadas, int Pecas, decimal Valor);
     private sealed record AlertaDto(string Tipo, string Gravidade, string Titulo, string Detalhe, string Link);
     private sealed record DashboardDto(string Periodo, DateOnly De, DateOnly Ate, VendasDto? Vendas, FinanceiroDto? Financeiro, EstoqueDto? Estoque,
-        CondicionaisDto? Condicionais, List<AlertaDto> Alertas);
+        CondicionaisDto? Condicionais, List<AlertaDto> Alertas, List<string> PrimeirosPassos);
 
     private sealed record PreferenciasDto(bool Ativo, int Hora, List<int> Dias, bool Vendas, bool Financeiro, bool Estoque, bool Condicionais, bool Crediario,
         bool EnviarSemMovimento, DateOnly? UltimoEnvio);
@@ -128,7 +128,7 @@ public sealed class IndicadoresTests : IAsyncDisposable
         var f = d.Financeiro.ShouldNotBeNull();
         f.SaldoTotal.ShouldBe(100m + 59.90m + 179.70m);
         f.Contas.Single().Nome.ShouldBe("Caixa");
-        f.APagar.ShouldBe(new CompromissosDto(30m, 0m, 30m, 50m, 1));
+        f.APagar.ShouldBe(new CompromissosDto(30m, 0m, 30m, 50m, 1, 1));
         f.AReceber.Vencido.ShouldBe(0m);
 
         var e = d.Estoque.ShouldNotBeNull();
@@ -140,6 +140,19 @@ public sealed class IndicadoresTests : IAsyncDisposable
         d.Condicionais.ShouldBe(new CondicionaisDto(1, 1, 1, 59.90m));
         d.Alertas.Select(a => a.Tipo).ShouldBe(["contas_a_pagar_vencidas", "condicionais_atrasadas", "quebra_de_grade"], ignoreOrder: true);
         d.Alertas.Single(a => a.Tipo == "contas_a_pagar_vencidas").Link.ShouldBe("/financeiro/contas-a-pagar");
+    }
+
+    [Fact]
+    public async Task Dashboard_PrimeirosPassos_MarcaAsEtapasConcluidasDaImplantacao()
+    {
+        var client = await Entrar(_api);
+        var antes = (await client.GetFromJsonAsync<DashboardDto>(U("/api/indicadores?periodo=hoje"), Ct))!;
+        antes.PrimeirosPassos.ShouldBeEmpty();
+
+        var c = await Preparar();
+
+        var depois = (await c.Client.GetFromJsonAsync<DashboardDto>(U("/api/indicadores?periodo=hoje"), Ct))!;
+        depois.PrimeirosPassos.ShouldBe(["produtos", "clientes", "entrada_de_estoque", "contas_a_pagar", "primeira_venda"], ignoreOrder: true);
     }
 
     [Fact]

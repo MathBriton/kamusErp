@@ -24,6 +24,7 @@ public static class ModuloEstoque
         services.AddScoped<Lojas>();
         services.AddScoped<IMovimentacaoDeEstoque, MovimentacaoDeEstoque>();
         services.AddScoped<Kamus.SharedKernel.Indicadores.IIndicadoresDeEstoque, IndicadoresDeEstoque>();
+        services.AddScoped<Kamus.SharedKernel.Indicadores.IProgressoDaImplantacao, ProgressoDaImplantacao>();
         services.AddScoped<IRelatorio, RelatorioDePosicao>();
         services.AddScoped<IRelatorio, RelatorioDeInventario>();
         services.AddScoped<IImportador, ImportadorDeEstoqueInicial>();

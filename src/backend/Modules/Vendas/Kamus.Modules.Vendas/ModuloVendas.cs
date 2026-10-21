@@ -19,6 +19,7 @@ public static class ModuloVendas
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<Aplicacao.RegistroDeVendas>();
         services.AddScoped<Kamus.SharedKernel.Indicadores.IIndicadoresDeVendas, Aplicacao.IndicadoresDeVendas>();
+        services.AddScoped<Kamus.SharedKernel.Indicadores.IProgressoDaImplantacao, Aplicacao.ProgressoDaImplantacao>();
         services.AddScoped<IRelatorio, RelatorioDeVendas>();
         services.AddScoped<IRelatorio, RelatorioDeComissoes>();
         services.AddScoped<IRelatorio, RelatorioDeVales>();

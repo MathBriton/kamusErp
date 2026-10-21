@@ -22,12 +22,14 @@ internal sealed class IndicadoresFinanceiros(FinanceiroDbContext db) : IIndicado
         {
             var doTipo = abertas.Where(x => x.Titulo.Tipo == tipo).Select(x => x.Parcela).ToList();
             var vencidas = doTipo.Where(p => p.Vencimento < hoje).ToList();
+            var proximas = doTipo.Where(p => p.Vencimento >= hoje && p.Vencimento <= hoje.AddDays(6)).ToList();
             return new Compromissos(
                 doTipo.Where(p => p.Vencimento == hoje).Sum(p => p.Saldo),
                 doTipo.Where(p => p.Vencimento == hoje.AddDays(1)).Sum(p => p.Saldo),
-                doTipo.Where(p => p.Vencimento >= hoje && p.Vencimento <= hoje.AddDays(6)).Sum(p => p.Saldo),
+                proximas.Sum(p => p.Saldo),
                 vencidas.Sum(p => p.Saldo),
-                vencidas.Count);
+                vencidas.Count,
+                proximas.Count);
         }
 
         var crediarioVencido = abertas.Where(x => x.Titulo.Crediario && x.Parcela.Vencimento < hoje).ToList();

@@ -24,6 +24,7 @@ public static class ModuloFinanceiro
         services.AddScoped<Crediario>();
         services.AddScoped<ICrediario>(sp => sp.GetRequiredService<Crediario>());
         services.AddScoped<Kamus.SharedKernel.Indicadores.IIndicadoresFinanceiros, IndicadoresFinanceiros>();
+        services.AddScoped<Kamus.SharedKernel.Indicadores.IProgressoDaImplantacao, ProgressoDaImplantacao>();
         services.AddScoped<IRelatorio, RelatorioDeInadimplencia>();
         services.AddScoped<IRelatorio, RelatorioDeTitulos>();
         services.AddScoped<IRelatorio, RelatorioDeFluxo>();

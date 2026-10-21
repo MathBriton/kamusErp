@@ -6,7 +6,8 @@ public sealed record SaldoDeConta(Guid Id, string Nome, string Tipo, decimal Sal
 /// <param name="Amanha">Saldo das parcelas que vencem amanhã.</param>
 /// <param name="ProximosSeteDias">De hoje até daqui a 6 dias.</param>
 /// <param name="Vencido">Parcelas vencidas e não pagas (antes de hoje).</param>
-public sealed record Compromissos(decimal Hoje, decimal Amanha, decimal ProximosSeteDias, decimal Vencido, int ParcelasVencidas);
+/// <param name="ParcelasProximosSeteDias">Quantas parcelas em aberto vencem de hoje até daqui a 6 dias.</param>
+public sealed record Compromissos(decimal Hoje, decimal Amanha, decimal ProximosSeteDias, decimal Vencido, int ParcelasVencidas, int ParcelasProximosSeteDias);
 
 public sealed record ResumoFinanceiro(IReadOnlyList<SaldoDeConta> Contas, decimal SaldoTotal, Compromissos AReceber, Compromissos APagar,
     decimal CrediarioEmAtraso, int ClientesEmAtraso);

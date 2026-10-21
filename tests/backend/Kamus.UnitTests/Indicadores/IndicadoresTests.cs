@@ -37,7 +37,7 @@ public class PeriodoTests
 
 public class AlertasTests
 {
-    private static readonly Compromissos Nada = new(0, 0, 0, 0, 0);
+    private static readonly Compromissos Nada = new(0, 0, 0, 0, 0, 0);
 
     [Fact]
     public void Alertas_SoParaOQueTemProblema_ComLinkParaODetalhe()
