@@ -44,6 +44,25 @@ export interface ListaDeParcelas {
   pago: number
   saldo: number
   vencido: number
+  /** Linhas com os filtros (os valores acima somam todas elas; `itens` é só a página). */
+  total: number
+  pagina: number
+  tamanho: number
+}
+
+export interface ListaDeContas {
+  itens: ContaFinanceira[]
+  total: number
+  pagina: number
+  tamanho: number
+  /** Saldo somado de todas as contas filtradas. */
+  saldo: number
+}
+
+export interface ResultadoDaBaixaEmLote {
+  baixadas: number
+  total: number
+  falhas: { parcelaId: string; descricao: string; motivo: string }[]
 }
 
 export interface Baixa {

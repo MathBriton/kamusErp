@@ -1,18 +1,28 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useApi } from '../api/useApi'
 import { ErroDeApi } from '../auth/api'
 import { lerNumero, moeda } from '../cadastros/catalogo'
 import { Campo } from '../components/Campo'
 import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { Confirmacao } from '../components/grade/Confirmacao'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade, useListaPaginada } from '../components/grade/useGrade'
 import { Icone } from '../components/Icone'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { BotaoExportar } from '../relatorios/BotaoExportar'
+import { Indicador } from './Indicador'
 import { SeloDeSituacao } from './Selo'
-import { dataBr, hojeIso, PERFIS_DO_FINANCEIRO, somarMeses, type LinhaDeParcela, type ListaDeParcelas, type TipoDeTitulo, type Titulo } from './tipos'
+import {
+  dataBr, hojeIso, PERFIS_DO_FINANCEIRO, somarMeses, type LinhaDeParcela, type ListaDeParcelas, type ResultadoDaBaixaEmLote, type TipoDeTitulo, type Titulo,
+} from './tipos'
 import { useCategorias, useContas } from './useFinanceiro'
 
-const TEXTOS: Record<TipoDeTitulo, { titulo: string; subtitulo: string; pessoa: string; papel: string; novo: string; baixar: string; categoria: 'Despesa' | 'Receita' }> = {
+const TEXTOS: Record<TipoDeTitulo, {
+  titulo: string; subtitulo: string; pessoa: string; papel: string; novo: string; baixar: string; baixadas: [string, string]; categoria: 'Despesa' | 'Receita'
+}> = {
   pagar: {
     titulo: 'Contas a pagar',
     subtitulo: 'Fornecedores, despesas fixas e impostos. Notas de entrada lançadas no estoque entram aqui sozinhas.',
@@ -20,6 +30,7 @@ const TEXTOS: Record<TipoDeTitulo, { titulo: string; subtitulo: string; pessoa: 
     papel: 'fornecedor',
     novo: 'Nova conta a pagar',
     baixar: 'Pagar',
+    baixadas: ['paga', 'pagas'],
     categoria: 'Despesa',
   },
   receber: {
@@ -29,49 +40,48 @@ const TEXTOS: Record<TipoDeTitulo, { titulo: string; subtitulo: string; pessoa: 
     papel: 'cliente',
     novo: 'Nova conta a receber',
     baixar: 'Receber',
+    baixadas: ['recebida', 'recebidas'],
     categoria: 'Receita',
   },
 }
 
-/** Contas a pagar ou a receber: uma linha por parcela, com baixa (total ou parcial), detalhe, estorno e cancelamento. */
+type Janela =
+  | { tipo: 'novo' }
+  | { tipo: 'baixar'; linha: LinhaDeParcela }
+  | { tipo: 'detalhe'; tituloId: string }
+  | { tipo: 'cancelar'; linha: LinhaDeParcela }
+  | { tipo: 'baixarSelecionadas'; linhas: LinhaDeParcela[] }
+  | null
+
+const FILTROS = { situacao: 'abertas', busca: '', de: '', ate: '' }
+
+/** "Reforma da vitrine 1/2": nome da linha (uma parcela) nas ações e na seleção. */
+const nomeDaLinha = (l: LinhaDeParcela) => `${l.descricao} ${l.numero}/${l.parcelas}`
+const temSaldo = (l: LinhaDeParcela) => l.saldo > 0 && l.situacao !== 'Cancelada'
+const quantasParcelas = (n: number) => `${n} ${n === 1 ? 'parcela' : 'parcelas'}`
+
+/**
+ * Contas a pagar ou a receber no padrão de grade: uma linha por parcela, com filtros, seleção, baixa (total ou parcial),
+ * detalhe com estorno, cancelamento, baixa das selecionadas e exportação (das selecionadas ou dos filtros).
+ */
 export function ContasPage({ tipo }: { tipo: TipoDeTitulo }) {
-  const { getJson } = useApi()
+  const { enviar } = useApi()
   const { perfilAtual, consolidado } = useEmpresa()
   const textos = TEXTOS[tipo]
-  const [situacao, setSituacao] = useState('abertas')
-  const [de, setDe] = useState('')
-  const [ate, setAte] = useState('')
-  const [busca, setBusca] = useState('')
-  const [versao, setVersao] = useState(0)
-  const [{ lista, erro }, setEstado] = useState<{ lista: ListaDeParcelas | null; erro: string | null }>({ lista: null, erro: null })
-  const [novo, setNovo] = useState(false)
-  const [baixando, setBaixando] = useState<LinhaDeParcela | null>(null)
-  const [detalhe, setDetalhe] = useState<string | null>(null)
   const permitido = PERFIS_DO_FINANCEIRO.includes(perfilAtual)
-
-  const filtros = useMemo(() => {
-    const f: Record<string, string> = { tipo, situacao }
-    if (de) f.de = de
-    if (ate) f.ate = ate
-    if (busca.trim()) f.busca = busca.trim()
-    return f
-  }, [tipo, situacao, de, ate, busca])
-
+  const grade = useGrade(FILTROS)
+  const [versao, setVersao] = useState(0)
+  const { dados, erro } = useListaPaginada<ListaDeParcelas>(
+    permitido ? `/api/financeiro/titulos?tipo=${tipo}&${grade.consulta}` : null,
+    versao,
+    grade.filtros.busca ? 250 : 0,
+  )
+  const [janela, setJanela] = useState<Janela>(null)
+  // Linhas já vistas (de qualquer página): a seleção sobrevive à troca de página e a baixa em lote precisa do saldo delas.
+  const vistas = useRef(new Map<string, LinhaDeParcela>())
   useEffect(() => {
-    if (!permitido) return
-    const controle = new AbortController()
-    const timer = window.setTimeout(() => {
-      getJson<ListaDeParcelas>(`/api/financeiro/titulos?${new URLSearchParams(filtros)}`, controle.signal)
-        .then((l) => setEstado({ lista: l, erro: null }))
-        .catch((e: unknown) => {
-          if (!controle.signal.aborted) setEstado({ lista: null, erro: e instanceof ErroDeApi ? e.message : 'Não foi possível carregar.' })
-        })
-    }, busca ? 250 : 0)
-    return () => {
-      window.clearTimeout(timer)
-      controle.abort()
-    }
-  }, [getJson, filtros, busca, versao, permitido])
+    for (const l of dados?.itens ?? []) vistas.current.set(l.parcelaId, l)
+  }, [dados])
 
   if (!permitido)
     return (
@@ -82,30 +92,61 @@ export function ContasPage({ tipo }: { tipo: TipoDeTitulo }) {
     )
 
   const recarregar = () => setVersao((v) => v + 1)
+  const fecharERecarregar = () => {
+    setJanela(null)
+    recarregar()
+  }
+
+  const colunas: Coluna<LinhaDeParcela>[] = [
+    { titulo: 'Vencimento', celula: (l) => <span className="whitespace-nowrap tabular-nums">{dataBr(l.vencimento)}</span> },
+    {
+      titulo: 'Descrição',
+      celula: (l) => (
+        <>
+          <span className="font-semibold">{l.descricao}</span>
+          {l.parcelas > 1 && <span className="ml-1 text-xs text-muted">{`${l.numero}/${l.parcelas}`}</span>}
+          <span className="block text-xs text-muted">{[l.pessoaNome, l.documento].filter(Boolean).join(' · ')}</span>
+        </>
+      ),
+    },
+    { titulo: 'Categoria', celula: (l) => <span className="text-muted">{l.categoria ?? '—'}</span> },
+    { titulo: 'Valor', celula: (l) => moeda(l.valor), alinhar: 'direita' },
+    { titulo: 'Saldo', celula: (l) => <span className="font-semibold">{moeda(l.saldo)}</span>, alinhar: 'direita' },
+    { titulo: 'Situação', celula: (l) => <SeloDeSituacao situacao={l.situacao} /> },
+  ]
 
   return (
     <div className="mx-auto max-w-7xl">
-      <p className="text-xs text-muted">Financeiro</p>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">{textos.titulo}</h1>
-          <p className="mt-1 text-sm text-muted">{textos.subtitulo}</p>
-        </div>
-        {!consolidado && (
-          <button type="button" onClick={() => setNovo(true)} className={estilos.botaoPrimario}>
-            {textos.novo}
-          </button>
-        )}
-      </div>
+      <CabecalhoDaPagina
+        secao="Financeiro"
+        titulo={textos.titulo}
+        descricao={textos.subtitulo}
+        acoes={
+          <>
+            <BotaoExportar relatorio="titulos" parametros={{ tipo, ...grade.parametros }} selecionados={[...grade.selecionados]} />
+            {!consolidado && (
+              <button type="button" onClick={() => setJanela({ tipo: 'novo' })} className={estilos.botaoPrimario}>
+                <Icone nome="plus" />
+                {textos.novo}
+              </button>
+            )}
+          </>
+        }
+      />
 
-      <div className="mt-6 flex flex-wrap items-end gap-3">
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
         <label className="min-w-56 flex-1 text-sm">
           <span className="mb-1 block font-semibold">Buscar</span>
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={`Descrição, ${textos.pessoa.toLowerCase()} ou documento`} className={estilos.campo} />
+          <input
+            value={grade.filtros.busca}
+            onChange={(e) => grade.filtrar({ busca: e.target.value })}
+            placeholder={`Descrição, ${textos.pessoa.toLowerCase()} ou documento`}
+            className={estilos.campo}
+          />
         </label>
-        <label className="text-sm">
+        <label className="w-40 text-sm">
           <span className="mb-1 block font-semibold">Situação</span>
-          <select value={situacao} onChange={(e) => setSituacao(e.target.value)} className={estilos.campo}>
+          <select value={grade.filtros.situacao} onChange={(e) => grade.filtrar({ situacao: e.target.value })} className={estilos.campo}>
             <option value="abertas">Em aberto</option>
             <option value="vencidas">Vencidas</option>
             <option value="pagas">{tipo === 'pagar' ? 'Pagas' : 'Recebidas'}</option>
@@ -115,14 +156,13 @@ export function ContasPage({ tipo }: { tipo: TipoDeTitulo }) {
         </label>
         <label className="text-sm">
           <span className="mb-1 block font-semibold">Vencimento de</span>
-          <input type="date" value={de} onChange={(e) => setDe(e.target.value)} className={estilos.campo} />
+          <input type="date" value={grade.filtros.de} onChange={(e) => grade.filtrar({ de: e.target.value })} className={estilos.campo} />
         </label>
         <label className="text-sm">
           <span className="mb-1 block font-semibold">até</span>
-          <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} className={estilos.campo} />
+          <input type="date" value={grade.filtros.ate} onChange={(e) => grade.filtrar({ ate: e.target.value })} className={estilos.campo} />
         </label>
-        <BotaoExportar relatorio="titulos" parametros={filtros} />
-      </div>
+      </BarraDeFiltros>
 
       {erro && (
         <p role="alert" className={`mt-4 flex items-center gap-2 ${estilos.erro}`}>
@@ -131,92 +171,174 @@ export function ContasPage({ tipo }: { tipo: TipoDeTitulo }) {
         </p>
       )}
 
-      {lista && (
-        <>
-          <dl className="mt-4 grid gap-3 sm:grid-cols-3">
-            <Indicador rotulo="Saldo em aberto" valor={moeda(lista.saldo)} />
-            <Indicador rotulo="Vencido" valor={moeda(lista.vencido)} destaque={lista.vencido > 0} />
-            <Indicador rotulo={tipo === 'pagar' ? 'Já pago' : 'Já recebido'} valor={moeda(lista.pago)} />
-          </dl>
-          <div className="mt-4 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-            {lista.itens.length === 0 ? (
-              <p className="p-8 text-center text-sm text-muted">Nada por aqui com esses filtros.</p>
-            ) : (
-              <table aria-label={textos.titulo} className="w-full text-sm">
-                <thead className="bg-surface-2 text-left text-xs text-muted uppercase">
-                  <tr>
-                    <th className="px-4 py-2">Vencimento</th>
-                    <th className="px-4 py-2">Descrição</th>
-                    <th className="px-4 py-2">Categoria</th>
-                    <th className="px-4 py-2 text-right">Valor</th>
-                    <th className="px-4 py-2 text-right">Saldo</th>
-                    <th className="px-4 py-2">Situação</th>
-                    <th className="px-4 py-2" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {lista.itens.map((l) => (
-                    <tr key={l.parcelaId}>
-                      <td className="px-4 py-2.5 whitespace-nowrap tabular-nums">{dataBr(l.vencimento)}</td>
-                      <td className="px-4 py-2.5">
-                        <button type="button" onClick={() => setDetalhe(l.tituloId)} className="text-left font-semibold hover:text-primary hover:underline">
-                          {l.descricao}
-                        </button>
-                        {l.parcelas > 1 && <span className="ml-1 text-xs text-muted">{`${l.numero}/${l.parcelas}`}</span>}
-                        <span className="block text-xs text-muted">{[l.pessoaNome, l.documento].filter(Boolean).join(' · ')}</span>
-                      </td>
-                      <td className="px-4 py-2.5 text-muted">{l.categoria ?? '—'}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{moeda(l.valor)}</td>
-                      <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{moeda(l.saldo)}</td>
-                      <td className="px-4 py-2.5"><SeloDeSituacao situacao={l.situacao} /></td>
-                      <td className="px-4 py-2.5 text-right">
-                        {l.saldo > 0 && l.situacao !== 'Cancelada' && !consolidado && (
-                          <button type="button" onClick={() => setBaixando(l)} className={estilos.botao} aria-label={`${textos.baixar} ${l.descricao} ${l.numero}/${l.parcelas}`}>
-                            {textos.baixar}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </>
+      {dados && (
+        <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+          <Indicador rotulo="Saldo em aberto" valor={moeda(dados.saldo)} />
+          <Indicador rotulo="Vencido" valor={moeda(dados.vencido)} destaque={dados.vencido > 0} />
+          <Indicador rotulo={tipo === 'pagar' ? 'Já pago' : 'Já recebido'} valor={moeda(dados.pago)} />
+        </dl>
       )}
 
-      {novo && (
-        <NovoTitulo
+      <GradeDeRegistros
+        rotulo={textos.titulo}
+        colunas={colunas}
+        itens={dados?.itens ?? (erro ? [] : null)}
+        chave={(l) => l.parcelaId}
+        nome={nomeDaLinha}
+        total={dados?.total ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
+        apagada={(l) => l.situacao === 'Cancelada'}
+        vazio="Nada por aqui com esses filtros."
+        acoes={(l) => (
+          <>
+            <AcaoDaLinha rotulo={`Ver ${nomeDaLinha(l)}`} icone="eye" onClick={() => setJanela({ tipo: 'detalhe', tituloId: l.tituloId })} />
+            {!consolidado && temSaldo(l) && (
+              <AcaoDaLinha rotulo={`${textos.baixar} ${nomeDaLinha(l)}`} icone="dollar" onClick={() => setJanela({ tipo: 'baixar', linha: l })} />
+            )}
+            {!consolidado && l.situacao !== 'Cancelada' && (
+              <AcaoDaLinha rotulo={`Cancelar título ${nomeDaLinha(l)}`} icone="x" perigo onClick={() => setJanela({ tipo: 'cancelar', linha: l })} />
+            )}
+          </>
+        )}
+        acoesEmLote={
+          !consolidado && (
+            <button
+              type="button"
+              onClick={() => setJanela({ tipo: 'baixarSelecionadas', linhas: [...grade.selecionados].flatMap((id) => vistas.current.get(id) ?? []) })}
+              className={estilos.botao}
+            >
+              {`${textos.baixar} selecionadas`}
+            </button>
+          )
+        }
+      />
+
+      {janela?.tipo === 'novo' && <NovoTitulo tipo={tipo} onFechar={() => setJanela(null)} onSalvo={fecharERecarregar} />}
+      {janela?.tipo === 'baixar' && <BaixarParcela tipo={tipo} linha={janela.linha} onFechar={() => setJanela(null)} onSalvo={fecharERecarregar} />}
+      {janela?.tipo === 'detalhe' && <DetalheDoTitulo id={janela.tituloId} onFechar={() => setJanela(null)} onMudou={recarregar} />}
+      {janela?.tipo === 'cancelar' && (
+        <Confirmacao
+          titulo="Cancelar título"
+          rotulo="Cancelar título"
+          onCancelar={() => setJanela(null)}
+          onConfirmar={async () => {
+            await enviar('POST', `/api/financeiro/titulos/${janela.linha.tituloId}/cancelar`)
+            fecharERecarregar()
+          }}
+        >
+          <p>
+            {`Cancelar "${janela.linha.descricao}"${janela.linha.parcelas > 1 ? ` e as suas ${janela.linha.parcelas} parcelas` : ''}? `}
+            Só dá para cancelar sem pagamentos ativos — estorne as baixas antes, se houver.
+          </p>
+        </Confirmacao>
+      )}
+      {janela?.tipo === 'baixarSelecionadas' && (
+        <BaixarSelecionadas
           tipo={tipo}
-          onFechar={() => setNovo(false)}
-          onSalvo={() => {
-            setNovo(false)
+          linhas={janela.linhas}
+          onFechar={() => setJanela(null)}
+          onConcluido={() => {
+            grade.limparSelecao()
             recarregar()
           }}
         />
       )}
-      {baixando && (
-        <BaixarParcela
-          tipo={tipo}
-          linha={baixando}
-          onFechar={() => setBaixando(null)}
-          onSalvo={() => {
-            setBaixando(null)
-            recarregar()
-          }}
-        />
-      )}
-      {detalhe && <DetalheDoTitulo id={detalhe} onFechar={() => setDetalhe(null)} onMudou={recarregar} />}
     </div>
   )
 }
 
-function Indicador({ rotulo, valor, destaque = false }: { rotulo: string; valor: string; destaque?: boolean }) {
+/** Quita as parcelas selecionadas de uma vez: saldo inteiro, hoje, numa conta; mostra quantas deram e o motivo das que não deram. */
+function BaixarSelecionadas({ tipo, linhas, onFechar, onConcluido }: {
+  tipo: TipoDeTitulo
+  linhas: LinhaDeParcela[]
+  onFechar: () => void
+  onConcluido: () => void
+}) {
+  const { enviar } = useApi()
+  const textos = TEXTOS[tipo]
+  const contas = useContas()?.filter((c) => c.ativa) ?? []
+  const [contaId, setContaId] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const [resultado, setResultado] = useState<ResultadoDaBaixaEmLote | null>(null)
+  const elegiveis = linhas.filter(temSaldo)
+  const total = elegiveis.reduce((s, l) => s + l.saldo, 0)
+  const contaEscolhida = contaId || (contas.length === 1 ? contas[0]!.id : '')
+  const hoje = hojeIso()
+
+  async function confirmar(e: FormEvent) {
+    e.preventDefault()
+    setEnviando(true)
+    setErro(null)
+    try {
+      setResultado(await enviar<ResultadoDaBaixaEmLote>('POST', '/api/financeiro/parcelas/baixas-em-lote', {
+        parcelaIds: elegiveis.map((l) => l.parcelaId),
+        contaId: contaEscolhida,
+        data: hoje,
+      }))
+      onConcluido()
+    } catch (ex) {
+      setErro(ex instanceof ErroDeApi ? ex.message : 'Não foi possível registrar.')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
   return (
-    <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
-      <dt className="text-xs text-muted uppercase">{rotulo}</dt>
-      <dd className={`mt-1 text-xl font-bold tabular-nums ${destaque ? 'text-danger' : ''}`}>{valor}</dd>
-    </div>
+    <Dialogo titulo={`${textos.baixar} selecionadas`} onFechar={onFechar}>
+      {resultado ? (
+        <div className="space-y-4 text-sm">
+          <p role="status" className="rounded-lg bg-success-soft px-3 py-2.5 text-success">
+            {`${quantasParcelas(resultado.baixadas)} ${resultado.baixadas === 1 ? textos.baixadas[0] : textos.baixadas[1]}: ${moeda(resultado.total)}`}
+          </p>
+          {resultado.falhas.length > 0 && (
+            <div role="alert" className={estilos.erro}>
+              <p className="font-semibold">{`Não deu para ${textos.baixar.toLowerCase()} ${quantasParcelas(resultado.falhas.length)}:`}</p>
+              <ul className="mt-1 list-disc pl-5">
+                {resultado.falhas.map((f) => (
+                  <li key={f.parcelaId}>{`${f.descricao}: ${f.motivo}`}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="flex justify-end">
+            <button type="button" onClick={onFechar} className={estilos.botaoPrimario}>Concluir</button>
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={(e) => void confirmar(e)} className="space-y-4 text-sm">
+          <p>
+            <span className="font-semibold">{quantasParcelas(elegiveis.length)}</span>
+            {' · total '}
+            <span className="font-semibold tabular-nums">{moeda(total)}</span>
+            {` · em ${dataBr(hoje)}`}
+          </p>
+          <p className="text-muted">
+            O saldo inteiro de cada parcela é baixado hoje, sem juros, multa ou desconto. Para baixa parcial ou com encargos, use a ação da linha.
+          </p>
+          {linhas.length > elegiveis.length && (
+            <p className="text-muted">{`${quantasParcelas(linhas.length - elegiveis.length)} já quitada(s) ou cancelada(s) fica(m) de fora.`}</p>
+          )}
+          {contas.length === 0 && <p className={estilos.erro}>Cadastre uma conta financeira (caixa ou banco) em Financeiro → Contas financeiras.</p>}
+          <Campo rotulo="Conta">
+            <select value={contaEscolhida} onChange={(e) => setContaId(e.target.value)} className={estilos.campo}>
+              <option value="">Escolha...</option>
+              {contas.map((c) => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </select>
+          </Campo>
+          {erro && <p role="alert" className={estilos.erro}>{erro}</p>}
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={onFechar} className={estilos.botao}>Cancelar</button>
+            <button type="submit" disabled={enviando || !contaEscolhida || elegiveis.length === 0} className={estilos.botaoPrimario}>
+              {enviando ? 'Aguarde...' : `${textos.baixar} ${quantasParcelas(elegiveis.length)}`}
+            </button>
+          </div>
+        </form>
+      )}
+    </Dialogo>
   )
 }
 
