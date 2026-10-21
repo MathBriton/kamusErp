@@ -33,7 +33,7 @@ export function LoginPage() {
   return (
     <main className="grid min-h-dvh lg:grid-cols-2">
       {/* Painel da marca (cores fixas de propósito: é a identidade visual, igual nos dois temas) */}
-      <section className="relative hidden flex-col overflow-hidden bg-gradient-to-br from-[#4f46e5] via-[#6d28d9] to-[#9d174d] p-14 text-white lg:flex">
+      <section className="relative hidden flex-col overflow-hidden bg-gradient-to-br from-[#0d5c3a] via-[#004328] to-[#1e293b] p-14 text-white lg:flex">
         <Logo invertido />
         <div className="mt-auto max-w-md">
           <h2 className="text-4xl leading-tight font-bold tracking-tight">

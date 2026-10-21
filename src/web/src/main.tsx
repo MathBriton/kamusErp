@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router'
 import { App } from './App'
 import { AuthProvider } from './auth/AuthProvider'
 import { ThemeProvider } from './theme/ThemeProvider'
+import '@fontsource-variable/plus-jakarta-sans'
 import './index.css'
 
 createRoot(document.getElementById('root')!).render(

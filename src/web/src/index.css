@@ -8,35 +8,45 @@
  * sempre os tokens abaixo, assim qualquer tela nova funciona nos dois temas.
  */
 :root {
-  --background: #f6f6f8;
+  /* Design system "Sartorial Modernist" (verde de alfaiataria + neutros slate). */
+  --background: #f8f9ff;
   --surface: #ffffff;
-  --surface-2: #f2f2f5;
-  --border: #e5e5ea;
-  --foreground: #16161d;
-  --muted: #6b6b78;
-  --primary: #4f46e5;
+  --surface-2: #f1f5f9;
+  --border: #e2e8f0;
+  --foreground: #0b1c30;
+  --muted: #64748b;
+  --primary: #0d5c3a;
+  --primary-hover: #0a482e;
   --primary-foreground: #ffffff;
-  --primary-soft: #eeeffe;
+  --primary-soft: #ebf7f0;
+  --accent: #92650a;
+  --accent-soft: #fef9c3;
   --success: #15803d;
-  --success-soft: #e7f6ec;
+  --success-soft: #dcfce7;
   --warning: #b45309;
-  --warning-soft: #fef3dd;
-  --danger: #dc2626;
-  --danger-soft: #fdecec;
-  --info: #2563eb;
-  --info-soft: #e6eefe;
+  --warning-soft: #fef3c7;
+  --danger: #b91c1c;
+  --danger-soft: #fee2e2;
+  --info: #1d4ed8;
+  --info-soft: #eff6ff;
+  /* Cor da marca WhatsApp (botão de atendimento). */
+  --whatsapp: #25d366;
+  --whatsapp-foreground: #ffffff;
 }
 
 .dark {
-  --background: #0c0c11;
-  --surface: #15151c;
-  --surface-2: #1d1d26;
-  --border: #2a2a36;
-  --foreground: #f2f2f6;
-  --muted: #9a9aa8;
-  --primary: #8b85ff;
-  --primary-foreground: #0c0c11;
-  --primary-soft: #23213f;
+  --background: #0a110e;
+  --surface: #111a16;
+  --surface-2: #18241f;
+  --border: #263630;
+  --foreground: #e8f0ec;
+  --muted: #93a39b;
+  --primary: #8ed6aa;
+  --primary-hover: #a9f3c5;
+  --primary-foreground: #002111;
+  --primary-soft: #133626;
+  --accent: #eec14b;
+  --accent-soft: #33290c;
   --success: #4ade80;
   --success-soft: #11291b;
   --warning: #fbbf24;
@@ -45,10 +55,12 @@
   --danger-soft: #351616;
   --info: #60a5fa;
   --info-soft: #0f2240;
+  --whatsapp: #25d366;
+  --whatsapp-foreground: #ffffff;
 }
 
 @theme inline {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
@@ -56,8 +68,11 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-soft: var(--primary-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
@@ -66,6 +81,8 @@
   --color-danger-soft: var(--danger-soft);
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
+  --color-whatsapp: var(--whatsapp);
+  --color-whatsapp-foreground: var(--whatsapp-foreground);
 }
 
 body {
