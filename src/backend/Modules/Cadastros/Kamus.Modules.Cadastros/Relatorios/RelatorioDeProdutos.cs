@@ -19,7 +19,7 @@ internal sealed class RelatorioDeProdutos(CadastrosDbContext db) : IRelatorio
         var busca = parametros.GetValueOrDefault("busca");
         var situacao = parametros.GetValueOrDefault("situacao");
         // "ids" = linhas selecionadas na grade (separadas por vírgula): exporta só elas, ignorando os demais filtros.
-        var ids = LerIds(parametros.GetValueOrDefault("ids"));
+        var ids = ParametrosDoRelatorio.Ids(parametros);
         var produtos = ids.Count > 0
             ? await ProdutosEndpoints.FiltrarAsync(db, null, null, null, "todos", ct)
             : await ProdutosEndpoints.FiltrarAsync(db, busca, parametros.GetValueOrDefault("categoria"), parametros.GetValueOrDefault("colecao"), situacao, ct);
@@ -34,7 +34,7 @@ internal sealed class RelatorioDeProdutos(CadastrosDbContext db) : IRelatorio
             ])).ToList();
 
         var filtros = new List<FiltroAplicado>();
-        if (ids.Count > 0) filtros.Add(new FiltroAplicado("Selecionados", produtos.Count == 1 ? "1 produto" : $"{produtos.Count} produtos"));
+        if (ids.Count > 0) filtros.Add(ParametrosDoRelatorio.Selecionados(produtos.Count, "produto", "produtos"));
         else if (!string.IsNullOrWhiteSpace(busca)) filtros.Add(new FiltroAplicado("Busca", busca));
         return new DadosDoRelatorio(Titulo,
         [
@@ -50,8 +50,4 @@ internal sealed class RelatorioDeProdutos(CadastrosDbContext db) : IRelatorio
             new ColunaRelatorio("Markup", TipoColuna.Numero, Largura: 0.6f),
         ], linhas, filtros);
     }
-
-    private static HashSet<Guid> LerIds(string? valor) =>
-        [.. (valor ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(v => Guid.TryParse(v, out var id) ? id : Guid.Empty).Where(id => id != Guid.Empty)];
 }

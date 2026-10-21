@@ -9,6 +9,7 @@ import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
 import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
 import { Confirmacao } from '../components/grade/Confirmacao'
 import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade, useListaPaginada } from '../components/grade/useGrade'
 import { Icone } from '../components/Icone'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { BotaoExportar } from '../relatorios/BotaoExportar'
@@ -23,12 +24,7 @@ type Janela =
   | { tipo: 'mudarSelecionados'; ativo: boolean }
   | null
 
-interface Filtros {
-  situacao: string
-  categoria: string
-  colecao: string
-}
-const FILTROS_PADRAO: Filtros = { situacao: 'ativos', categoria: '', colecao: '' }
+const FILTROS = { situacao: 'ativos', busca: '', categoria: '', colecao: '' }
 
 /** Produtos no padrão das telas de cadastro: filtros, grade paginada com seleção, ações por linha e em lote, exportação. */
 export function ProdutosPage() {
@@ -36,62 +32,18 @@ export function ProdutosPage() {
   const { perfilAtual } = useEmpresa()
   const podeEditar = PERFIS_DO_CATALOGO.includes(perfilAtual)
   const [params, setParams] = useSearchParams()
-  const [busca, setBusca] = useState('')
-  const [filtros, setFiltros] = useState<Filtros>(FILTROS_PADRAO)
-  const [pagina, setPagina] = useState(1)
-  const [tamanho, setTamanho] = useState(20)
-  const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
-  const [{ produtos, total, erro }, setResultado] = useState<{ produtos: ProdutoResumo[] | null; total: number; erro: string | null }>({ produtos: null, total: 0, erro: null })
+  const grade = useGrade(FILTROS)
+  const [versao, setVersao] = useState(0)
+  const { dados, erro } = useListaPaginada<{ itens: ProdutoResumo[]; total: number }>(`/api/produtos?${grade.consulta}`, versao, grade.filtros.busca ? 250 : 0)
   const [sugestoes, setSugestoes] = useState<{ categorias: string[]; colecoes: string[] }>({ categorias: [], colecoes: [] })
   const [janela, setJanela] = useState<Janela>(null)
-  const [versao, setVersao] = useState(0)
   const idDaUrl = params.get('id')
-
-  const consulta = new URLSearchParams({ situacao: filtros.situacao })
-  if (busca.trim()) consulta.set('busca', busca.trim())
-  if (filtros.categoria) consulta.set('categoria', filtros.categoria)
-  if (filtros.colecao) consulta.set('colecao', filtros.colecao)
-  const parametrosDoRelatorio = Object.fromEntries(consulta)
-  consulta.set('pagina', String(pagina))
-  consulta.set('tamanho', String(tamanho))
-  const url = `/api/produtos?${consulta}`
-
-  useEffect(() => {
-    const controle = new AbortController()
-    const timer = window.setTimeout(() => {
-      getJson<{ itens: ProdutoResumo[]; total: number }>(url, controle.signal)
-        .then((r) => setResultado({ produtos: r.itens, total: r.total, erro: null }))
-        .catch((e: unknown) => {
-          if (!controle.signal.aborted) setResultado({ produtos: [], total: 0, erro: e instanceof ErroDeApi ? e.message : 'Não foi possível carregar.' })
-        })
-    }, busca ? 250 : 0)
-    return () => {
-      window.clearTimeout(timer)
-      controle.abort()
-    }
-  }, [getJson, url, busca, versao])
 
   useEffect(() => {
     const controle = new AbortController()
     getJson<{ categorias: string[]; colecoes: string[] }>('/api/produtos/sugestoes', controle.signal).then(setSugestoes).catch(() => {})
     return () => controle.abort()
   }, [getJson, versao])
-
-  // Filtro novo volta para a primeira página e limpa a seleção (as linhas marcadas podem nem aparecer mais).
-  const recomecar = () => {
-    setPagina(1)
-    setSelecionados(new Set())
-  }
-  const filtrar = (mudanca: Partial<Filtros>) => {
-    setFiltros((f) => ({ ...f, ...mudanca }))
-    recomecar()
-  }
-  const limparFiltros = () => {
-    setFiltros(FILTROS_PADRAO)
-    setBusca('')
-    recomecar()
-  }
-  const filtrosAtivos = busca.trim() !== '' || filtros.situacao !== FILTROS_PADRAO.situacao || filtros.categoria !== '' || filtros.colecao !== ''
 
   const abrir = useCallback(
     (id: string, acao: (produto: Produto) => void) => {
@@ -153,7 +105,7 @@ export function ProdutosPage() {
         descricao="Cada produto gera um SKU por cor × tamanho, com código de barras próprio."
         acoes={
           <>
-            <BotaoExportar relatorio="produtos" parametros={parametrosDoRelatorio} selecionados={[...selecionados]} />
+            <BotaoExportar relatorio="produtos" parametros={grade.parametros} selecionados={[...grade.selecionados]} />
             {podeEditar && (
               <button type="button" onClick={() => setJanela({ tipo: 'novo' })} className={estilos.botaoPrimario}>
                 <Icone nome="plus" />
@@ -164,22 +116,19 @@ export function ProdutosPage() {
         }
       />
 
-      <BarraDeFiltros ativos={filtrosAtivos} onLimpar={limparFiltros}>
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
         <label className="min-w-60 flex-1 text-sm">
           <span className="mb-1 block font-semibold">Buscar</span>
           <input
-            value={busca}
-            onChange={(e) => {
-              setBusca(e.target.value)
-              recomecar()
-            }}
+            value={grade.filtros.busca}
+            onChange={(e) => grade.filtrar({ busca: e.target.value })}
             placeholder="Descrição, referência, marca ou código de barras"
             className={estilos.campo}
           />
         </label>
         <label className="w-40 text-sm">
           <span className="mb-1 block font-semibold">Situação</span>
-          <select value={filtros.situacao} onChange={(e) => filtrar({ situacao: e.target.value })} className={estilos.campo}>
+          <select value={grade.filtros.situacao} onChange={(e) => grade.filtrar({ situacao: e.target.value })} className={estilos.campo}>
             <option value="ativos">Ativos</option>
             <option value="inativos">Inativos</option>
             <option value="todos">Todos</option>
@@ -187,7 +136,7 @@ export function ProdutosPage() {
         </label>
         <label className="w-48 text-sm">
           <span className="mb-1 block font-semibold">Categoria</span>
-          <select value={filtros.categoria} onChange={(e) => filtrar({ categoria: e.target.value })} className={estilos.campo}>
+          <select value={grade.filtros.categoria} onChange={(e) => grade.filtrar({ categoria: e.target.value })} className={estilos.campo}>
             <option value="">Todas</option>
             {sugestoes.categorias.map((c) => (
               <option key={c} value={c}>{c}</option>
@@ -196,7 +145,7 @@ export function ProdutosPage() {
         </label>
         <label className="w-48 text-sm">
           <span className="mb-1 block font-semibold">Coleção</span>
-          <select value={filtros.colecao} onChange={(e) => filtrar({ colecao: e.target.value })} className={estilos.campo}>
+          <select value={grade.filtros.colecao} onChange={(e) => grade.filtrar({ colecao: e.target.value })} className={estilos.campo}>
             <option value="">Todas</option>
             {sugestoes.colecoes.map((c) => (
               <option key={c} value={c}>{c}</option>
@@ -215,18 +164,12 @@ export function ProdutosPage() {
       <GradeDeRegistros
         rotulo="Produtos"
         colunas={colunas}
-        itens={produtos}
+        itens={dados?.itens ?? (erro ? [] : null)}
         chave={(p) => p.id}
         nome={(p) => p.descricao}
-        total={total}
-        pagina={pagina}
-        tamanho={tamanho}
-        onPagina={setPagina}
-        onTamanho={(t) => {
-          setTamanho(t)
-          setPagina(1)
-        }}
-        selecao={{ selecionados, onMudar: setSelecionados }}
+        total={dados?.total ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
         apagada={(p) => !p.ativo}
         vazio="Nenhum produto encontrado com esses filtros."
         acoes={(p) => (
@@ -293,12 +236,12 @@ export function ProdutosPage() {
           rotulo={janela.ativo ? 'Reativar' : 'Inativar'}
           onCancelar={() => setJanela(null)}
           onConfirmar={async () => {
-            await enviar('POST', '/api/produtos/situacao', { ids: [...selecionados], ativo: janela.ativo })
-            setSelecionados(new Set())
+            await enviar('POST', '/api/produtos/situacao', { ids: [...grade.selecionados], ativo: janela.ativo })
+            grade.limparSelecao()
             recarregar()
           }}
         >
-          <p>{`${janela.ativo ? 'Reativar' : 'Inativar'} ${selecionados.size === 1 ? 'o produto selecionado' : `os ${selecionados.size} produtos selecionados`}?`}</p>
+          <p>{`${janela.ativo ? 'Reativar' : 'Inativar'} ${grade.selecionados.size === 1 ? 'o produto selecionado' : `os ${grade.selecionados.size} produtos selecionados`}?`}</p>
         </Confirmacao>
       )}
     </div>

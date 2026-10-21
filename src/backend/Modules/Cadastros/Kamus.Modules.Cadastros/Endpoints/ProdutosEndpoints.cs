@@ -1,6 +1,7 @@
 using Kamus.Modules.Cadastros.Dominio;
 using Kamus.Modules.Cadastros.Persistencia;
 using Kamus.SharedKernel.Busca;
+using Kamus.SharedKernel.Consultas;
 using Kamus.SharedKernel.Documentos;
 using Kamus.SharedKernel.MultiTenancy;
 using Microsoft.AspNetCore.Builder;
@@ -16,8 +17,6 @@ internal static class ProdutosEndpoints
     public sealed record ProdutoRequest(
         string? Referencia, string? Descricao, string? Marca, string? Categoria, string? Colecao, string? ReferenciaDoFornecedor,
         Guid? FornecedorId, decimal PrecoVenda, decimal? PrecoCusto, Guid? GradeId, IReadOnlyList<Guid>? CorIds);
-    public sealed record SituacaoEmLoteRequest(IReadOnlyList<Guid>? Ids, bool Ativo);
-    public sealed record SituacaoEmLoteResponse(int Alterados);
     public sealed record SkuRequest(string? CodigoDeBarras, decimal? PrecoVenda, bool Ativo);
     public sealed record SkuDto(Guid Id, Guid CorId, string Tamanho, int OrdemTamanho, string CodigoDeBarras, decimal? PrecoVenda, decimal Preco, bool Ativo);
     public sealed record ProdutoDto(
@@ -26,14 +25,13 @@ internal static class ProdutosEndpoints
         IReadOnlyList<GradesECoresEndpoints.CorDto> Cores, IReadOnlyList<SkuDto> Skus, bool Ativo);
     public sealed record ResumoDto(Guid Id, string Referencia, string Descricao, string? Marca, string? Categoria, string? Colecao,
         decimal PrecoVenda, decimal? Markup, int Skus, IReadOnlyList<string> Cores, bool Ativo);
-    public sealed record PaginaDto(IReadOnlyList<ResumoDto> Itens, int Total, int Pagina, int Tamanho);
     public sealed record PorCodigoDto(ProdutoDto Produto, SkuDto Sku, string Cor);
     public sealed record SugestoesDto(IReadOnlyList<string> Marcas, IReadOnlyList<string> Categorias, IReadOnlyList<string> Colecoes);
 
     public static IEndpointRouteBuilder MapProdutos(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/produtos").RequireAuthorization().WithTags("Produtos");
-        g.MapGet("", Listar).WithSummary("Produtos (busca por descrição, referência, marca ou código de barras)").Produces<PaginaDto>();
+        g.MapGet("", Listar).WithSummary("Produtos (busca por descrição, referência, marca ou código de barras)").Produces<PaginaDeRegistros<ResumoDto>>();
         g.MapGet("/sugestoes", Sugestoes).WithSummary("Marcas, categorias e coleções já usadas (para completar o formulário)").Produces<SugestoesDto>();
         g.MapGet("/por-codigo/{codigo}", PorCodigo).WithSummary("SKU pelo código de barras (leitor)").Produces<PorCodigoDto>();
         g.MapGet("/{id:guid}", Obter).WithSummary("Produto com a grade, cores e SKUs").Produces<ProdutoDto>();
@@ -96,16 +94,13 @@ internal static class ProdutosEndpoints
     }
 
     private static async Task<IResult> Listar(CadastrosDbContext db, CancellationToken ct,
-        string? busca = null, string? categoria = null, string? colecao = null, string? situacao = null, int pagina = 1, int tamanho = 50)
+        string? busca = null, string? categoria = null, string? colecao = null, string? situacao = null, int pagina = 1, int tamanho = Paginacao.TamanhoPadrao)
     {
         var todos = await FiltrarAsync(db, busca, categoria, colecao, situacao, ct);
         var cores = await db.Cores.AsNoTracking().ToDictionaryAsync(c => c.Id, c => c.Nome, ct);
-        pagina = Math.Max(1, pagina);
-        tamanho = Math.Clamp(tamanho, 1, 200);
-        var itens = todos.Skip((pagina - 1) * tamanho).Take(tamanho).Select(p => new ResumoDto(p.Id, p.Referencia, p.Descricao, p.Marca, p.Categoria, p.Colecao,
+        return Results.Ok(todos.Paginar(pagina, tamanho).Converter(p => new ResumoDto(p.Id, p.Referencia, p.Descricao, p.Marca, p.Categoria, p.Colecao,
             p.PrecoVenda, p.Markup, p.Skus.Count(s => s.Ativo),
-            p.Skus.Where(s => s.Ativo).Select(s => s.CorId).Distinct().Select(c => cores.GetValueOrDefault(c, "?")).ToList(), p.Ativo)).ToList();
-        return Results.Ok(new PaginaDto(itens, todos.Count, pagina, tamanho));
+            p.Skus.Where(s => s.Ativo).Select(s => s.CorId).Distinct().Select(c => cores.GetValueOrDefault(c, "?")).ToList(), p.Ativo)));
     }
 
     private static async Task<IResult> Sugestoes(CadastrosDbContext db, CancellationToken ct)
