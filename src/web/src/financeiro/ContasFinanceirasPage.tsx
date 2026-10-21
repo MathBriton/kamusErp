@@ -5,8 +5,16 @@ import { lerNumero, moeda } from '../cadastros/catalogo'
 import { Campo } from '../components/Campo'
 import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { Confirmacao } from '../components/grade/Confirmacao'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade, useListaPaginada } from '../components/grade/useGrade'
+import { Icone } from '../components/Icone'
 import { useEmpresa } from '../empresa/EmpresaContext'
-import { dataBr, hojeIso, PERFIS_DO_FINANCEIRO, somarDias, type ContaFinanceira } from './tipos'
+import { BotaoExportar } from '../relatorios/BotaoExportar'
+import { Indicador } from './Indicador'
+import { dataBr, hojeIso, PERFIS_DO_FINANCEIRO, somarDias, type ContaFinanceira, type ListaDeContas } from './tipos'
 import { useContas } from './useFinanceiro'
 
 interface Extrato {
@@ -20,16 +28,29 @@ interface Extrato {
 
 const TIPOS: Record<ContaFinanceira['tipo'], string> = { Caixa: 'Caixa da loja', Banco: 'Conta bancária', Carteira: 'Carteira digital' }
 
-/** Contas financeiras (saldo atual), extrato por período e transferência entre contas. */
-export function ContasFinanceirasPage() {
-  const { perfilAtual, consolidado } = useEmpresa()
-  const [versao, setVersao] = useState(0)
-  const contas = useContas(versao)
-  const [nova, setNova] = useState(false)
-  const [transferir, setTransferir] = useState(false)
-  const [extrato, setExtrato] = useState<ContaFinanceira | null>(null)
+type Janela =
+  | { tipo: 'nova' }
+  | { tipo: 'editar'; conta: ContaFinanceira }
+  | { tipo: 'transferir' }
+  | { tipo: 'extrato'; conta: ContaFinanceira }
+  | { tipo: 'mudarSituacao'; conta: ContaFinanceira }
+  | { tipo: 'mudarSelecionadas'; ativa: boolean }
+  | null
 
-  if (!PERFIS_DO_FINANCEIRO.includes(perfilAtual))
+const FILTROS = { situacao: 'ativas', tipo: '', busca: '' }
+
+/** Contas financeiras no padrão de grade: saldo atual (e o total das filtradas), extrato, transferência, edição e desativação. */
+export function ContasFinanceirasPage() {
+  const { enviar } = useApi()
+  const { perfilAtual, consolidado } = useEmpresa()
+  const permitido = PERFIS_DO_FINANCEIRO.includes(perfilAtual)
+  const grade = useGrade(FILTROS)
+  const [versao, setVersao] = useState(0)
+  const { dados, erro } = useListaPaginada<ListaDeContas>(permitido ? `/api/financeiro/contas?${grade.consulta}` : null, versao, grade.filtros.busca ? 250 : 0)
+  const ativas = useContas(versao)?.filter((c) => c.ativa) ?? []
+  const [janela, setJanela] = useState<Janela>(null)
+
+  if (!permitido)
     return (
       <div className="mx-auto max-w-3xl">
         <h1 className="text-2xl font-bold tracking-tight">Contas financeiras</h1>
@@ -37,87 +58,192 @@ export function ContasFinanceirasPage() {
       </div>
     )
 
-  const recarregar = () => setVersao((v) => v + 1)
-  const total = contas?.reduce((s, c) => s + c.saldo, 0) ?? 0
+  const recarregar = () => {
+    setJanela(null)
+    setVersao((v) => v + 1)
+  }
+
+  const colunas: Coluna<ContaFinanceira>[] = [
+    {
+      titulo: 'Conta',
+      celula: (c) => (
+        <>
+          <span className="font-semibold">{c.nome}</span>
+          <span className="block text-xs text-muted">{TIPOS[c.tipo]}</span>
+        </>
+      ),
+    },
+    {
+      titulo: 'Saldo inicial',
+      celula: (c) => (
+        <>
+          {moeda(c.saldoInicial)}
+          <span className="block text-xs text-muted">{`em ${dataBr(c.saldoInicialEm)}`}</span>
+        </>
+      ),
+      alinhar: 'direita',
+    },
+    { titulo: 'Saldo atual', celula: (c) => <span className={`font-semibold ${c.saldo < 0 ? 'text-danger' : ''}`}>{moeda(c.saldo)}</span>, alinhar: 'direita' },
+    {
+      titulo: 'Situação',
+      celula: (c) => (
+        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${c.ativa ? 'bg-success-soft text-success' : 'bg-surface-2 text-muted'}`}>
+          {c.ativa ? 'Ativa' : 'Inativa'}
+        </span>
+      ),
+    },
+  ]
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <p className="text-xs text-muted">Financeiro</p>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">Contas financeiras</h1>
-          <p className="mt-1 text-sm text-muted">Onde o dinheiro está. Cada pagamento ou recebimento movimenta uma conta.</p>
-        </div>
-        {!consolidado && (
+    <div className="mx-auto max-w-7xl">
+      <CabecalhoDaPagina
+        secao="Financeiro"
+        titulo="Contas financeiras"
+        descricao="Onde o dinheiro está. Cada pagamento ou recebimento movimenta uma conta."
+        acoes={
           <>
-            {contas && contas.length > 1 && <button type="button" onClick={() => setTransferir(true)} className={estilos.botao}>Transferir entre contas</button>}
-            <button type="button" onClick={() => setNova(true)} className={estilos.botaoPrimario}>Nova conta</button>
+            <BotaoExportar relatorio="contas-financeiras" parametros={grade.parametros} selecionados={[...grade.selecionados]} />
+            {!consolidado && (
+              <>
+                {ativas.length > 1 && (
+                  <button type="button" onClick={() => setJanela({ tipo: 'transferir' })} className={estilos.botao}>Transferir entre contas</button>
+                )}
+                <button type="button" onClick={() => setJanela({ tipo: 'nova' })} className={estilos.botaoPrimario}>
+                  <Icone nome="plus" />
+                  Nova conta
+                </button>
+              </>
+            )}
+          </>
+        }
+      />
+
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
+        <label className="min-w-56 flex-1 text-sm">
+          <span className="mb-1 block font-semibold">Buscar</span>
+          <input value={grade.filtros.busca} onChange={(e) => grade.filtrar({ busca: e.target.value })} placeholder="Nome da conta" className={estilos.campo} />
+        </label>
+        <label className="w-40 text-sm">
+          <span className="mb-1 block font-semibold">Situação</span>
+          <select value={grade.filtros.situacao} onChange={(e) => grade.filtrar({ situacao: e.target.value })} className={estilos.campo}>
+            <option value="ativas">Ativas</option>
+            <option value="inativas">Inativas</option>
+            <option value="todas">Todas</option>
+          </select>
+        </label>
+        <label className="w-48 text-sm">
+          <span className="mb-1 block font-semibold">Tipo</span>
+          <select value={grade.filtros.tipo} onChange={(e) => grade.filtrar({ tipo: e.target.value })} className={estilos.campo}>
+            <option value="">Todos</option>
+            {Object.entries(TIPOS).map(([v, r]) => (
+              <option key={v} value={v}>{r}</option>
+            ))}
+          </select>
+        </label>
+      </BarraDeFiltros>
+
+      {erro && (
+        <p role="alert" className={`mt-4 flex items-center gap-2 ${estilos.erro}`}>
+          <Icone nome="alert" />
+          {erro}
+        </p>
+      )}
+
+      {dados && (
+        <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+          <Indicador rotulo="Saldo total" valor={moeda(dados.saldo)} destaque={dados.saldo < 0} />
+        </dl>
+      )}
+
+      <GradeDeRegistros
+        rotulo="Contas financeiras"
+        colunas={colunas}
+        itens={dados?.itens ?? (erro ? [] : null)}
+        chave={(c) => c.id}
+        nome={(c) => c.nome}
+        total={dados?.total ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
+        apagada={(c) => !c.ativa}
+        vazio="Nenhuma conta com esses filtros. Comece pelo caixa da loja e pela conta do banco."
+        acoes={(c) => (
+          <>
+            <AcaoDaLinha rotulo={`Extrato de ${c.nome}`} icone="file" onClick={() => setJanela({ tipo: 'extrato', conta: c })} />
+            {!consolidado && (
+              <>
+                <AcaoDaLinha rotulo={`Editar ${c.nome}`} icone="pencil" onClick={() => setJanela({ tipo: 'editar', conta: c })} />
+                <AcaoDaLinha
+                  rotulo={`${c.ativa ? 'Desativar' : 'Reativar'} ${c.nome}`}
+                  icone="power"
+                  perigo={c.ativa}
+                  onClick={() => setJanela({ tipo: 'mudarSituacao', conta: c })}
+                />
+              </>
+            )}
           </>
         )}
-      </div>
+        acoesEmLote={
+          !consolidado && (
+            <>
+              <button type="button" onClick={() => setJanela({ tipo: 'mudarSelecionadas', ativa: false })} className={estilos.botao}>Desativar selecionadas</button>
+              <button type="button" onClick={() => setJanela({ tipo: 'mudarSelecionadas', ativa: true })} className={estilos.botao}>Reativar selecionadas</button>
+            </>
+          )
+        }
+      />
 
-      {contas && (
-        <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
-          {contas.length === 0 ? (
-            <p className="p-8 text-center text-sm text-muted">Nenhuma conta ainda. Comece pelo caixa da loja e pela conta do banco.</p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {contas.map((c) => (
-                <li key={c.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                  <div className="flex-1">
-                    <p className={`font-semibold ${c.ativa ? '' : 'text-muted line-through'}`}>{c.nome}</p>
-                    <p className="text-xs text-muted">{TIPOS[c.tipo]}</p>
-                  </div>
-                  <span className={`text-lg font-bold tabular-nums ${c.saldo < 0 ? 'text-danger' : ''}`}>{moeda(c.saldo)}</span>
-                  <button type="button" onClick={() => setExtrato(c)} className={estilos.botao} aria-label={`Extrato de ${c.nome}`}>Extrato</button>
-                </li>
-              ))}
-              <li className="flex items-center justify-between bg-surface-2 px-4 py-3 text-sm font-semibold">
-                <span>Total</span>
-                <span className="tabular-nums">{moeda(total)}</span>
-              </li>
-            </ul>
-          )}
-        </div>
-      )}
-
-      {nova && (
-        <NovaConta
-          onFechar={() => setNova(false)}
-          onSalvo={() => {
-            setNova(false)
+      {janela?.tipo === 'nova' && <FormularioDeConta conta={null} onFechar={() => setJanela(null)} onSalvo={recarregar} />}
+      {janela?.tipo === 'editar' && <FormularioDeConta conta={janela.conta} onFechar={() => setJanela(null)} onSalvo={recarregar} />}
+      {janela?.tipo === 'transferir' && <Transferencia contas={ativas} onFechar={() => setJanela(null)} onSalvo={recarregar} />}
+      {janela?.tipo === 'extrato' && <ExtratoDaConta conta={janela.conta} onFechar={() => setJanela(null)} />}
+      {janela?.tipo === 'mudarSituacao' && (
+        <Confirmacao
+          titulo={janela.conta.ativa ? 'Desativar conta' : 'Reativar conta'}
+          rotulo={janela.conta.ativa ? 'Desativar' : 'Reativar'}
+          onCancelar={() => setJanela(null)}
+          onConfirmar={async () => {
+            await enviar('POST', `/api/financeiro/contas/${janela.conta.id}/${janela.conta.ativa ? 'desativar' : 'reativar'}`)
             recarregar()
           }}
-        />
+        >
+          {janela.conta.ativa
+            ? <p>{`"${janela.conta.nome}" deixa de aparecer nas baixas, vendas e transferências. Só dá para desativar com saldo zero; o extrato continua guardado.`}</p>
+            : <p>{`"${janela.conta.nome}" volta a aparecer nas baixas, vendas e transferências.`}</p>}
+        </Confirmacao>
       )}
-      {transferir && contas && (
-        <Transferencia
-          contas={contas.filter((c) => c.ativa)}
-          onFechar={() => setTransferir(false)}
-          onSalvo={() => {
-            setTransferir(false)
+      {janela?.tipo === 'mudarSelecionadas' && (
+        <Confirmacao
+          titulo={janela.ativa ? 'Reativar contas' : 'Desativar contas'}
+          rotulo={janela.ativa ? 'Reativar' : 'Desativar'}
+          onCancelar={() => setJanela(null)}
+          onConfirmar={async () => {
+            await enviar('POST', '/api/financeiro/contas/situacao', { ids: [...grade.selecionados], ativo: janela.ativa })
+            grade.limparSelecao()
             recarregar()
           }}
-        />
+        >
+          <p>{`${janela.ativa ? 'Reativar' : 'Desativar'} ${grade.selecionados.size === 1 ? 'a conta selecionada' : `as ${grade.selecionados.size} contas selecionadas`}?`}</p>
+          {!janela.ativa && <p className="mt-2 text-muted">Se alguma ainda tiver saldo, nenhuma é desativada: transfira o saldo antes.</p>}
+        </Confirmacao>
       )}
-      {extrato && <ExtratoDaConta conta={extrato} onFechar={() => setExtrato(null)} />}
     </div>
   )
 }
 
-function NovaConta({ onFechar, onSalvo }: { onFechar: () => void; onSalvo: () => void }) {
+function FormularioDeConta({ conta, onFechar, onSalvo }: { conta: ContaFinanceira | null; onFechar: () => void; onSalvo: () => void }) {
   const { enviar } = useApi()
-  const [nome, setNome] = useState('')
-  const [tipo, setTipo] = useState<ContaFinanceira['tipo']>('Caixa')
-  const [saldo, setSaldo] = useState('')
-  const [desde, setDesde] = useState(hojeIso())
+  const [nome, setNome] = useState(conta?.nome ?? '')
+  const [tipo, setTipo] = useState<ContaFinanceira['tipo']>(conta?.tipo ?? 'Caixa')
+  const [saldo, setSaldo] = useState(conta ? String(conta.saldoInicial).replace('.', ',') : '')
+  const [desde, setDesde] = useState(conta?.saldoInicialEm ?? hojeIso())
   const [erro, setErro] = useState<string | null>(null)
 
   async function salvar(e: FormEvent) {
     e.preventDefault()
     setErro(null)
+    const corpo = { nome, tipo, saldoInicial: lerNumero(saldo) ?? 0, saldoInicialEm: desde }
     try {
-      await enviar('POST', '/api/financeiro/contas', { nome, tipo, saldoInicial: lerNumero(saldo) ?? 0, saldoInicialEm: desde })
+      await enviar(conta ? 'PUT' : 'POST', conta ? `/api/financeiro/contas/${conta.id}` : '/api/financeiro/contas', corpo)
       onSalvo()
     } catch (ex) {
       setErro(ex instanceof ErroDeApi ? ex.message : 'Não foi possível salvar.')
@@ -125,7 +251,7 @@ function NovaConta({ onFechar, onSalvo }: { onFechar: () => void; onSalvo: () =>
   }
 
   return (
-    <Dialogo titulo="Nova conta" onFechar={onFechar}>
+    <Dialogo titulo={conta ? `Editar ${conta.nome}` : 'Nova conta'} onFechar={onFechar}>
       <form onSubmit={salvar} className="space-y-4">
         <Campo rotulo="Nome">
           <input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={60} autoFocus placeholder="Ex.: Caixa da loja, Banco do Brasil" className={estilos.campo} />
@@ -145,6 +271,7 @@ function NovaConta({ onFechar, onSalvo }: { onFechar: () => void; onSalvo: () =>
             <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className={estilos.campo} />
           </Campo>
         </div>
+        {conta && <p className="text-xs text-muted">Mudar o saldo inicial recalcula o saldo atual e o extrato desde aquela data.</p>}
         {erro && <p role="alert" className={estilos.erro}>{erro}</p>}
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onFechar} className={estilos.botao}>Cancelar</button>

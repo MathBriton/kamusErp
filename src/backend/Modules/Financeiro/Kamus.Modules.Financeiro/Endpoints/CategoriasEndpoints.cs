@@ -1,6 +1,7 @@
 using Kamus.Modules.Financeiro.Dominio;
 using Kamus.Modules.Financeiro.Persistencia;
 using Kamus.SharedKernel.Busca;
+using Kamus.SharedKernel.Consultas;
 using Kamus.SharedKernel.MultiTenancy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -18,7 +19,9 @@ internal static class CategoriasEndpoints
     public static IEndpointRouteBuilder MapCategorias(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/financeiro/categorias").RequireAuthorization().WithTags("Financeiro");
-        g.MapGet("/", Listar).WithSummary("Categorias (receitas e despesas) por grupo");
+        g.MapGet("/", Listar).WithSummary("Categorias (receitas e despesas) por grupo. Filtros: tipo (Receita/Despesa), situacao (ativas, inativas, todas), busca; "
+            + "com pagina/tamanho devolve a página ({ itens, total, pagina, tamanho }), sem pagina a lista inteira");
+        g.MapPost("/situacao", MudarEmLote).WithSummary("Desativar ou reativar várias categorias de uma vez (seleção da grade)").Produces<SituacaoEmLoteResponse>();
         g.MapPost("/padrao", Padrao).WithSummary("Cria as categorias padrão que ainda não existem");
         g.MapPost("/", Criar).WithSummary("Nova categoria").Produces<CategoriaDto>(StatusCodes.Status201Created);
         g.MapPut("/{id:guid}", Atualizar).WithSummary("Altera nome, grupo e tipo");
@@ -29,11 +32,50 @@ internal static class CategoriasEndpoints
 
     private static CategoriaDto Dto(Categoria c) => new(c.Id, c.Nome, c.Grupo, c.Tipo.ToString(), c.Ativa);
 
-    private static async Task<IResult> Listar(FinanceiroDbContext db, IEmpresaAtiva empresa, CancellationToken ct)
+    public static readonly string[] Situacoes = ["ativas", "inativas", "todas"];
+
+    /// <summary>Categorias filtradas e ordenadas (tipo › grupo › nome) — usada pela tela e pelo relatório.</summary>
+    internal static async Task<List<Categoria>> FiltrarAsync(FinanceiroDbContext db, TipoDeCategoria? tipo, string? situacao, string? busca, CancellationToken ct)
+    {
+        var categorias = await db.Categorias.AsNoTracking().ToListAsync(ct);
+        var termo = TextoParaBusca.Normalizar(busca);
+        return categorias
+            .Where(c => tipo is null || c.Tipo == tipo)
+            .Where(c => situacao?.ToLowerInvariant() switch { "ativas" => c.Ativa, "inativas" => !c.Ativa, _ => true })
+            .Where(c => termo.Length == 0 || TextoParaBusca.Normalizar($"{c.Nome} {c.Grupo}").Contains(termo, StringComparison.Ordinal))
+            .OrderBy(c => c.Tipo).ThenBy(c => c.Grupo, StringComparer.CurrentCulture).ThenBy(c => c.Nome, StringComparer.CurrentCulture)
+            .ToList();
+    }
+
+    private static async Task<IResult> Listar(FinanceiroDbContext db, IEmpresaAtiva empresa, CancellationToken ct,
+        string? tipo = null, string? situacao = null, string? busca = null, int? pagina = null, int tamanho = Paginacao.TamanhoPadrao)
     {
         if (Permissoes.Barrar(empresa) is { } negado) return negado;
-        var categorias = await db.Categorias.AsNoTracking().ToListAsync(ct);
-        return Results.Ok(categorias.OrderBy(c => c.Tipo).ThenBy(c => c.Grupo, StringComparer.CurrentCulture).ThenBy(c => c.Nome, StringComparer.CurrentCulture).Select(Dto).ToList());
+        TipoDeCategoria? t = null;
+        if (!string.IsNullOrWhiteSpace(tipo))
+        {
+            if (!TentarTipo(tipo, out var valor)) return Permissoes.Erro("Tipo inválido: Receita ou Despesa.");
+            t = valor;
+        }
+        if (situacao is not null && !Situacoes.Contains(situacao.ToLowerInvariant())) return Permissoes.Erro("Situação inválida: ativas, inativas ou todas.");
+        var categorias = await FiltrarAsync(db, t, situacao, busca, ct);
+        // Sem "pagina" devolve a lista inteira (selects das outras telas); a grade manda pagina/tamanho.
+        return pagina is null ? Results.Ok(categorias.Select(Dto).ToList()) : Results.Ok(categorias.Paginar(pagina.Value, tamanho).Converter(Dto));
+    }
+
+    private static async Task<IResult> MudarEmLote(SituacaoEmLoteRequest r, FinanceiroDbContext db, IEmpresaAtiva empresa, CancellationToken ct)
+    {
+        if (Permissoes.Barrar(empresa) is { } negado) return negado;
+        var ids = (r.Ids ?? []).Distinct().ToList();
+        if (ids.Count == 0) return Permissoes.Erro("Selecione pelo menos uma categoria.");
+        var categorias = await db.Categorias.Where(c => ids.Contains(c.Id) && c.Ativa != r.Ativo).ToListAsync(ct);
+        foreach (var categoria in categorias)
+        {
+            if (r.Ativo) categoria.Reativar();
+            else categoria.Desativar();
+        }
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(new SituacaoEmLoteResponse(categorias.Count));
     }
 
     private static async Task<IResult> Padrao(FinanceiroDbContext db, IEmpresaAtiva empresa, CancellationToken ct)
@@ -46,7 +88,7 @@ internal static class CategoriasEndpoints
         return Results.Ok();
     }
 
-    private static bool TentarTipo(string? texto, out TipoDeCategoria tipo) => Enum.TryParse(texto, ignoreCase: true, out tipo) && Enum.IsDefined(tipo);
+    internal static bool TentarTipo(string? texto, out TipoDeCategoria tipo) => Enum.TryParse(texto, ignoreCase: true, out tipo) && Enum.IsDefined(tipo);
 
     private static async Task<bool> RepetidaAsync(FinanceiroDbContext db, TipoDeCategoria tipo, string? nome, Guid? exceto, CancellationToken ct)
     {

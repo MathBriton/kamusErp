@@ -7,7 +7,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Kamus.Modules.Financeiro.Aplicacao;
 
 /// <param name="Situacao">abertas (inclui vencidas e parciais), vencidas, pagas, canceladas ou todas.</param>
-internal sealed record FiltroDeTitulos(TipoDeTitulo Tipo, string Situacao, DateOnly? De, DateOnly? Ate, string? Busca);
+/// <param name="ParcelaIds">Só estas parcelas (linhas selecionadas na grade); nulo = sem esse filtro.</param>
+internal sealed record FiltroDeTitulos(TipoDeTitulo Tipo, string Situacao, DateOnly? De, DateOnly? Ate, string? Busca, IReadOnlySet<Guid>? ParcelaIds = null);
 
 internal sealed record LinhaDeParcela(Guid TituloId, Guid ParcelaId, int Numero, int Parcelas, DateOnly Vencimento, string Descricao, string? PessoaNome,
     string? Documento, string? Categoria, decimal Valor, decimal ValorPago, decimal Saldo, string Situacao, string Origem);
@@ -31,6 +32,7 @@ internal static class Consultas
         var linhas = titulos
             .Where(t => termo.Length == 0 || TextoParaBusca.Normalizar($"{t.Descricao} {t.PessoaNome} {t.Documento}").Contains(termo, StringComparison.Ordinal))
             .SelectMany(t => t.Parcelas.Select(p => (Titulo: t, Parcela: p, Situacao: p.Situacao(hoje))))
+            .Where(x => f.ParcelaIds is null || f.ParcelaIds.Contains(x.Parcela.Id))
             .Where(x => (f.De is null || x.Parcela.Vencimento >= f.De) && (f.Ate is null || x.Parcela.Vencimento <= f.Ate))
             .Where(x => f.Situacao switch
             {

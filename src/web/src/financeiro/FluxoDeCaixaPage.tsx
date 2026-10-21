@@ -3,8 +3,11 @@ import { useApi } from '../api/useApi'
 import { ErroDeApi } from '../auth/api'
 import { moeda } from '../cadastros/catalogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { BotaoExportar } from '../relatorios/BotaoExportar'
+import { Indicador } from './Indicador'
 import { dataBr, hojeIso, PERFIS_DO_FINANCEIRO, somarDias } from './tipos'
 import { useContas } from './useFinanceiro'
 
@@ -33,9 +36,15 @@ export function FluxoDeCaixaPage() {
   const { getJson } = useApi()
   const { perfilAtual } = useEmpresa()
   const contas = useContas()
-  const [de, setDe] = useState(hojeIso())
-  const [ate, setAte] = useState(somarDias(hojeIso(), 30))
+  const [padrao] = useState(() => ({ de: hojeIso(), ate: somarDias(hojeIso(), 30) }))
+  const [de, setDe] = useState(padrao.de)
+  const [ate, setAte] = useState(padrao.ate)
   const [contaId, setContaId] = useState('')
+  const limpar = () => {
+    setDe(padrao.de)
+    setAte(padrao.ate)
+    setContaId('')
+  }
   const [{ fluxo, erro }, setEstado] = useState<{ fluxo: Fluxo | null; erro: string | null }>({ fluxo: null, erro: null })
   const permitido = PERFIS_DO_FINANCEIRO.includes(perfilAtual)
 
@@ -69,11 +78,14 @@ export function FluxoDeCaixaPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <p className="text-xs text-muted">Financeiro</p>
-      <h1 className="text-2xl font-bold tracking-tight">Fluxo de caixa</h1>
-      <p className="mt-1 text-sm text-muted">Até hoje, o que de fato entrou e saiu das contas; de hoje em diante, as contas a pagar e a receber em aberto.</p>
+      <CabecalhoDaPagina
+        secao="Financeiro"
+        titulo="Fluxo de caixa"
+        descricao="Até hoje, o que de fato entrou e saiu das contas; de hoje em diante, as contas a pagar e a receber em aberto."
+        acoes={<BotaoExportar relatorio="fluxo-de-caixa" parametros={filtros} />}
+      />
 
-      <div className="mt-6 flex flex-wrap items-end gap-3">
+      <BarraDeFiltros ativos={de !== padrao.de || ate !== padrao.ate || contaId !== ''} onLimpar={limpar}>
         <label className="text-sm">
           <span className="mb-1 block font-semibold">De</span>
           <input type="date" value={de} onChange={(e) => setDe(e.target.value)} className={estilos.campo} />
@@ -91,9 +103,7 @@ export function FluxoDeCaixaPage() {
             ))}
           </select>
         </label>
-        <span className="flex-1" />
-        <BotaoExportar relatorio="fluxo-de-caixa" parametros={filtros} />
-      </div>
+      </BarraDeFiltros>
 
       {erro && <p role="alert" className={`mt-4 ${estilos.erro}`}>{erro}</p>}
 
@@ -140,15 +150,6 @@ export function FluxoDeCaixaPage() {
           </div>
         </>
       )}
-    </div>
-  )
-}
-
-function Indicador({ rotulo, valor, destaque = false }: { rotulo: string; valor: string; destaque?: boolean }) {
-  return (
-    <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
-      <dt className="text-xs text-muted uppercase">{rotulo}</dt>
-      <dd className={`mt-1 text-xl font-bold tabular-nums ${destaque ? 'text-danger' : ''}`}>{valor}</dd>
     </div>
   )
 }

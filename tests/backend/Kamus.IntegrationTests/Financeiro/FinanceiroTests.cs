@@ -21,7 +21,11 @@ public sealed class FinanceiroTests : IAsyncDisposable
     private sealed record TituloDto(Guid Id, string Tipo, string Descricao, string? PessoaNome, string? Categoria, decimal ValorTotal, bool Cancelado, string Origem, List<ParcelaDto> Parcelas);
     private sealed record LinhaDto(Guid TituloId, Guid ParcelaId, int Numero, int Parcelas, DateOnly Vencimento, string Descricao, string? PessoaNome, decimal Valor,
         decimal ValorPago, decimal Saldo, string Situacao);
-    private sealed record ListaDto(List<LinhaDto> Itens, decimal Valor, decimal Pago, decimal Saldo, decimal Vencido);
+    private sealed record ListaDto(List<LinhaDto> Itens, decimal Valor, decimal Pago, decimal Saldo, decimal Vencido, int Total = 0, int Pagina = 0, int Tamanho = 0);
+    private sealed record PaginaDeCategoriasDto(List<CategoriaDto> Itens, int Total, int Pagina, int Tamanho);
+    private sealed record PaginaDeContasDto(List<ContaDto> Itens, int Total, int Pagina, int Tamanho, decimal Saldo);
+    private sealed record FalhaDto(Guid ParcelaId, string Descricao, string Motivo);
+    private sealed record BaixaEmLoteDto(int Baixadas, decimal Total, List<FalhaDto> Falhas);
     private sealed record MovimentoDto(DateOnly Data, string Descricao, decimal Valor, decimal Saldo);
     private sealed record ExtratoDto(decimal SaldoAnterior, List<MovimentoDto> Movimentos, decimal SaldoFinal);
     private sealed record DiaDto(DateOnly Data, decimal EntradasRealizadas, decimal SaidasRealizadas, decimal EntradasPrevistas, decimal SaidasPrevistas, decimal Saldo);
@@ -243,5 +247,149 @@ public sealed class FinanceiroTests : IAsyncDisposable
 
         contas.ShouldContain("Internet");
         fluxo.ShouldContain(Hoje.AddDays(1).ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public async Task Listagem_PaginadaComTotaisSobreTodasAsLinhas_SemPaginaDevolveTudo()
+    {
+        var client = await Entrar(_api);
+        foreach (var (descricao, dias, valor) in new[] { ("Luz", 1, 10m), ("Água", 2, 20m), ("Internet", 3, 30m) })
+            await CriarTitulo(client, new { tipo = "Pagar", descricao, competencia = Hoje, parcelas = new[] { new { vencimento = Hoje.AddDays(dias), valor } } });
+
+        var pagina = (await client.GetFromJsonAsync<ListaDto>(U("/api/financeiro/titulos?tipo=pagar&situacao=abertas&pagina=2&tamanho=2"), Ct))!;
+        var tudo = (await client.GetFromJsonAsync<ListaDto>(U("/api/financeiro/titulos?tipo=pagar&situacao=abertas"), Ct))!;
+
+        pagina.Itens.Select(i => i.Descricao).ShouldBe(["Internet"]);
+        (pagina.Total, pagina.Pagina, pagina.Tamanho, pagina.Saldo, pagina.Valor).ShouldBe((3, 2, 2, 60m, 60m));
+        tudo.Itens.Count.ShouldBe(3);
+        tudo.Total.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task BaixaEmLote_QuitaAsSelecionadasHojeNaConta_EInformaAsQueNaoDeram()
+    {
+        var client = await Entrar(_api);
+        var caixa = await CriarConta(client, "Caixa", 1000m);
+        var luz = await CriarTitulo(client, new { tipo = "Pagar", descricao = "Luz", competencia = Hoje, parcelas = new[] { new { vencimento = Hoje.AddDays(-2), valor = 120m } } });
+        var agua = await CriarTitulo(client, new
+        {
+            tipo = "Pagar",
+            descricao = "Água",
+            competencia = Hoje,
+            parcelas = new[] { new { vencimento = Hoje.AddDays(5), valor = 60m }, new { vencimento = Hoje.AddDays(35), valor = 40m } },
+        });
+        var internet = await CriarTitulo(client, new { tipo = "Pagar", descricao = "Internet", competencia = Hoje, parcelas = new[] { new { vencimento = Hoje, valor = 99m } } });
+        (await Baixar(client, agua.Parcelas[0].Id, caixa.Id, 25m)).EnsureSuccessStatusCode();
+        (await client.PostAsync(U($"/api/financeiro/titulos/{internet.Id}/cancelar"), null, Ct)).EnsureSuccessStatusCode();
+
+        var r = await client.PostAsJsonAsync(U("/api/financeiro/parcelas/baixas-em-lote"),
+            new { parcelaIds = new[] { luz.Parcelas[0].Id, agua.Parcelas[0].Id, internet.Parcelas[0].Id }, contaId = caixa.Id }, Ct);
+
+        r.StatusCode.ShouldBe(HttpStatusCode.OK, await r.Content.ReadAsStringAsync(Ct));
+        var resultado = (await r.Content.ReadFromJsonAsync<BaixaEmLoteDto>(Ct))!;
+        (resultado.Baixadas, resultado.Total).ShouldBe((2, 155m));
+        resultado.Falhas.Single().ShouldBe(new FalhaDto(internet.Parcelas[0].Id, "Internet", "Título cancelado não recebe baixa."));
+        (await Contas(client)).Single().Saldo.ShouldBe(1000m - 25m - 155m);
+        var aguaDepois = (await client.GetFromJsonAsync<TituloDto>(U($"/api/financeiro/titulos/{agua.Id}"), Ct))!;
+        aguaDepois.Parcelas.Select(p => p.Situacao).ShouldBe(["Paga", "Aberta"]);
+        aguaDepois.Parcelas[0].Baixas.Last().ShouldBe(aguaDepois.Parcelas[0].Baixas.Last() with { Data = Hoje, Conta = "Caixa", Valor = 35m, Juros = 0m, Total = 35m });
+    }
+
+    [Fact]
+    public async Task BaixaEmLote_ValidaSelecaoContaEPermissao()
+    {
+        var client = await Entrar(_api);
+        var luz = await CriarTitulo(client, new { tipo = "Pagar", descricao = "Luz", competencia = Hoje, parcelas = new[] { new { vencimento = Hoje, valor = 100m } } });
+        var contaDoShopping = await CriarConta(await Entrar(_api, empresa: "Kamus Moda Shopping"), "Caixa Shopping");
+        var caixa = await CriarConta(client, "Caixa");
+        static object Corpo(Guid conta, params Guid[] ids) => new { parcelaIds = ids, contaId = conta };
+
+        (await client.PostAsJsonAsync(U("/api/financeiro/parcelas/baixas-em-lote"), Corpo(caixa.Id), Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await client.PostAsJsonAsync(U("/api/financeiro/parcelas/baixas-em-lote"), Corpo(contaDoShopping.Id, luz.Parcelas[0].Id), Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var vendedor = await Entrar(_api, "vendedor@kamus.local");
+        (await vendedor.PostAsJsonAsync(U("/api/financeiro/parcelas/baixas-em-lote"), Corpo(caixa.Id, luz.Parcelas[0].Id), Ct)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await client.GetFromJsonAsync<TituloDto>(U($"/api/financeiro/titulos/{luz.Id}"), Ct))!.Parcelas[0].Situacao.ShouldBe("Aberta");
+    }
+
+    [Fact]
+    public async Task Relatorio_Titulos_SoAsParcelasSelecionadas()
+    {
+        var client = await Entrar(_api);
+        var agua = await CriarTitulo(client, new
+        {
+            tipo = "Pagar",
+            descricao = "Água",
+            competencia = Hoje,
+            parcelas = new[] { new { vencimento = Hoje.AddDays(5), valor = 61m }, new { vencimento = Hoje.AddDays(35), valor = 42m } },
+        });
+        await CriarTitulo(client, new { tipo = "Pagar", descricao = "Luz", competencia = Hoje, parcelas = new[] { new { vencimento = Hoje, valor = 100m } } });
+
+        var csv = await client.GetStringAsync(U($"/api/relatorios/titulos.csv?ids={agua.Parcelas[1].Id}"), Ct);
+
+        csv.ShouldContain("Água");
+        static string Br(DateOnly d) => d.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        csv.ShouldContain(Br(Hoje.AddDays(35)));
+        csv.ShouldNotContain(Br(Hoje.AddDays(5)));
+        csv.ShouldNotContain("Luz");
+        var dados = await client.GetFromJsonAsync<JsonElement>(U($"/api/relatorios/titulos/dados?ids={agua.Parcelas[1].Id},{Guid.NewGuid()}"), Ct);
+        dados.GetProperty("filtros")[0].GetProperty("valor").GetString().ShouldBe("1 parcela");
+    }
+
+    [Fact]
+    public async Task Categorias_FiltrosPaginacaoSituacaoEmLoteERelatorio()
+    {
+        var client = await Entrar(_api);
+        var todas = await CategoriasPadrao(client);
+        var despesas = todas.Where(c => c.Tipo == "Despesa").ToList();
+        var (aluguel, salarios) = (despesas.Single(c => c.Nome == "Aluguel"), despesas.Single(c => c.Nome == "Salários"));
+
+        var pagina = (await client.GetFromJsonAsync<PaginaDeCategoriasDto>(U("/api/financeiro/categorias?tipo=Despesa&situacao=ativas&pagina=1&tamanho=3"), Ct))!;
+        (pagina.Total, pagina.Itens.Count, pagina.Pagina, pagina.Tamanho).ShouldBe((despesas.Count, 3, 1, 3));
+        pagina.Itens.ShouldAllBe(c => c.Tipo == "Despesa");
+        (await client.GetFromJsonAsync<PaginaDeCategoriasDto>(U("/api/financeiro/categorias?busca=alug&pagina=1&tamanho=20"), Ct))!.Itens.Single().Id.ShouldBe(aluguel.Id);
+
+        var lote = await client.PostAsJsonAsync(U("/api/financeiro/categorias/situacao"), new { ids = new[] { aluguel.Id, salarios.Id }, ativo = false }, Ct);
+        lote.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await lote.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("alterados").GetInt32().ShouldBe(2);
+        (await client.GetFromJsonAsync<PaginaDeCategoriasDto>(U("/api/financeiro/categorias?situacao=inativas&pagina=1&tamanho=20"), Ct))!.Total.ShouldBe(2);
+        (await client.GetFromJsonAsync<List<CategoriaDto>>(U("/api/financeiro/categorias"), Ct))!.Count.ShouldBe(todas.Count);
+        (await client.PostAsJsonAsync(U("/api/financeiro/categorias/situacao"), new { ids = Array.Empty<Guid>(), ativo = true }, Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var vendedor = await Entrar(_api, "vendedor@kamus.local");
+        (await vendedor.PostAsJsonAsync(U("/api/financeiro/categorias/situacao"), new { ids = new[] { aluguel.Id }, ativo = true }, Ct)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        var csv = await client.GetStringAsync(U($"/api/relatorios/categorias-financeiras.csv?ids={aluguel.Id}"), Ct);
+        csv.ShouldContain("Aluguel");
+        csv.ShouldNotContain("Salários");
+        (await client.GetStringAsync(U("/api/relatorios/categorias-financeiras.csv?tipo=Receita&situacao=todas"), Ct)).ShouldNotContain("Aluguel");
+    }
+
+    [Fact]
+    public async Task ContasFinanceiras_PaginacaoSaldoTotalSituacaoEmLoteERelatorio()
+    {
+        var client = await Entrar(_api);
+        var caixa = await CriarConta(client, "Caixa");
+        var banco = await CriarConta(client, "Banco", 0m, "Banco");
+        var cofre = await CriarConta(client, "Cofre", 250m);
+
+        var pagina = (await client.GetFromJsonAsync<PaginaDeContasDto>(U("/api/financeiro/contas?situacao=ativas&pagina=1&tamanho=2"), Ct))!;
+        (pagina.Total, pagina.Itens.Count, pagina.Saldo).ShouldBe((3, 2, 250m));
+        (await client.GetFromJsonAsync<PaginaDeContasDto>(U("/api/financeiro/contas?tipo=Banco&pagina=1&tamanho=20"), Ct))!.Itens.Single().Id.ShouldBe(banco.Id);
+
+        var comSaldo = await client.PostAsJsonAsync(U("/api/financeiro/contas/situacao"), new { ids = new[] { caixa.Id, cofre.Id }, ativo = false }, Ct);
+        comSaldo.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await comSaldo.Content.ReadAsStringAsync(Ct)).ShouldContain("Cofre");
+        (await Contas(client)).ShouldAllBe(c => c.Ativa);
+
+        var lote = await client.PostAsJsonAsync(U("/api/financeiro/contas/situacao"), new { ids = new[] { caixa.Id, banco.Id }, ativo = false }, Ct);
+        lote.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await lote.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("alterados").GetInt32().ShouldBe(2);
+        (await client.GetFromJsonAsync<PaginaDeContasDto>(U("/api/financeiro/contas?situacao=inativas&pagina=1&tamanho=20"), Ct))!.Total.ShouldBe(2);
+        (await Contas(client)).Count.ShouldBe(3);
+        var vendedor = await Entrar(_api, "vendedor@kamus.local");
+        (await vendedor.PostAsJsonAsync(U("/api/financeiro/contas/situacao"), new { ids = new[] { caixa.Id }, ativo = true }, Ct)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+
+        var csv = await client.GetStringAsync(U($"/api/relatorios/contas-financeiras.csv?ids={cofre.Id}"), Ct);
+        csv.ShouldContain("Cofre");
+        csv.ShouldNotContain("Banco");
     }
 }

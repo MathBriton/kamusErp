@@ -4,20 +4,41 @@ import { ErroDeApi } from '../auth/api'
 import { Campo } from '../components/Campo'
 import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { Confirmacao } from '../components/grade/Confirmacao'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade, useListaPaginada } from '../components/grade/useGrade'
+import { Icone } from '../components/Icone'
 import { useEmpresa } from '../empresa/EmpresaContext'
+import { BotaoExportar } from '../relatorios/BotaoExportar'
 import { PERFIS_DO_FINANCEIRO, type Categoria } from './tipos'
-import { useCategorias } from './useFinanceiro'
 
-/** Plano de contas simples: categorias de receita e despesa agrupadas (base do fluxo por categoria e do DRE). */
+type Janela =
+  | { tipo: 'nova' }
+  | { tipo: 'editar'; categoria: Categoria }
+  | { tipo: 'mudarSituacao'; categoria: Categoria }
+  | { tipo: 'mudarSelecionadas'; ativa: boolean }
+  | null
+
+const FILTROS = { situacao: 'ativas', tipo: '', busca: '' }
+
+/** Plano de contas simples no padrão de grade: categorias de receita e despesa por grupo (base do fluxo por categoria e do DRE). */
 export function CategoriasPage() {
   const { post, enviar } = useApi()
   const { perfilAtual } = useEmpresa()
+  const permitido = PERFIS_DO_FINANCEIRO.includes(perfilAtual)
+  const grade = useGrade(FILTROS)
   const [versao, setVersao] = useState(0)
-  const categorias = useCategorias(versao)
-  const [edicao, setEdicao] = useState<Categoria | 'nova' | null>(null)
-  const [erro, setErro] = useState<string | null>(null)
+  const { dados, erro } = useListaPaginada<{ itens: Categoria[]; total: number }>(
+    permitido ? `/api/financeiro/categorias?${grade.consulta}` : null,
+    versao,
+    grade.filtros.busca ? 250 : 0,
+  )
+  const [janela, setJanela] = useState<Janela>(null)
+  const [erroDoPadrao, setErroDoPadrao] = useState<string | null>(null)
 
-  if (!PERFIS_DO_FINANCEIRO.includes(perfilAtual))
+  if (!permitido)
     return (
       <div className="mx-auto max-w-3xl">
         <h1 className="text-2xl font-bold tracking-tight">Categorias</h1>
@@ -25,70 +46,142 @@ export function CategoriasPage() {
       </div>
     )
 
-  const recarregar = () => setVersao((v) => v + 1)
-  async function alternar(c: Categoria) {
-    setErro(null)
+  const recarregar = () => {
+    setJanela(null)
+    setVersao((v) => v + 1)
+  }
+  async function adicionarPadrao() {
+    setErroDoPadrao(null)
     try {
-      await enviar('POST', `/api/financeiro/categorias/${c.id}/${c.ativa ? 'desativar' : 'reativar'}`)
+      await post('/api/financeiro/categorias/padrao')
       recarregar()
     } catch (ex) {
-      setErro(ex instanceof ErroDeApi ? ex.message : 'Não foi possível alterar.')
+      setErroDoPadrao(ex instanceof ErroDeApi ? ex.message : 'Não foi possível adicionar.')
     }
   }
 
-  const grupos = (tipo: Categoria['tipo']) => {
-    const lista = categorias?.filter((c) => c.tipo === tipo) ?? []
-    return [...new Set(lista.map((c) => c.grupo))].map((g) => ({ grupo: g, itens: lista.filter((c) => c.grupo === g) }))
-  }
+  const colunas: Coluna<Categoria>[] = [
+    { titulo: 'Tipo', celula: (c) => <span className={`font-semibold ${c.tipo === 'Receita' ? 'text-success' : 'text-danger'}`}>{c.tipo}</span> },
+    { titulo: 'Grupo', celula: (c) => <span className="text-muted">{c.grupo}</span> },
+    { titulo: 'Categoria', celula: (c) => <span className="font-semibold">{c.nome}</span> },
+    {
+      titulo: 'Situação',
+      celula: (c) => (
+        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${c.ativa ? 'bg-success-soft text-success' : 'bg-surface-2 text-muted'}`}>
+          {c.ativa ? 'Ativa' : 'Inativa'}
+        </span>
+      ),
+    },
+  ]
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <p className="text-xs text-muted">Financeiro</p>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">Categorias</h1>
-          <p className="mt-1 text-sm text-muted">Organize receitas e despesas em grupos (ex.: Ocupação › Aluguel). Valem para todas as empresas.</p>
-        </div>
-        <button type="button" onClick={() => void post('/api/financeiro/categorias/padrao').then(recarregar)} className={estilos.botao}>
-          Adicionar categorias padrão
-        </button>
-        <button type="button" onClick={() => setEdicao('nova')} className={estilos.botaoPrimario}>Nova categoria</button>
-      </div>
-      {erro && <p role="alert" className={`mt-4 ${estilos.erro}`}>{erro}</p>}
+    <div className="mx-auto max-w-7xl">
+      <CabecalhoDaPagina
+        secao="Financeiro"
+        titulo="Categorias"
+        descricao="Organize receitas e despesas em grupos (ex.: Ocupação › Aluguel). Valem para todas as empresas."
+        acoes={
+          <>
+            <BotaoExportar relatorio="categorias-financeiras" parametros={grade.parametros} selecionados={[...grade.selecionados]} />
+            <button type="button" onClick={() => void adicionarPadrao()} className={estilos.botao}>Adicionar categorias padrão</button>
+            <button type="button" onClick={() => setJanela({ tipo: 'nova' })} className={estilos.botaoPrimario}>
+              <Icone nome="plus" />
+              Nova categoria
+            </button>
+          </>
+        }
+      />
 
-      {categorias && categorias.length > 0 && (
-        <div className="mt-6 grid gap-6 md:grid-cols-2">
-          {(['Receita', 'Despesa'] as const).map((tipo) => (
-            <section key={tipo} aria-label={tipo === 'Receita' ? 'Receitas' : 'Despesas'} className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
-              <h2 className={`font-semibold ${tipo === 'Receita' ? 'text-success' : 'text-danger'}`}>{tipo === 'Receita' ? 'Receitas' : 'Despesas'}</h2>
-              {grupos(tipo).map((g) => (
-                <div key={g.grupo} className="mt-3">
-                  <p className="text-xs font-semibold text-muted uppercase">{g.grupo}</p>
-                  <ul className="mt-1 divide-y divide-border">
-                    {g.itens.map((c) => (
-                      <li key={c.id} className="flex items-center gap-2 py-1.5 text-sm">
-                        <span className={`flex-1 ${c.ativa ? '' : 'text-muted line-through'}`}>{c.nome}</span>
-                        <button type="button" onClick={() => setEdicao(c)} className="text-xs text-primary hover:underline" aria-label={`Editar ${c.nome}`}>Editar</button>
-                        <button type="button" onClick={() => void alternar(c)} className="text-xs text-muted hover:underline">{c.ativa ? 'Desativar' : 'Reativar'}</button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </section>
-          ))}
-        </div>
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
+        <label className="min-w-56 flex-1 text-sm">
+          <span className="mb-1 block font-semibold">Buscar</span>
+          <input value={grade.filtros.busca} onChange={(e) => grade.filtrar({ busca: e.target.value })} placeholder="Nome ou grupo" className={estilos.campo} />
+        </label>
+        <label className="w-40 text-sm">
+          <span className="mb-1 block font-semibold">Situação</span>
+          <select value={grade.filtros.situacao} onChange={(e) => grade.filtrar({ situacao: e.target.value })} className={estilos.campo}>
+            <option value="ativas">Ativas</option>
+            <option value="inativas">Inativas</option>
+            <option value="todas">Todas</option>
+          </select>
+        </label>
+        <label className="w-40 text-sm">
+          <span className="mb-1 block font-semibold">Tipo</span>
+          <select value={grade.filtros.tipo} onChange={(e) => grade.filtrar({ tipo: e.target.value })} className={estilos.campo}>
+            <option value="">Todos</option>
+            <option value="Receita">Receitas</option>
+            <option value="Despesa">Despesas</option>
+          </select>
+        </label>
+      </BarraDeFiltros>
+
+      {(erro || erroDoPadrao) && (
+        <p role="alert" className={`mt-4 flex items-center gap-2 ${estilos.erro}`}>
+          <Icone nome="alert" />
+          {erro ?? erroDoPadrao}
+        </p>
       )}
 
-      {edicao && (
-        <FormularioDeCategoria
-          categoria={edicao === 'nova' ? null : edicao}
-          onFechar={() => setEdicao(null)}
-          onSalvo={() => {
-            setEdicao(null)
+      <GradeDeRegistros
+        rotulo="Categorias"
+        colunas={colunas}
+        itens={dados?.itens ?? (erro ? [] : null)}
+        chave={(c) => c.id}
+        nome={(c) => c.nome}
+        total={dados?.total ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
+        apagada={(c) => !c.ativa}
+        vazio="Nenhuma categoria com esses filtros. Use “Adicionar categorias padrão” para começar."
+        acoes={(c) => (
+          <>
+            <AcaoDaLinha rotulo={`Editar ${c.nome}`} icone="pencil" onClick={() => setJanela({ tipo: 'editar', categoria: c })} />
+            <AcaoDaLinha
+              rotulo={`${c.ativa ? 'Desativar' : 'Reativar'} ${c.nome}`}
+              icone="power"
+              perigo={c.ativa}
+              onClick={() => setJanela({ tipo: 'mudarSituacao', categoria: c })}
+            />
+          </>
+        )}
+        acoesEmLote={
+          <>
+            <button type="button" onClick={() => setJanela({ tipo: 'mudarSelecionadas', ativa: false })} className={estilos.botao}>Desativar selecionadas</button>
+            <button type="button" onClick={() => setJanela({ tipo: 'mudarSelecionadas', ativa: true })} className={estilos.botao}>Reativar selecionadas</button>
+          </>
+        }
+      />
+
+      {janela?.tipo === 'nova' && <FormularioDeCategoria categoria={null} onFechar={() => setJanela(null)} onSalvo={recarregar} />}
+      {janela?.tipo === 'editar' && <FormularioDeCategoria categoria={janela.categoria} onFechar={() => setJanela(null)} onSalvo={recarregar} />}
+      {janela?.tipo === 'mudarSituacao' && (
+        <Confirmacao
+          titulo={janela.categoria.ativa ? 'Desativar categoria' : 'Reativar categoria'}
+          rotulo={janela.categoria.ativa ? 'Desativar' : 'Reativar'}
+          onCancelar={() => setJanela(null)}
+          onConfirmar={async () => {
+            await enviar('POST', `/api/financeiro/categorias/${janela.categoria.id}/${janela.categoria.ativa ? 'desativar' : 'reativar'}`)
             recarregar()
           }}
-        />
+        >
+          {janela.categoria.ativa
+            ? <p>{`"${janela.categoria.nome}" deixa de aparecer nos lançamentos novos. As contas já lançadas continuam com ela.`}</p>
+            : <p>{`"${janela.categoria.nome}" volta a aparecer nos lançamentos.`}</p>}
+        </Confirmacao>
+      )}
+      {janela?.tipo === 'mudarSelecionadas' && (
+        <Confirmacao
+          titulo={janela.ativa ? 'Reativar categorias' : 'Desativar categorias'}
+          rotulo={janela.ativa ? 'Reativar' : 'Desativar'}
+          onCancelar={() => setJanela(null)}
+          onConfirmar={async () => {
+            await enviar('POST', '/api/financeiro/categorias/situacao', { ids: [...grade.selecionados], ativo: janela.ativa })
+            grade.limparSelecao()
+            recarregar()
+          }}
+        >
+          <p>{`${janela.ativa ? 'Reativar' : 'Desativar'} ${grade.selecionados.size === 1 ? 'a categoria selecionada' : `as ${grade.selecionados.size} categorias selecionadas`}?`}</p>
+        </Confirmacao>
       )}
     </div>
   )
