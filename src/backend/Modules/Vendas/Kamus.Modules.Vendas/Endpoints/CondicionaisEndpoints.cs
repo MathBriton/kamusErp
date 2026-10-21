@@ -29,7 +29,9 @@ internal static class CondicionaisEndpoints
     public sealed record FechamentoDto(CondicionalDto Condicional, int? VendaNumero, decimal? VendaTotal, IReadOnlyList<string> Avisos);
     public sealed record LinhaDeCondicional(Guid Id, int Numero, DateOnly Data, DateOnly Prazo, Guid ClienteId, string ClienteNome, string? VendedorNome, int Pecas,
         decimal Valor, string Situacao, int? VendaNumero);
-    public sealed record ListaDeCondicionais(IReadOnlyList<LinhaDeCondicional> Itens, int Abertas, int Atrasadas, int PecasNaRua, decimal ValorNaRua);
+    /// <summary>Indicadores "na rua" sobre todas as filtradas; <c>Itens</c> é a página pedida (ou todas, sem página) e <c>Total</c> quantas os filtros trazem.</summary>
+    public sealed record ListaDeCondicionais(IReadOnlyList<LinhaDeCondicional> Itens, int Abertas, int Atrasadas, int PecasNaRua, decimal ValorNaRua, int Total, int Pagina,
+        int Tamanho);
     public sealed record ConversaoDto(Guid? VendedorId, string Vendedor, int Condicionais, int PecasLevadas, int PecasVendidas, decimal ValorLevado,
         decimal ValorVendido, decimal Conversao);
 
@@ -39,7 +41,7 @@ internal static class CondicionaisEndpoints
     public static IEndpointRouteBuilder MapCondicionais(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/vendas/condicionais").RequireAuthorization().WithTags("Vendas");
-        g.MapGet("/", Listar).WithSummary("Condicionais (situacao: abertas, atrasadas, fechadas, todas; clienteId; busca) com peças e valor \"na rua\"");
+        g.MapGet("/", Listar).WithSummary("Condicionais (situacao: abertas, atrasadas, fechadas, todas; clienteId; busca; pagina e tamanho) com peças e valor \"na rua\"");
         g.MapGet("/conversao", Conversao).WithSummary("Conversão por vendedor: quanto das condicionais fechadas no período virou venda");
         g.MapGet("/{id:guid}", Obter).WithSummary("Condicional com as peças");
         g.MapGet("/{id:guid}/termo.pdf", Termo).WithSummary("Termo de responsabilidade em PDF (peças, valores e prazo)");
@@ -53,11 +55,18 @@ internal static class CondicionaisEndpoints
         c.Situacao(hoje).ToString(), c.Pecas, c.Valor, c.Itens.Select(i => new ItemDto(i.SkuId, i.Descricao, i.Quantidade, i.PrecoUnitario, i.Devolvidas)).ToList(),
         c.VendaId, c.VendaNumero, c.Observacao, c.RegistradaPor);
 
+    /// <param name="selecionadas">Só estas condicionais (linhas marcadas na grade), ignorando os demais filtros.</param>
     internal static async Task<ListaDeCondicionais> ListaAsync(VendasDbContext db, IEmpresaAtiva empresa, string situacao, Guid? clienteId, string? busca, DateOnly hoje,
-        CancellationToken ct)
+        CancellationToken ct, int? pagina = null, int? tamanho = null, IReadOnlySet<Guid>? selecionadas = null)
     {
         var ids = empresa.EmpresaIds;
         var q = db.Condicionais.AsNoTracking().Include(c => c.Itens).Where(c => ids.Contains(c.EmpresaId));
+        if (selecionadas is { Count: > 0 })
+        {
+            var lista = selecionadas.ToList();
+            (situacao, busca, clienteId) = ("todas", null, null);
+            q = q.Where(c => lista.Contains(c.Id));
+        }
         if (clienteId is { } cliente) q = q.Where(c => c.ClienteId == cliente);
         if (situacao != "todas") q = situacao == "fechadas" ? q.Where(c => c.Fechada) : q.Where(c => !c.Fechada);
         var todas = await q.ToListAsync(ct);
@@ -67,20 +76,21 @@ internal static class CondicionaisEndpoints
             todas = todas.Where(c => c.Numero.ToString(System.Globalization.CultureInfo.InvariantCulture) == busca!.Trim()
                 || TextoParaBusca.Normalizar(c.ClienteNome).Contains(termo, StringComparison.Ordinal)).ToList();
         var abertas = todas.Where(c => !c.Fechada).ToList();
-        return new ListaDeCondicionais(
-            todas.OrderBy(c => c.Fechada).ThenBy(c => c.Fechada ? DateOnly.MaxValue : c.Prazo).ThenByDescending(c => c.Numero)
-                .Select(c => new LinhaDeCondicional(c.Id, c.Numero, c.Data, c.Prazo, c.ClienteId, c.ClienteNome, c.VendedorNome, c.Pecas, c.Valor,
-                    c.Situacao(hoje).ToString(), c.VendaNumero)).ToList(),
-            abertas.Count, abertas.Count(c => c.Situacao(hoje) == SituacaoDaCondicional.Atrasada), abertas.Sum(c => c.Pecas), abertas.Sum(c => c.Valor));
+        var pag = todas.OrderBy(c => c.Fechada).ThenBy(c => c.Fechada ? DateOnly.MaxValue : c.Prazo).ThenByDescending(c => c.Numero).ToList()
+            .PaginarSePedido(pagina, tamanho)
+            .Converter(c => new LinhaDeCondicional(c.Id, c.Numero, c.Data, c.Prazo, c.ClienteId, c.ClienteNome, c.VendedorNome, c.Pecas, c.Valor,
+                c.Situacao(hoje).ToString(), c.VendaNumero));
+        return new ListaDeCondicionais(pag.Itens, abertas.Count, abertas.Count(c => c.Situacao(hoje) == SituacaoDaCondicional.Atrasada), abertas.Sum(c => c.Pecas),
+            abertas.Sum(c => c.Valor), pag.Total, pag.Pagina, pag.Tamanho);
     }
 
-    private static async Task<IResult> Listar(string? situacao, Guid? clienteId, string? busca, VendasDbContext db, IEmpresaAtiva empresa, TimeProvider relogio,
-        CancellationToken ct)
+    private static async Task<IResult> Listar(string? situacao, Guid? clienteId, string? busca, int? pagina, int? tamanho, VendasDbContext db, IEmpresaAtiva empresa,
+        TimeProvider relogio, CancellationToken ct)
     {
         if (Permissoes.Exigir(empresa, Perfis, "Seu perfil não acessa as condicionais.") is { } negado) return negado;
         var s = situacao?.ToLowerInvariant() ?? "abertas";
         if (!Situacoes.Contains(s)) return Permissoes.Erro("Situação inválida: abertas, atrasadas, fechadas ou todas.");
-        return Results.Ok(await ListaAsync(db, empresa, s, clienteId, busca, CalendarioBrasilia.Hoje(relogio), ct));
+        return Results.Ok(await ListaAsync(db, empresa, s, clienteId, busca, CalendarioBrasilia.Hoje(relogio), ct, pagina, tamanho));
     }
 
     private static async Task<Condicional?> CarregarAsync(VendasDbContext db, IEmpresaAtiva empresa, Guid id, CancellationToken ct)

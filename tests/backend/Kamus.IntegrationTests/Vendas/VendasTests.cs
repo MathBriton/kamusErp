@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Kamus.SharedKernel.Tempo;
 using static Kamus.IntegrationTests.Estoque.ApiDoEstoque;
 
@@ -22,6 +23,8 @@ public sealed class VendasTests : IAsyncDisposable
         List<ItemDto> Itens, List<PagamentoDto> Pagamentos, List<string> Avisos);
     private sealed record LinhaDto(Guid Id, int Numero, string? VendedorNome, int Pecas, decimal Total, string Formas, string Status);
     private sealed record ListaDto(List<LinhaDto> Itens, int Quantidade, int Pecas, decimal Total, decimal TicketMedio);
+    private sealed record PaginaDeVendasDto(List<LinhaDto> Itens, int Registros, int Pagina, int Tamanho, int Quantidade, int Pecas, decimal Total);
+    private sealed record PaginaDto<T>(List<T> Itens, int Total, int Pagina, int Tamanho);
     private sealed record ComissaoDto(Guid? VendedorId, string Vendedor, int Vendas, decimal Total, decimal Comissao);
     private sealed record ContaDto(Guid Id, string Nome, decimal Saldo);
     private sealed record VendedorDto(Guid Id, string Nome);
@@ -241,5 +244,72 @@ public sealed class VendasTests : IAsyncDisposable
         csv.ShouldContain("Bia");
         csv.ShouldContain("PIX");
         (await c.Client.GetStringAsync(U($"/api/relatorios/comissoes.csv?de={Hoje:yyyy-MM-dd}&ate={Hoje:yyyy-MM-dd}"), Ct)).ShouldContain("Sem vendedor");
+    }
+
+    [Fact]
+    public async Task Listar_ComPagina_DevolveAPaginaComTotaisDeTodas_SemPaginaDevolveTudo()
+    {
+        var c = await Preparar();
+        foreach (var cliente in new[] { "Ana", "Bruna", "Carla" })
+            (await Vender(c.Client, c.LojaId, [new { skuId = c.AzulM, quantidade = 1, desconto = 0m }], [Pag(c.Formas["PIX"], 59.90m)], clienteNome: cliente))
+                .StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var pagina = (await c.Client.GetFromJsonAsync<PaginaDeVendasDto>(U("/api/vendas?status=todas&pagina=2&tamanho=2"), Ct))!;
+        pagina.Itens.Select(i => i.Numero).ShouldBe([1]);
+        (pagina.Registros, pagina.Pagina, pagina.Tamanho, pagina.Quantidade, pagina.Pecas, pagina.Total).ShouldBe((3, 2, 2, 3, 3, 179.70m));
+
+        var tudo = (await c.Client.GetFromJsonAsync<PaginaDeVendasDto>(U("/api/vendas"), Ct))!;
+        (tudo.Itens.Count, tudo.Registros).ShouldBe((3, 3));
+    }
+
+    [Fact]
+    public async Task Relatorio_SoAsVendasSelecionadas_IgnoraOsFiltros()
+    {
+        var c = await Preparar();
+        var ids = new List<Guid>();
+        foreach (var cliente in new[] { "Ana", "Bruna", "Carla" })
+        {
+            var r = await Vender(c.Client, c.LojaId, [new { skuId = c.AzulM, quantidade = 1, desconto = 0m }], [Pag(c.Formas["PIX"], 59.90m)], clienteNome: cliente);
+            ids.Add((await r.Content.ReadFromJsonAsync<VendaDto>(Ct))!.Id);
+        }
+
+        var csv = await c.Client.GetStringAsync(U($"/api/relatorios/vendas.csv?ids={ids[0]},{ids[2]}&status=canceladas"), Ct);
+        csv.ShouldContain("Ana");
+        csv.ShouldContain("Carla");
+        csv.ShouldNotContain("Bruna");
+        var dados = await c.Client.GetFromJsonAsync<JsonElement>(U($"/api/relatorios/vendas/dados?ids={ids[1]}"), Ct);
+        dados.GetProperty("linhas").GetArrayLength().ShouldBe(1);
+        dados.GetProperty("filtros")[0].GetProperty("valor").GetString().ShouldBe("1 venda");
+    }
+
+    [Fact]
+    public async Task Formas_PaginadasComFiltro_SituacaoEmLote_RelatorioDasSelecionadas_SoGestao()
+    {
+        var client = await Entrar(_api);
+        (await client.PostAsync(U("/api/vendas/formas/padrao"), null, Ct)).EnsureSuccessStatusCode();
+        var formas = await Formas(client);
+
+        var pagina = (await client.GetFromJsonAsync<PaginaDto<FormaDto>>(U("/api/vendas/formas?pagina=1&tamanho=4"), Ct))!;
+        (pagina.Itens.Count, pagina.Total, pagina.Pagina, pagina.Tamanho).ShouldBe((4, 6, 1, 4));
+        (await client.GetFromJsonAsync<PaginaDto<FormaDto>>(U("/api/vendas/formas?busca=cartao&pagina=1&tamanho=20"), Ct))!.Total.ShouldBe(2);
+
+        var ids = new[] { formas["Dinheiro"].Id, formas["PIX"].Id };
+        var lote = await client.PostAsJsonAsync(U("/api/vendas/formas/situacao"), new { ids, ativo = false }, Ct);
+        lote.StatusCode.ShouldBe(HttpStatusCode.OK, await lote.Content.ReadAsStringAsync(Ct));
+        (await lote.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("alterados").GetInt32().ShouldBe(2);
+        var inativas = (await client.GetFromJsonAsync<PaginaDto<FormaDto>>(U("/api/vendas/formas?situacao=inativas&pagina=1&tamanho=20"), Ct))!;
+        inativas.Itens.Select(f => f.Nome).Order().ShouldBe(["Dinheiro", "PIX"]);
+        (await client.GetFromJsonAsync<PaginaDto<FormaDto>>(U("/api/vendas/formas?situacao=ativas&pagina=1&tamanho=20"), Ct))!.Total.ShouldBe(4);
+        (await client.PostAsJsonAsync(U("/api/vendas/formas/situacao"), new { ids = new[] { formas["PIX"].Id }, ativo = true }, Ct)).EnsureSuccessStatusCode();
+        (await Formas(client))["PIX"].Ativa.ShouldBeTrue();
+        (await client.PostAsJsonAsync(U("/api/vendas/formas/situacao"), new { ids = Array.Empty<Guid>(), ativo = true }, Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var csv = await client.GetStringAsync(U($"/api/relatorios/formas-de-pagamento.csv?ids={formas["PIX"].Id}"), Ct);
+        csv.ShouldContain("PIX");
+        csv.ShouldNotContain("Dinheiro");
+        (await client.GetStringAsync(U("/api/relatorios/formas-de-pagamento.csv?situacao=inativas"), Ct)).ShouldContain("Dinheiro");
+
+        var vendedora = await Entrar(_api, "vendedor@kamus.local");
+        (await vendedora.PostAsJsonAsync(U("/api/vendas/formas/situacao"), new { ids, ativo = true }, Ct)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }
 }

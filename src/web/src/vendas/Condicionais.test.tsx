@@ -19,7 +19,8 @@ const linha = (extra = {}) => ({
   id: 'k4', numero: 4, data: hojeIso(), prazo: somarDias(hojeIso(), 2), clienteId: 'p1', clienteNome: 'Maria Souza', vendedorNome: 'Bia', pecas: 3, valor: 179.7,
   situacao: 'Aberta', vendaNumero: null, ...extra,
 })
-const lista = { itens: [linha(), linha({ id: 'k2', numero: 2, situacao: 'Atrasada', pecas: 1, valor: 59.9 })], abertas: 2, atrasadas: 1, pecasNaRua: 4, valorNaRua: 239.6 }
+const lista = { itens: [linha(), linha({ id: 'k2', numero: 2, situacao: 'Atrasada', pecas: 1, valor: 59.9 })], abertas: 2, atrasadas: 1, pecasNaRua: 4, valorNaRua: 239.6,
+  total: 2, pagina: 1, tamanho: 20 }
 
 function api(extras: Parameters<typeof mockApi>[0] = {}, sessao = sessaoDemo) {
   return mockApi({
@@ -30,7 +31,7 @@ function api(extras: Parameters<typeof mockApi>[0] = {}, sessao = sessaoDemo) {
     'GET /api/vendedores': () => json([{ id: 'b1', nome: 'Bia', comissaoPercentual: 5, usuarioId: 'u2', ativo: true }]),
     'GET /api/vendas/formas': () => json(formas),
     'GET /api/vendas/configuracao': () => json({ permitirEstoqueNegativo: true, prazoDeTrocaDias: 30, validadeDoValeDias: 90, prazoCondicionalDias: 2, limiteCondicionalPecas: 10, limiteCondicionalValor: 1000 }),
-    'GET /api/vendas/condicionais?situacao=abertas': () => json(lista),
+    'GET /api/vendas/condicionais?situacao=abertas&pagina=1&tamanho=20': () => json(lista),
     'GET /api/vendas/condicionais/k4': () => json(condicional()),
     ...extras,
   })
@@ -46,9 +47,37 @@ describe('Vendas → Condicional', () => {
     api()
     renderApp('/vendas/condicional')
     const tabela = await screen.findByRole('table', { name: 'Condicionais' })
-    expect(within(tabela).getAllByText('Maria Souza')).toHaveLength(2)
+    expect(await within(tabela).findAllByText('Maria Souza')).toHaveLength(2)
     expect(within(tabela).getByText('Atrasada')).toBeInTheDocument()
     expect(screen.getByText('R$ 239,60', { selector: 'dd' })).toBeInTheDocument()
+    expect(screen.getByText('2 registros')).toBeInTheDocument()
+  })
+
+  it('ver as peças pela linha, busca e exporta com a busca ou só as selecionadas', async () => {
+    const fetch = api({
+      'GET /api/vendas/condicionais?situacao=abertas&busca=maria&pagina=1&tamanho=20': () => json({ ...lista, itens: [linha()], total: 1 }),
+      'GET /api/relatorios/condicionais.csv?situacao=abertas&busca=maria': () => new Response('csv', { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=c.csv' } }),
+      'GET /api/relatorios/condicionais.csv?ids=k4': () => new Response('csv', { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=c.csv' } }),
+    })
+    renderApp('/vendas/condicional')
+    const tabela = await screen.findByRole('table', { name: 'Condicionais' })
+    await within(tabela).findAllByText('Maria Souza')
+
+    await userEvent.click(within(tabela).getByRole('button', { name: 'Ver condicional 4' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Condicional nº 4' })
+    expect(await within(dialogo).findByText('Camiseta básica Azul G')).toBeInTheDocument()
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Fechar' }))
+
+    await userEvent.type(screen.getByLabelText('Buscar'), 'maria')
+    expect(await screen.findByText('1 registro')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Exportar/ }))
+    await userEvent.click(within(screen.getByRole('menu', { name: 'Exportar' })).getByRole('menuitem', { name: /CSV/ }))
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => url === '/api/relatorios/condicionais.csv?situacao=abertas&busca=maria')).toBe(true))
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Selecionar condicional nº 4' }))
+    await userEvent.click(screen.getByRole('button', { name: /Exportar/ }))
+    await userEvent.click(within(screen.getByRole('menu', { name: 'Exportar' })).getByRole('menuitem', { name: /CSV/ }))
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => url === '/api/relatorios/condicionais.csv?ids=k4')).toBe(true))
   })
 
   it('abre condicional para cliente cadastrado com as peças pelo leitor e baixa o termo', async () => {
@@ -126,7 +155,7 @@ describe('Vendas → Condicional', () => {
     })
     renderApp('/vendas/condicional')
     const tabela = await screen.findByRole('table', { name: 'Condicionais' })
-    await userEvent.click(within(tabela).getByRole('button', { name: 'Fechar condicional 4' }))
+    await userEvent.click(await within(tabela).findByRole('button', { name: 'Fechar condicional 4' }))
     const dialogo = await screen.findByRole('dialog', { name: 'Fechar condicional nº 4' })
     const devolveu = await within(dialogo).findByLabelText('Devolveu Camiseta básica Azul M')
     expect(devolveu).toHaveValue('2')

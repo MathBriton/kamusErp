@@ -38,7 +38,7 @@ internal static class VendasEndpoints
     public static IEndpointRouteBuilder MapVendas(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/vendas").RequireAuthorization().WithTags("Vendas");
-        g.MapGet("/", Listar).WithSummary("Vendas com totais. Filtros: de, ate, vendedorId, status (concluidas, canceladas, todas), busca (nº, cliente, nota), clienteId");
+        g.MapGet("/", Listar).WithSummary("Vendas com totais de todas as filtradas. Filtros: de, ate, vendedorId, status (concluidas, canceladas, todas), busca (nº, cliente, nota), clienteId; pagina e tamanho (sem pagina, todas)");
         g.MapGet("/comissoes", Comissoes).WithSummary("Comissão por vendedor sobre as vendas concluídas no período");
         g.MapGet("/{id:guid}", Obter).WithSummary("Venda com itens e pagamentos");
         g.MapPost("/", Registrar).WithSummary("Registra a venda: baixa o estoque, lança dinheiro/PIX no caixa e gera os recebíveis de cartão")
@@ -61,12 +61,12 @@ internal static class VendasEndpoints
         return Consultas.Status.Contains(s) ? new FiltroDeVendas(de, ate, vendedorId, s, busca, clienteId) : null;
     }
 
-    private static async Task<IResult> Listar(DateOnly? de, DateOnly? ate, Guid? vendedorId, string? status, string? busca, Guid? clienteId, VendasDbContext db, IEmpresaAtiva empresa,
-        IUsuarioAtual usuario, CancellationToken ct)
+    private static async Task<IResult> Listar(DateOnly? de, DateOnly? ate, Guid? vendedorId, string? status, string? busca, Guid? clienteId, int? pagina, int? tamanho,
+        VendasDbContext db, IEmpresaAtiva empresa, IUsuarioAtual usuario, CancellationToken ct)
     {
         if (Permissoes.Exigir(empresa, [.. Permissoes.Registrar, .. Permissoes.Consultar], "Seu perfil não acessa as vendas.") is { } negado) return negado;
         if (Filtro(de, ate, vendedorId, status, busca, clienteId) is not { } filtro) return Permissoes.Erro("Status inválido: concluidas, canceladas ou todas.");
-        return Results.Ok(await Consultas.ListarAsync(db, empresa, usuario.Id, filtro, ct));
+        return Results.Ok(await Consultas.ListarAsync(db, empresa, usuario.Id, filtro, ct, pagina, tamanho));
     }
 
     private static async Task<IResult> Comissoes(DateOnly? de, DateOnly? ate, VendasDbContext db, IEmpresaAtiva empresa, TimeProvider relogio, CancellationToken ct)

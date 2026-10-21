@@ -38,7 +38,7 @@ function api(extras: Parameters<typeof mockApi>[0] = {}, sessao = sessaoDemo) {
     'GET /api/estoque/lojas': () => json([{ id: 'l1', empresaId: 'e1', nome: 'Loja Centro', ativa: true, quantidade: 3 }]),
     'GET /api/vendedores': () => json([{ id: 'b1', nome: 'Bia', comissaoPercentual: 5, usuarioId: null, ativo: true }]),
     'GET /api/vendas/formas': () => json(formas),
-    [`GET /api/vendas/trocas?${periodo}`]: () => json([]),
+    [`GET /api/vendas/trocas?${periodo}&pagina=1&tamanho=20`]: () => json({ itens: [], total: 0, pagina: 1, tamanho: 20 }),
     'GET /api/vendas/devolviveis?numero=7': () => json(devolviveis()),
     ...extras,
   })
@@ -128,7 +128,7 @@ describe('Vendas → Vales-troca', () => {
   it('lista com saldos e o Dono cancela com motivo', async () => {
     let motivo: unknown = null
     api({
-      'GET /api/vendas/vales?situacao=ativos': () => json({ itens: [vale], saldoAtivo: 54.51, saldoVencido: 10 }),
+      'GET /api/vendas/vales?situacao=ativos&pagina=1&tamanho=20': () => json({ itens: [vale], saldoAtivo: 54.51, saldoVencido: 10, total: 1, pagina: 1, tamanho: 20 }),
       'POST /api/vendas/vales/vt1/cancelar': (init) => {
         motivo = corpo(init).motivo
         return json({ ...vale, situacao: 'Cancelado' })
@@ -136,14 +136,71 @@ describe('Vendas → Vales-troca', () => {
     })
     renderApp('/vendas/vales-troca')
     const tabela = await screen.findByRole('table', { name: 'Vales-troca' })
-    expect(within(tabela).getByText('VT7K2M9Q')).toBeInTheDocument()
+    expect(await within(tabela).findByText('VT7K2M9Q')).toBeInTheDocument()
     expect(screen.getByText('R$ 10,00', { selector: 'dd' })).toBeInTheDocument()
+    expect(screen.getByText('1 registro')).toBeInTheDocument()
 
     await userEvent.click(within(tabela).getByRole('button', { name: 'Cancelar VT7K2M9Q' }))
     const dialogo = await screen.findByRole('dialog', { name: 'Cancelar vale VT7K2M9Q' })
     await userEvent.type(within(dialogo).getByLabelText('Motivo'), 'Emitido por engano')
     await userEvent.click(within(dialogo).getByRole('button', { name: 'Cancelar vale' }))
     await waitFor(() => expect(motivo).toBe('Emitido por engano'))
+  })
+
+  it('filtra, exporta só os selecionados', async () => {
+    const fetch = api({
+      'GET /api/vendas/vales?situacao=ativos&pagina=1&tamanho=20': () => json({ itens: [vale], saldoAtivo: 54.51, saldoVencido: 0, total: 1, pagina: 1, tamanho: 20 }),
+      'GET /api/vendas/vales?situacao=todos&pagina=1&tamanho=20': () => json({ itens: [], saldoAtivo: 54.51, saldoVencido: 0, total: 0, pagina: 1, tamanho: 20 }),
+      'GET /api/relatorios/vales-troca.csv?ids=vt1': () => new Response('csv', { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=vales.csv' } }),
+    })
+    URL.createObjectURL = (() => 'blob:x') as typeof URL.createObjectURL
+    URL.revokeObjectURL = () => {}
+    renderApp('/vendas/vales-troca')
+    const tabela = await screen.findByRole('table', { name: 'Vales-troca' })
+    await within(tabela).findByText('VT7K2M9Q')
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Selecionar VT7K2M9Q' }))
+    await userEvent.click(screen.getByRole('button', { name: /Exportar/ }))
+    await userEvent.click(within(screen.getByRole('menu', { name: 'Exportar' })).getByRole('menuitem', { name: /CSV/ }))
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => url === '/api/relatorios/vales-troca.csv?ids=vt1')).toBe(true))
+
+    await userEvent.selectOptions(screen.getByLabelText('Situação'), 'todos')
+    expect(await screen.findByText('Nenhum vale com esses filtros.')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Seleção' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Vendas → Trocas registradas (grade)', () => {
+  const linha = { id: 't3', numero: 3, data: '2026-10-20', vendaNumero: 7, clienteNome: 'Maria', motivo: 'Defeito', pecasDevolvidas: 1, valorDevolvido: 54.51,
+    valorLevado: 0, diferenca: -54.51, valeCodigo: 'VT7K2M9Q' }
+
+  it('lista as trocas do período, abre o detalhe, busca e exporta as selecionadas', async () => {
+    const fetch = api({
+      [`GET /api/vendas/trocas?${periodo}&pagina=1&tamanho=20`]: () => json({ itens: [linha], total: 1, pagina: 1, tamanho: 20 }),
+      [`GET /api/vendas/trocas?${periodo}&busca=7&pagina=1&tamanho=20`]: () => json({ itens: [], total: 0, pagina: 1, tamanho: 20 }),
+      'GET /api/vendas/trocas/t3': () => json(troca()),
+      'GET /api/relatorios/trocas.csv?ids=t3': () => new Response('csv', { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=trocas.csv' } }),
+    })
+    URL.createObjectURL = (() => 'blob:x') as typeof URL.createObjectURL
+    URL.revokeObjectURL = () => {}
+    renderApp('/vendas/trocas')
+    const tabela = await screen.findByRole('table', { name: 'Trocas registradas' })
+    expect(await within(tabela).findByText('VT7K2M9Q')).toBeInTheDocument()
+    expect(screen.getByText('1 registro')).toBeInTheDocument()
+
+    await userEvent.click(within(tabela).getByRole('button', { name: 'Ver troca nº 3' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Troca nº 3' })
+    expect(within(dialogo).getByText('Camiseta básica Azul M')).toBeInTheDocument()
+    expect(within(dialogo).getByText(/Avariada/)).toBeInTheDocument()
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Fechar' }))
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Selecionar troca nº 3' }))
+    await userEvent.click(screen.getByRole('button', { name: /Exportar/ }))
+    await userEvent.click(within(screen.getByRole('menu', { name: 'Exportar' })).getByRole('menuitem', { name: /CSV/ }))
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => url === '/api/relatorios/trocas.csv?ids=t3')).toBe(true))
+
+    await userEvent.type(screen.getByLabelText('Busca'), '7')
+    expect(await screen.findByText('Nenhuma troca com esses filtros.')).toBeInTheDocument()
   })
 })
 
@@ -180,7 +237,7 @@ describe('Vendas → fechamento de comissões', () => {
     let fechamentos = [] as unknown[]
     api({
       [`GET /api/vendas/comissoes?${periodo}`]: () => json([{ vendedorId: 'b1', vendedor: 'Bia', vendas: 2, total: 119.8, comissao: 5.99, comissaoPendente: 5.99 }]),
-      'GET /api/vendas/comissoes/fechamentos': () => json(fechamentos),
+      'GET /api/vendas/comissoes/fechamentos?pagina=1&tamanho=20': () => json({ itens: fechamentos, total: fechamentos.length, pagina: 1, tamanho: 20 }),
       'POST /api/vendas/comissoes/fechamentos': (init) => {
         fechado = corpo(init)
         fechamentos = [{ id: 'fc1', vendedorId: 'b1', vendedorNome: 'Bia', de: inicioDoMes(hojeIso()), ate: hojeIso(), vendas: 2, trocas: 1, totalVendido: 119.8,
@@ -201,11 +258,14 @@ describe('Vendas → fechamento de comissões', () => {
     await userEvent.click(within(dialogo).getByRole('button', { name: 'Fechar comissão' }))
 
     const lista = await screen.findByRole('table', { name: 'Fechamentos' })
-    expect(within(lista).getByText('Conta a pagar gerada')).toBeInTheDocument()
+    expect(await within(lista).findByText('Conta a pagar gerada')).toBeInTheDocument()
+    expect(screen.getByText('1 registro')).toBeInTheDocument()
     expect(fechado).toMatchObject({ vendedorId: 'b1', de: inicioDoMes(hojeIso()), ate: hojeIso(), gerarContaAPagar: true })
 
-    await userEvent.click(within(lista).getByRole('button', { name: 'Reabrir' }))
+    await userEvent.click(within(lista).getByRole('button', { name: 'Reabrir fechamento de Bia' }))
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Reabrir fechamento' })).getByRole('button', { name: 'Reabrir' }))
     await waitFor(() => expect(reaberto).toBe(true))
+    expect(await within(lista).findByText('Nenhum fechamento ainda.')).toBeInTheDocument()
   })
 })
 

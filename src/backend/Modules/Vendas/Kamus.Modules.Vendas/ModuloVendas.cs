@@ -24,6 +24,9 @@ public static class ModuloVendas
         services.AddScoped<IRelatorio, RelatorioDeComissoes>();
         services.AddScoped<IRelatorio, RelatorioDeVales>();
         services.AddScoped<IRelatorio, RelatorioDeCondicionais>();
+        services.AddScoped<IRelatorio, RelatorioDeTrocas>();
+        services.AddScoped<IRelatorio, RelatorioDeFormas>();
+        services.AddScoped<IRelatorio, RelatorioDeFechamentos>();
         services.AddScoped<IRelatorio, RelatorioDeVendasAgrupadas>();
         services.AddScoped<IRelatorio, RelatorioCurvaAbc>();
         return services;

@@ -4,16 +4,22 @@ import { useApi } from '../api/useApi'
 import { ErroDeApi } from '../auth/api'
 import { moeda } from '../cadastros/catalogo'
 import { Campo } from '../components/Campo'
+import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade, useListaPaginada } from '../components/grade/useGrade'
 import { Icone } from '../components/Icone'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { dataBr, hojeIso } from '../financeiro/tipos'
+import { BotaoExportar } from '../relatorios/BotaoExportar'
 import { EditorDePagamentos } from './EditorDePagamentos'
 import { EntradaDeItens } from './EntradaDeItens'
 import { calcularPagamentos, corpoDosPagamentos, inteiro, novaLinha, somaDosItens, valorDe, type ItemDigitado, type PagamentoDigitado } from './itens'
 import {
   centavos, inicioDoMes, MOTIVOS_DA_TROCA, PERFIS_DE_GESTAO, PERFIS_QUE_VENDEM,
-  type Devolviveis, type LinhaDeTroca, type MotivoDaTroca, type Troca,
+  type Devolviveis, type LinhaDeTroca, type MotivoDaTroca, type Pagina, type Troca,
 } from './tipos'
 import { useFormas } from './useVendas'
 
@@ -38,6 +44,8 @@ export function TrocasPage() {
   const [registrada, setRegistrada] = useState<Troca | null>(null)
   const [versao, setVersao] = useState(0)
   const gestao = PERFIS_DE_GESTAO.includes(perfilAtual)
+  const [padrao] = useState(trocasDoMes)
+  const grade = useGrade(padrao)
 
   const devolvido = centavos((venda?.itens ?? []).reduce((s, i) => s + Math.min(inteiro(quantidades[i.skuId] ?? ''), i.disponiveis) * i.valorPorPeca, 0))
   const levado = somaDosItens(levados)
@@ -114,12 +122,18 @@ export function TrocasPage() {
   const podeRegistrar = !!venda && algumaDevolvida && prazoOk && (diferenca <= 0 || falta <= 0) && levados.every((i) => inteiro(i.quantidade) > 0)
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <p className="text-xs text-muted">Vendas</p>
-      <h1 className="text-2xl font-bold tracking-tight">Trocas</h1>
-      <p className="mt-1 text-sm text-muted">
-        Peças devolvidas valem o que o cliente pagou (com o desconto da venda). Se ele leva menos, a diferença vira vale-troca; se leva mais, paga a diferença.
-      </p>
+    <div className="mx-auto max-w-7xl">
+      <CabecalhoDaPagina
+        secao="Vendas"
+        titulo="Trocas"
+        descricao="Peças devolvidas valem o que o cliente pagou (com o desconto da venda). Se ele leva menos, a diferença vira vale-troca; se leva mais, paga a diferença."
+        acoes={
+          <>
+            <BotaoExportar relatorio="trocas" parametros={grade.parametros} selecionados={[...grade.selecionados]} />
+            <Link to="/vendas/vales-troca" className={estilos.botao}>Ver vales-troca</Link>
+          </>
+        }
+      />
 
       {registrada && <TrocaRegistrada troca={registrada} />}
 
@@ -247,7 +261,7 @@ export function TrocasPage() {
         </form>
       )}
 
-      <TrocasDoMes versao={versao} />
+      <TrocasRegistradas grade={grade} versao={versao} />
     </div>
   )
 }
@@ -276,57 +290,124 @@ function TrocaRegistrada({ troca }: { troca: Troca }) {
   )
 }
 
-function TrocasDoMes({ versao }: { versao: number }) {
+/** Filtros padrão do histórico: o mês corrente (a ordem das chaves é a da URL). */
+const trocasDoMes = () => ({ de: inicioDoMes(hojeIso()), ate: hojeIso(), busca: '' })
+
+type GradeDeTrocas = ReturnType<typeof useGrade<ReturnType<typeof trocasDoMes>>>
+
+/** Histórico de trocas no padrão de grade (período, busca, seleção para exportar e detalhe). */
+function TrocasRegistradas({ grade, versao }: { grade: GradeDeTrocas; versao: number }) {
+  const { dados, erro } = useListaPaginada<Pagina<LinhaDeTroca>>(`/api/vendas/trocas?${grade.consulta}`, versao, grade.filtros.busca ? 250 : 0)
+  const [detalhe, setDetalhe] = useState<string | null>(null)
+
+  const colunas: Coluna<LinhaDeTroca>[] = [
+    { titulo: 'Nº', celula: (t) => <span className="font-semibold">{t.numero}</span> },
+    { titulo: 'Data', celula: (t) => dataBr(t.data) },
+    { titulo: 'Venda', celula: (t) => `nº ${t.vendaNumero}` },
+    { titulo: 'Cliente', celula: (t) => t.clienteNome ?? '—' },
+    { titulo: 'Motivo', celula: (t) => MOTIVOS_DA_TROCA.find((m) => m.valor === t.motivo)?.rotulo ?? t.motivo },
+    { titulo: 'Devolvido', celula: (t) => moeda(t.valorDevolvido), alinhar: 'direita' },
+    { titulo: 'Levado', celula: (t) => moeda(t.valorLevado), alinhar: 'direita' },
+    { titulo: 'Vale', celula: (t) => <span className="font-mono">{t.valeCodigo ?? '—'}</span> },
+  ]
+
+  return (
+    <section className="mt-10">
+      <h2 className="text-lg font-semibold">Trocas registradas</h2>
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
+        <Campo rotulo="De" className="w-40">
+          <input type="date" value={grade.filtros.de} onChange={(e) => grade.filtrar({ de: e.target.value })} className={estilos.campo} />
+        </Campo>
+        <Campo rotulo="Até" className="w-40">
+          <input type="date" value={grade.filtros.ate} onChange={(e) => grade.filtrar({ ate: e.target.value })} className={estilos.campo} />
+        </Campo>
+        <Campo rotulo="Busca" className="min-w-48 flex-1">
+          <input value={grade.filtros.busca} onChange={(e) => grade.filtrar({ busca: e.target.value })} placeholder="Nº da troca, da venda ou cliente" className={estilos.campo} />
+        </Campo>
+      </BarraDeFiltros>
+      {erro && <p role="alert" className={`mt-4 ${estilos.erro}`}>{erro}</p>}
+      <GradeDeRegistros
+        rotulo="Trocas registradas"
+        colunas={colunas}
+        itens={dados?.itens ?? (erro ? [] : null)}
+        chave={(t) => t.id}
+        nome={(t) => `troca nº ${t.numero}`}
+        total={dados?.total ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
+        vazio="Nenhuma troca com esses filtros."
+        acoes={(t) => <AcaoDaLinha rotulo={`Ver troca nº ${t.numero}`} icone="eye" onClick={() => setDetalhe(t.id)} />}
+      />
+      {detalhe && <DetalheDaTroca id={detalhe} onFechar={() => setDetalhe(null)} />}
+    </section>
+  )
+}
+
+function DetalheDaTroca({ id, onFechar }: { id: string; onFechar: () => void }) {
   const { getJson } = useApi()
-  const [trocas, setTrocas] = useState<LinhaDeTroca[] | null>(null)
+  const [troca, setTroca] = useState<Troca | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
 
   useEffect(() => {
     const controle = new AbortController()
-    getJson<LinhaDeTroca[]>(`/api/vendas/trocas?${new URLSearchParams({ de: inicioDoMes(hojeIso()), ate: hojeIso() })}`, controle.signal)
-      .then(setTrocas)
-      .catch(() => {
-        if (!controle.signal.aborted) setTrocas([])
+    getJson<Troca>(`/api/vendas/trocas/${id}`, controle.signal)
+      .then(setTroca)
+      .catch((e: unknown) => {
+        if (!controle.signal.aborted) setErro(e instanceof ErroDeApi ? e.message : 'Não foi possível abrir a troca.')
       })
     return () => controle.abort()
-  }, [getJson, versao])
+  }, [getJson, id])
 
-  if (!trocas || trocas.length === 0) return null
   return (
-    <section className="mt-8">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold">Trocas do mês</h2>
-        <Link to="/vendas/vales-troca" className="text-sm text-primary hover:underline">Ver vales-troca</Link>
-      </div>
-      <div className="mt-3 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-        <table aria-label="Trocas do mês" className="w-full text-sm">
-          <thead className="bg-surface-2 text-left text-xs text-muted uppercase">
-            <tr>
-              <th className="px-4 py-2">Nº</th>
-              <th className="px-4 py-2">Data</th>
-              <th className="px-4 py-2">Venda</th>
-              <th className="px-4 py-2">Cliente</th>
-              <th className="px-4 py-2">Motivo</th>
-              <th className="px-4 py-2 text-right">Devolvido</th>
-              <th className="px-4 py-2 text-right">Levado</th>
-              <th className="px-4 py-2">Vale</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {trocas.map((t) => (
-              <tr key={t.id}>
-                <td className="px-4 py-2 font-semibold">{t.numero}</td>
-                <td className="px-4 py-2">{dataBr(t.data)}</td>
-                <td className="px-4 py-2">{`nº ${t.vendaNumero}`}</td>
-                <td className="px-4 py-2">{t.clienteNome ?? '—'}</td>
-                <td className="px-4 py-2">{MOTIVOS_DA_TROCA.find((m) => m.valor === t.motivo)?.rotulo ?? t.motivo}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{moeda(t.valorDevolvido)}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{moeda(t.valorLevado)}</td>
-                <td className="px-4 py-2 font-mono">{t.valeCodigo ?? '—'}</td>
-              </tr>
+    <Dialogo titulo={troca ? `Troca nº ${troca.numero}` : 'Troca'} onFechar={onFechar} largo>
+      {erro && <p role="alert" className={estilos.erro}>{erro}</p>}
+      {troca && (
+        <div className="space-y-4 text-sm">
+          <p className="text-muted">
+            {`${dataBr(troca.data)} · venda nº ${troca.vendaNumero}${troca.clienteNome ? ` · ${troca.clienteNome}` : ''} · ${MOTIVOS_DA_TROCA.find((m) => m.valor === troca.motivo)?.rotulo ?? troca.motivo}`}
+          </p>
+          <div>
+            <h3 className="mb-1 font-semibold">Devolvidas</h3>
+            <ul className="space-y-0.5">
+              {troca.devolvidos.map((d) => (
+                <li key={d.skuId} className="flex justify-between gap-3">
+                  <span>
+                    <span>{d.descricao}</span>
+                    <span className="text-muted">{` · ${d.quantidade} · ${d.destino === 'Avariado' ? 'Avariada (não volta)' : 'Voltou ao estoque'}`}</span>
+                  </span>
+                  <span className="tabular-nums">{moeda(d.valor)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          {troca.levados.length > 0 && (
+            <div>
+              <h3 className="mb-1 font-semibold">Levadas</h3>
+              <ul className="space-y-0.5">
+                {troca.levados.map((l) => (
+                  <li key={l.skuId} className="flex justify-between gap-3">
+                    <span>{`${l.descricao} · ${l.quantidade}`}</span>
+                    <span className="tabular-nums">{moeda(l.total)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-1 rounded-xl bg-surface-2 p-4">
+            <dt className="text-muted">Devolvido</dt><dd className="text-right tabular-nums">{moeda(troca.valorDevolvido)}</dd>
+            <dt className="text-muted">Levado</dt><dd className="text-right tabular-nums">{moeda(troca.valorLevado)}</dd>
+            <dt className="font-bold">Diferença</dt><dd className="text-right font-bold tabular-nums">{moeda(troca.diferenca)}</dd>
+            {troca.pagamentos.map((p, n) => (
+              <div key={n} className="contents">
+                <dt className="text-muted">{p.formaNome}</dt><dd className="text-right tabular-nums">{moeda(p.valor)}</dd>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
+          </dl>
+          {troca.vale && <p>{`Vale-troca ${troca.vale.codigo}: ${moeda(troca.vale.valor)} · válido até ${dataBr(troca.vale.validoAte)}`}</p>}
+          {troca.observacao && <p className="text-muted">{troca.observacao}</p>}
+          <p className="text-xs text-muted">{`Registrada por ${troca.registradaPor ?? 'Sistema'}`}</p>
+        </div>
+      )}
+    </Dialogo>
   )
 }

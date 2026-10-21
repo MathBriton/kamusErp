@@ -2,6 +2,7 @@ using Kamus.Modules.Financeiro.Aplicacao;
 using Kamus.Modules.Financeiro.Dominio;
 using Kamus.Modules.Financeiro.Endpoints;
 using Kamus.Modules.Financeiro.Persistencia;
+using Kamus.SharedKernel.Busca;
 using Kamus.SharedKernel.MultiTenancy;
 using Kamus.SharedKernel.Relatorios;
 using Kamus.SharedKernel.Tempo;
@@ -117,13 +118,19 @@ internal sealed class RelatorioDeInadimplencia(FinanceiroDbContext db, Crediario
         var config = await crediario.ConfiguracaoAsync(ct);
         var titulos = await crediario.TitulosAsync(null, empresa.EmpresaIds, ct);
         var limites = (await db.LimitesDeCredito.ToListAsync(ct)).ToDictionary(l => l.ClienteId);
-        var linhas = titulos.Where(t => t.PessoaId is not null).GroupBy(t => t.PessoaId!.Value).Select(g =>
+        // "ids" = clientes selecionados na grade da carteira: só eles; "busca" = o mesmo filtro da tela.
+        var ids = ParametrosDoRelatorio.Ids(parametros);
+        var busca = parametros.GetValueOrDefault("busca");
+        var termo = TextoParaBusca.Normalizar(busca);
+        var linhas = titulos.Where(t => t.PessoaId is not null && (ids.Count == 0 || ids.Contains(t.PessoaId.Value))).GroupBy(t => t.PessoaId!.Value).Select(g =>
         {
             var abertas = g.SelectMany(t => t.Parcelas).Where(p => p.Saldo > 0).ToList();
             var situacao = Credito.Avaliar(limites.GetValueOrDefault(g.Key), abertas.Sum(p => p.Saldo), crediario.DiasDeAtraso(g), config);
             return (Nome: g.First().PessoaNome ?? "?", situacao.Limite, situacao.EmAberto, Atrasado: abertas.Where(p => p.Vencimento < hoje).Sum(p => p.Saldo),
                 situacao.DiasDeAtraso, Faixa: Credito.Faixa(situacao.DiasDeAtraso), situacao.Bloqueado);
-        }).Where(l => l.EmAberto > 0).OrderByDescending(l => l.DiasDeAtraso).ThenByDescending(l => l.EmAberto).ToList();
+        }).Where(l => l.EmAberto > 0)
+            .Where(l => ids.Count > 0 || string.IsNullOrEmpty(termo) || TextoParaBusca.Normalizar(l.Nome).Contains(termo, StringComparison.Ordinal))
+            .OrderByDescending(l => l.DiasDeAtraso).ThenByDescending(l => l.EmAberto).ToList();
 
         static string Rotulo(FaixaDeAtraso f) => f switch
         {
@@ -143,6 +150,8 @@ internal sealed class RelatorioDeInadimplencia(FinanceiroDbContext db, Crediario
             new ColunaRelatorio("Faixa", Largura: 0.9f),
             new ColunaRelatorio("Situação", Largura: 0.7f),
         ], linhas.Select(l => (IReadOnlyList<object?>)[l.Nome, l.Limite, l.EmAberto, l.Atrasado, l.DiasDeAtraso, Rotulo(l.Faixa), l.Bloqueado ? "Bloqueado" : "Liberado"]).ToList(),
-        [new("Data", $"{hoje:dd/MM/yyyy}")]);
+        ids.Count > 0
+            ? [ParametrosDoRelatorio.Selecionados(linhas.Count, "cliente", "clientes"), new("Data", $"{hoje:dd/MM/yyyy}")]
+            : string.IsNullOrWhiteSpace(busca) ? [new("Data", $"{hoje:dd/MM/yyyy}")] : [new("Data", $"{hoje:dd/MM/yyyy}"), new("Busca", busca)]);
     }
 }

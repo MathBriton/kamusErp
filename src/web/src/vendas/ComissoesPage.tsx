@@ -5,12 +5,21 @@ import { moeda } from '../cadastros/catalogo'
 import { Campo } from '../components/Campo'
 import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { Confirmacao } from '../components/grade/Confirmacao'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade, useListaPaginada } from '../components/grade/useGrade'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { dataBr, hojeIso, somarDias } from '../financeiro/tipos'
 import { BotaoExportar } from '../relatorios/BotaoExportar'
-import { inicioDoMes, PERFIS_DE_GESTAO, PERFIS_QUE_CONSULTAM, type ComissaoDoVendedor, type Fechamento } from './tipos'
+import { inicioDoMes, PERFIS_DE_GESTAO, PERFIS_QUE_CONSULTAM, type ComissaoDoVendedor, type Fechamento, type Pagina } from './tipos'
+import { useVendedores } from './useVendas'
 
-/** Comissão por vendedor no período (vendas concluídas, ajustada pelas trocas), fechamento com conta a pagar e reabertura. */
+/**
+ * Comissão por vendedor no período (vendas concluídas, ajustada pelas trocas) como resumo, fechamento com conta a pagar
+ * e a grade dos fechamentos (reabrir, exportar os selecionados).
+ */
 export function ComissoesPage() {
   const { getJson } = useApi()
   const { perfilAtual } = useEmpresa()
@@ -45,26 +54,28 @@ export function ComissoesPage() {
   const soma = (f: (c: ComissaoDoVendedor) => number) => (linhas ?? []).reduce((s, c) => s + f(c), 0)
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <p className="text-xs text-muted">Vendas</p>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">Comissões</h1>
-          <p className="mt-1 text-sm text-muted">
-            Percentual do vendedor sobre o total de cada venda concluída; trocas ajustam pela diferença e canceladas não contam. Feche o período para gerar a conta a pagar.
-          </p>
-        </div>
-        <BotaoExportar relatorio="comissoes" parametros={filtros} />
-      </div>
+    <div className="mx-auto max-w-7xl">
+      <CabecalhoDaPagina
+        secao="Vendas"
+        titulo="Comissões"
+        descricao="Percentual do vendedor sobre o total de cada venda concluída; trocas ajustam pela diferença e canceladas não contam. Feche o período para gerar a conta a pagar."
+        acoes={<BotaoExportar relatorio="comissoes" parametros={filtros} />}
+      />
 
-      <div className="mt-6 grid max-w-md grid-cols-2 gap-3">
-        <Campo rotulo="De">
+      <BarraDeFiltros
+        ativos={de !== inicioDoMes(hojeIso()) || ate !== hojeIso()}
+        onLimpar={() => {
+          setDe(inicioDoMes(hojeIso()))
+          setAte(hojeIso())
+        }}
+      >
+        <Campo rotulo="De" className="w-40">
           <input type="date" value={de} onChange={(e) => setDe(e.target.value)} className={estilos.campo} />
         </Campo>
-        <Campo rotulo="Até">
+        <Campo rotulo="Até" className="w-40">
           <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} className={estilos.campo} />
         </Campo>
-      </div>
+      </BarraDeFiltros>
 
       {erro && <p role="alert" className={`mt-4 ${estilos.erro}`}>{erro}</p>}
 
@@ -181,64 +192,73 @@ function FecharComissao({ linha, de, ate, onFechar, onFechado }: { linha: Comiss
   )
 }
 
+const FILTROS_DOS_FECHAMENTOS = { vendedorId: '' }
+
+/** Fechamentos já feitos, no padrão de grade: filtro por vendedor, reabrir com confirmação e exportar os selecionados. */
 function Fechamentos({ versao, gestao, onMudou }: { versao: number; gestao: boolean; onMudou: () => void }) {
-  const { getJson, enviar } = useApi()
-  const [lista, setLista] = useState<Fechamento[] | null>(null)
-  const [erro, setErro] = useState<string | null>(null)
+  const { enviar } = useApi()
+  const vendedores = useVendedores()
+  const grade = useGrade(FILTROS_DOS_FECHAMENTOS)
+  const { dados, erro } = useListaPaginada<Pagina<Fechamento>>(`/api/vendas/comissoes/fechamentos?${grade.consulta}`, versao)
+  const [reabrindo, setReabrindo] = useState<Fechamento | null>(null)
 
-  useEffect(() => {
-    const controle = new AbortController()
-    getJson<Fechamento[]>('/api/vendas/comissoes/fechamentos', controle.signal)
-      .then(setLista)
-      .catch(() => {
-        if (!controle.signal.aborted) setLista([])
-      })
-    return () => controle.abort()
-  }, [getJson, versao])
+  const colunas: Coluna<Fechamento>[] = [
+    { titulo: 'Vendedor', celula: (f) => <span className="font-semibold">{f.vendedorNome}</span> },
+    { titulo: 'Período', celula: (f) => `${dataBr(f.de)} a ${dataBr(f.ate)}` },
+    { titulo: 'Vendas', celula: (f) => (f.trocas > 0 ? `${f.vendas} (+${f.trocas} trocas)` : f.vendas), alinhar: 'direita' },
+    { titulo: 'Total vendido', celula: (f) => moeda(f.totalVendido), alinhar: 'direita' },
+    { titulo: 'Comissão', celula: (f) => <span className="font-semibold">{moeda(f.comissao)}</span>, alinhar: 'direita' },
+    { titulo: 'Financeiro', celula: (f) => (f.contaAPagarGerada ? 'Conta a pagar gerada' : '—') },
+    { titulo: 'Fechado por', celula: (f) => <span className="text-muted">{`${f.fechadoPor ?? 'Sistema'} · ${new Date(f.fechadoEm).toLocaleDateString('pt-BR')}`}</span> },
+  ]
 
-  const reabrir = async (f: Fechamento) => {
-    setErro(null)
-    try {
-      await enviar('POST', `/api/vendas/comissoes/fechamentos/${f.id}/reabrir`)
-      onMudou()
-    } catch (ex) {
-      setErro(ex instanceof ErroDeApi ? ex.message : 'Não foi possível reabrir.')
-    }
-  }
-
-  if (!lista || lista.length === 0) return null
   return (
-    <section className="mt-8">
-      <h2 className="font-semibold">Fechamentos</h2>
-      {erro && <p role="alert" className={`mt-2 ${estilos.erro}`}>{erro}</p>}
-      <div className="mt-3 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-        <table aria-label="Fechamentos" className="w-full text-sm">
-          <thead className="bg-surface-2 text-left text-xs text-muted uppercase">
-            <tr>
-              <th className="px-4 py-2">Vendedor</th>
-              <th className="px-4 py-2">Período</th>
-              <th className="px-4 py-2 text-right">Vendas</th>
-              <th className="px-4 py-2 text-right">Comissão</th>
-              <th className="px-4 py-2">Financeiro</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {lista.map((f) => (
-              <tr key={f.id}>
-                <td className="px-4 py-2 font-semibold">{f.vendedorNome}</td>
-                <td className="px-4 py-2">{`${dataBr(f.de)} a ${dataBr(f.ate)}`}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{f.trocas > 0 ? `${f.vendas} (+${f.trocas} trocas)` : f.vendas}</td>
-                <td className="px-4 py-2 text-right font-semibold tabular-nums">{moeda(f.comissao)}</td>
-                <td className="px-4 py-2">{f.contaAPagarGerada ? 'Conta a pagar gerada' : '—'}</td>
-                <td className="px-4 py-2 text-right">
-                  {gestao && <button type="button" onClick={() => void reabrir(f)} className={estilos.botao}>Reabrir</button>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <section className="mt-10">
+      <div className="flex flex-wrap items-end gap-3">
+        <h2 className="flex-1 text-lg font-semibold">Fechamentos</h2>
+        <BotaoExportar relatorio="fechamentos-de-comissao" parametros={grade.parametros} selecionados={[...grade.selecionados]} />
       </div>
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
+        <Campo rotulo="Vendedor" className="w-56">
+          <select value={grade.filtros.vendedorId} onChange={(e) => grade.filtrar({ vendedorId: e.target.value })} className={estilos.campo}>
+            <option value="">Todos</option>
+            {vendedores?.map((v) => (
+              <option key={v.id} value={v.id}>{v.nome}</option>
+            ))}
+          </select>
+        </Campo>
+      </BarraDeFiltros>
+      {erro && <p role="alert" className={`mt-2 ${estilos.erro}`}>{erro}</p>}
+      <GradeDeRegistros
+        rotulo="Fechamentos"
+        colunas={colunas}
+        itens={dados?.itens ?? (erro ? [] : null)}
+        chave={(f) => f.id}
+        nome={(f) => `fechamento de ${f.vendedorNome}`}
+        total={dados?.total ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
+        vazio={grade.ativos ? 'Nenhum fechamento com esses filtros.' : 'Nenhum fechamento ainda.'}
+        acoes={gestao ? (f) => <AcaoDaLinha rotulo={`Reabrir fechamento de ${f.vendedorNome}`} icone="x" perigo onClick={() => setReabrindo(f)} /> : undefined}
+      />
+      {reabrindo && (
+        <Confirmacao
+          titulo="Reabrir fechamento"
+          rotulo="Reabrir"
+          onCancelar={() => setReabrindo(null)}
+          onConfirmar={async () => {
+            await enviar('POST', `/api/vendas/comissoes/fechamentos/${reabrindo.id}/reabrir`)
+            setReabrindo(null)
+            grade.limparSelecao()
+            onMudou()
+          }}
+        >
+          <p>
+            {`A comissão de ${reabrindo.vendedorNome} (${dataBr(reabrindo.de)} a ${dataBr(reabrindo.ate)}, ${moeda(reabrindo.comissao)}) volta a ficar pendente`}
+            {reabrindo.contaAPagarGerada ? ' e a conta a pagar é cancelada (se ainda não foi paga).' : '.'}
+          </p>
+        </Confirmacao>
+      )}
     </section>
   )
 }

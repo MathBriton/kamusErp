@@ -5,6 +5,11 @@ import { decimal, lerNumero, moeda } from '../cadastros/catalogo'
 import { Campo } from '../components/Campo'
 import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade } from '../components/grade/useGrade'
+import { Icone } from '../components/Icone'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { SeloDeSituacao } from '../financeiro/Selo'
 import { dataBr } from '../financeiro/tipos'
@@ -12,32 +17,47 @@ import { BotaoExportar } from '../relatorios/BotaoExportar'
 import { salvarArquivo } from '../relatorios/salvarArquivo'
 import {
   PERFIS_DE_GESTAO, PERFIS_DO_CREDIARIO,
-  type Carteira, type ClienteDoCrediario, type ParcelaDoCrediario, type RegrasDoCrediario,
+  type Carteira, type ClienteDoCrediario, type LinhaDaCarteira, type ParcelaDoCrediario, type RegrasDoCrediario,
 } from './tipos'
 
-/** Crediário próprio: carteira por faixa de atraso, ficha do cliente com parcelas, recebimento, carnê/recibo, limite e regras. */
-export function CrediarioPage() {
+const FILTROS = { busca: '' }
+
+/** Como o useListaPaginada, mas a carteira traz `clientes` e `registros` (o `total` dela é o saldo em aberto). */
+function useCarteira(url: string | null, versao: number, atraso: number) {
   const { getJson } = useApi()
+  const [estado, setEstado] = useState<{ carteira: Carteira | null; erro: string | null }>({ carteira: null, erro: null })
+  useEffect(() => {
+    if (!url) return
+    const controle = new AbortController()
+    const timer = window.setTimeout(() => {
+      getJson<Carteira>(url, controle.signal)
+        .then((carteira) => setEstado({ carteira, erro: null }))
+        .catch((e: unknown) => {
+          if (!controle.signal.aborted) setEstado({ carteira: null, erro: e instanceof ErroDeApi ? e.message : 'Não foi possível carregar a carteira.' })
+        })
+    }, atraso)
+    return () => {
+      window.clearTimeout(timer)
+      controle.abort()
+    }
+  }, [getJson, url, versao, atraso])
+  return estado
+}
+
+/**
+ * Crediário próprio: faixas de atraso de toda a carteira, grade de clientes (busca, seleção para exportar a inadimplência),
+ * ficha do cliente com parcelas, recebimento, carnê/recibo, limite e regras.
+ */
+export function CrediarioPage() {
+  const { baixar } = useApi()
   const { perfilAtual } = useEmpresa()
-  const [busca, setBusca] = useState('')
-  const [versao, setVersao] = useState(0)
-  const [carteira, setCarteira] = useState<Carteira | null>(null)
-  const [aberto, setAberto] = useState<string | null>(null)
-  const [novo, setNovo] = useState(false)
   const permitido = PERFIS_DO_CREDIARIO.includes(perfilAtual)
   const gestao = PERFIS_DE_GESTAO.includes(perfilAtual)
-
-  useEffect(() => {
-    if (!permitido) return
-    const controle = new AbortController()
-    const termo = busca.trim()
-    getJson<Carteira>(`/api/financeiro/crediario/carteira${termo ? `?${new URLSearchParams({ busca: termo })}` : ''}`, controle.signal)
-      .then(setCarteira)
-      .catch(() => {
-        if (!controle.signal.aborted) setCarteira(null)
-      })
-    return () => controle.abort()
-  }, [getJson, busca, versao, permitido])
+  const grade = useGrade(FILTROS)
+  const [versao, setVersao] = useState(0)
+  const { carteira, erro } = useCarteira(permitido ? `/api/financeiro/crediario/carteira?${grade.consulta}` : null, versao, grade.filtros.busca ? 250 : 0)
+  const [aberto, setAberto] = useState<string | null>(null)
+  const [novo, setNovo] = useState(false)
 
   if (!permitido)
     return (
@@ -48,21 +68,53 @@ export function CrediarioPage() {
     )
 
   const recarregar = () => setVersao((v) => v + 1)
+  const baixarCarne = async (clienteId: string) => {
+    const r = await baixar(`/api/financeiro/crediario/clientes/${clienteId}/carne.pdf`)
+    if (r.tipo === 'arquivo') salvarArquivo(r.blob, r.nome)
+  }
   const faixas: [string, number][] = carteira
     ? [['A vencer', carteira.aVencer], ['1 a 30 dias', carteira.ate30], ['31 a 60 dias', carteira.ate60], ['61 a 90 dias', carteira.ate90], ['Mais de 90 dias', carteira.acima90]]
     : []
 
+  const colunas: Coluna<LinhaDaCarteira>[] = [
+    {
+      titulo: 'Cliente',
+      celula: (c) => <button type="button" onClick={() => setAberto(c.clienteId)} className="font-semibold text-primary hover:underline">{c.clienteNome}</button>,
+    },
+    { titulo: 'Limite', celula: (c) => moeda(c.limite), alinhar: 'direita' },
+    { titulo: 'Em aberto', celula: (c) => moeda(c.emAberto), alinhar: 'direita' },
+    { titulo: 'Atrasado', celula: (c) => <span className={c.atrasado > 0 ? 'font-semibold text-danger' : ''}>{moeda(c.atrasado)}</span>, alinhar: 'direita' },
+    { titulo: 'Atraso', celula: (c) => (c.diasDeAtraso > 0 ? `${c.diasDeAtraso} dias` : '—'), alinhar: 'direita' },
+    { titulo: 'Disponível', celula: (c) => moeda(c.disponivel), alinhar: 'direita' },
+    {
+      titulo: 'Situação',
+      celula: (c) =>
+        c.bloqueado ? (
+          <span className="rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger">Bloqueado</span>
+        ) : (
+          <span className="rounded-full bg-success-soft px-2 py-0.5 text-xs font-semibold text-success">Liberado</span>
+        ),
+    },
+  ]
+
   return (
-    <div className="mx-auto max-w-6xl">
-      <p className="text-xs text-muted">Vendas</p>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">Crediário</h1>
-          <p className="mt-1 text-sm text-muted">Venda a prazo para clientes com limite aprovado. Parcela atrasada além do prazo das regras bloqueia novas compras.</p>
-        </div>
-        <BotaoExportar relatorio="inadimplencia" />
-        {gestao && <button type="button" onClick={() => setNovo(true)} className={estilos.botaoPrimario}>Liberar crediário para cliente</button>}
-      </div>
+    <div className="mx-auto max-w-7xl">
+      <CabecalhoDaPagina
+        secao="Vendas"
+        titulo="Crediário"
+        descricao="Venda a prazo para clientes com limite aprovado. Parcela atrasada além do prazo das regras bloqueia novas compras."
+        acoes={
+          <>
+            <BotaoExportar relatorio="inadimplencia" parametros={grade.parametros} selecionados={[...grade.selecionados]} />
+            {gestao && (
+              <button type="button" onClick={() => setNovo(true)} className={estilos.botaoPrimario}>
+                <Icone nome="plus" />
+                Liberar crediário para cliente
+              </button>
+            )}
+          </>
+        }
+      />
 
       {carteira && (
         <dl className="mt-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -79,54 +131,31 @@ export function CrediarioPage() {
         </dl>
       )}
 
-      <div className="mt-4 max-w-sm">
-        <Campo rotulo="Buscar cliente">
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} className={estilos.campo} />
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
+        <Campo rotulo="Buscar cliente" className="min-w-60 flex-1">
+          <input value={grade.filtros.busca} onChange={(e) => grade.filtrar({ busca: e.target.value })} placeholder="Nome do cliente" className={estilos.campo} />
         </Campo>
-      </div>
+      </BarraDeFiltros>
 
-      {carteira && (
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-          {carteira.clientes.length === 0 ? (
-            <p className="p-8 text-center text-sm text-muted">Nenhum cliente no crediário ainda.</p>
-          ) : (
-            <table aria-label="Carteira do crediário" className="w-full text-sm">
-              <thead className="bg-surface-2 text-left text-xs text-muted uppercase">
-                <tr>
-                  <th className="px-4 py-2">Cliente</th>
-                  <th className="px-4 py-2 text-right">Limite</th>
-                  <th className="px-4 py-2 text-right">Em aberto</th>
-                  <th className="px-4 py-2 text-right">Atrasado</th>
-                  <th className="px-4 py-2 text-right">Atraso</th>
-                  <th className="px-4 py-2 text-right">Disponível</th>
-                  <th className="px-4 py-2">Situação</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {carteira.clientes.map((c) => (
-                  <tr key={c.clienteId}>
-                    <td className="px-4 py-2">
-                      <button type="button" onClick={() => setAberto(c.clienteId)} className="font-semibold text-primary hover:underline">{c.clienteNome}</button>
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums">{moeda(c.limite)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{moeda(c.emAberto)}</td>
-                    <td className={`px-4 py-2 text-right tabular-nums ${c.atrasado > 0 ? 'font-semibold text-danger' : ''}`}>{moeda(c.atrasado)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{c.diasDeAtraso > 0 ? `${c.diasDeAtraso} dias` : '—'}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{moeda(c.disponivel)}</td>
-                    <td className="px-4 py-2">
-                      {c.bloqueado ? (
-                        <span className="rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger">Bloqueado</span>
-                      ) : (
-                        <span className="rounded-full bg-success-soft px-2 py-0.5 text-xs font-semibold text-success">Liberado</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+      {erro && <p role="alert" className={`mt-4 ${estilos.erro}`}>{erro}</p>}
+
+      <GradeDeRegistros
+        rotulo="Carteira do crediário"
+        colunas={colunas}
+        itens={carteira?.clientes ?? (erro ? [] : null)}
+        chave={(c) => c.clienteId}
+        nome={(c) => c.clienteNome}
+        total={carteira?.registros ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
+        vazio={grade.ativos ? 'Nenhum cliente com essa busca.' : 'Nenhum cliente no crediário ainda.'}
+        acoes={(c) => (
+          <>
+            <AcaoDaLinha rotulo={`Ver crediário de ${c.clienteNome}`} icone="eye" onClick={() => setAberto(c.clienteId)} />
+            {c.emAberto > 0 && <AcaoDaLinha rotulo={`Carnê de ${c.clienteNome}`} icone="printer" onClick={() => void baixarCarne(c.clienteId)} />}
+          </>
+        )}
+      />
 
       {gestao && <Regras />}
 

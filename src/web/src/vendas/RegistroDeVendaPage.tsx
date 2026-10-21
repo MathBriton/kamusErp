@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthContext'
 import { moeda } from '../cadastros/catalogo'
 import { Campo } from '../components/Campo'
 import { estilos } from '../components/estilos'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
 import { Icone } from '../components/Icone'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { useLojas } from '../estoque/useLojas'
@@ -117,9 +118,12 @@ export function RegistroDeVendaPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <p className="text-xs text-muted">Vendas</p>
-      <h1 className="text-2xl font-bold tracking-tight">Registrar venda</h1>
-      <p className="mt-1 text-sm text-muted">A nota fiscal continua saindo no sistema atual da loja: aqui ficam o estoque, o caixa, os recebíveis e a comissão.</p>
+      <CabecalhoDaPagina
+        secao="Vendas"
+        titulo="Registrar venda"
+        descricao="A nota fiscal continua saindo no sistema atual da loja: aqui ficam o estoque, o caixa, os recebíveis e a comissão."
+        acoes={<Link to="/vendas/realizadas" className={estilos.botao}>Vendas realizadas</Link>}
+      />
 
       {registrada && (
         <div role="status" className="mt-4 space-y-1 rounded-lg bg-success-soft px-3 py-2.5 text-sm text-success">

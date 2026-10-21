@@ -22,6 +22,9 @@ public sealed class TrocasTests : IAsyncDisposable
     private sealed record TrocaDto(Guid Id, int Numero, int VendaNumero, string Motivo, decimal ValorDevolvido, decimal ValorLevado, decimal Diferenca, decimal Troco,
         decimal Comissao, ValeDto? Vale, List<string> Avisos);
     private sealed record ListaDeValesDto(List<ValeDto> Itens, decimal SaldoAtivo, decimal SaldoVencido);
+    private sealed record PaginaDeValesDto(List<ValeDto> Itens, int Total, int Pagina, int Tamanho, decimal SaldoAtivo, decimal SaldoVencido);
+    private sealed record LinhaDeTrocaDto(Guid Id, int Numero, int VendaNumero, string? ClienteNome, string Motivo, decimal ValorDevolvido, string? ValeCodigo);
+    private sealed record PaginaDto<T>(List<T> Itens, int Total, int Pagina, int Tamanho);
     private sealed record ComissaoDto(Guid? VendedorId, string Vendedor, int Vendas, decimal Total, decimal Comissao, decimal ComissaoPendente);
     private sealed record FechamentoDto(Guid Id, string VendedorNome, int Vendas, int Trocas, decimal TotalVendido, decimal Comissao, bool ContaAPagarGerada);
     private sealed record ContaDto(Guid Id, decimal Saldo);
@@ -188,6 +191,11 @@ public sealed class TrocasTests : IAsyncDisposable
         fechamento.ShouldBe(new FechamentoDto(fechamento.Id, "Bia", 2, 1, 119.80m, 5.99m, true));
 
         (await c.Client.PostAsJsonAsync(U("/api/vendas/comissoes/fechamentos"), corpo, Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest); // nada a fechar
+        var paginaDeFechamentos = (await c.Client.GetFromJsonAsync<PaginaDto<FechamentoDto>>(U("/api/vendas/comissoes/fechamentos?pagina=1&tamanho=20"), Ct))!;
+        (paginaDeFechamentos.Total, paginaDeFechamentos.Itens.Single().Id).ShouldBe((1, fechamento.Id));
+        var csvFechamentos = await c.Client.GetStringAsync(U($"/api/relatorios/fechamentos-de-comissao.csv?ids={fechamento.Id}"), Ct);
+        csvFechamentos.ShouldContain("Bia");
+        csvFechamentos.ShouldContain("5,99");
         (await c.Client.GetFromJsonAsync<List<ComissaoDto>>(U($"/api/vendas/comissoes?{periodo}"), Ct))!.Single().ComissaoPendente.ShouldBe(0m);
         var pagar = (await c.Client.GetFromJsonAsync<ListaFinDto>(U("/api/financeiro/titulos?tipo=pagar&situacao=abertas"), Ct))!.Itens;
         pagar.ShouldContain(l => l.Descricao.StartsWith("Comissão de Bia", StringComparison.Ordinal) && l.Valor == 5.99m);
@@ -198,10 +206,41 @@ public sealed class TrocasTests : IAsyncDisposable
 
         (await c.Client.PostAsync(U($"/api/vendas/comissoes/fechamentos/{fechamento.Id}/reabrir"), null, Ct)).StatusCode.ShouldBe(HttpStatusCode.OK);
         (await c.Client.GetFromJsonAsync<List<FechamentoDto>>(U("/api/vendas/comissoes/fechamentos"), Ct))!.ShouldBeEmpty();
+        (await c.Client.GetFromJsonAsync<PaginaDto<FechamentoDto>>(U("/api/vendas/comissoes/fechamentos?pagina=1&tamanho=20"), Ct))!.Total.ShouldBe(0);
         (await c.Client.GetFromJsonAsync<ListaFinDto>(U("/api/financeiro/titulos?tipo=pagar&situacao=canceladas"), Ct))!.Itens.ShouldContain(l => l.Valor == 5.99m);
         (await c.Client.PostAsJsonAsync(U($"/api/vendas/{v2.Id}/cancelar"), new { motivo = "Teste" }, Ct)).StatusCode.ShouldBe(HttpStatusCode.OK);
         var comTroca = await c.Client.PostAsJsonAsync(U($"/api/vendas/{v1.Id}/cancelar"), new { motivo = "Teste" }, Ct);
         comTroca.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         (await comTroca.Content.ReadAsStringAsync(Ct)).ShouldContain("troca");
+    }
+
+    [Fact]
+    public async Task TrocasEVales_Paginados_RelatoriosDosSelecionados()
+    {
+        var c = await Preparar();
+        var venda = await Vender(c, [new { skuId = c.AzulM, quantidade = 2, desconto = 0m }], [new { formaId = c.Formas["PIX"].Id, valor = 119.80m, parcelas = 1 }]);
+        var trocas = new List<TrocaDto>();
+        for (var i = 0; i < 2; i++)
+        {
+            var r = await Trocar(c.Client, venda.Id, [new { skuId = c.AzulM, quantidade = 1, destino = "Estoque" }]);
+            r.StatusCode.ShouldBe(HttpStatusCode.Created, await r.Content.ReadAsStringAsync(Ct));
+            trocas.Add((await r.Content.ReadFromJsonAsync<TrocaDto>(Ct))!);
+        }
+        var (valeA, valeB) = (trocas[0].Vale!, trocas[1].Vale!);
+
+        var paginaDeTrocas = (await c.Client.GetFromJsonAsync<PaginaDto<LinhaDeTrocaDto>>(U("/api/vendas/trocas?pagina=1&tamanho=1"), Ct))!;
+        (paginaDeTrocas.Total, paginaDeTrocas.Itens.Single().Numero).ShouldBe((2, 2));
+        (await c.Client.GetFromJsonAsync<List<LinhaDeTrocaDto>>(U("/api/vendas/trocas"), Ct))!.Count.ShouldBe(2);
+
+        var csvTrocas = await c.Client.GetStringAsync(U($"/api/relatorios/trocas.csv?ids={trocas[0].Id}"), Ct);
+        csvTrocas.ShouldContain(valeA.Codigo);
+        csvTrocas.ShouldNotContain(valeB.Codigo);
+        (await c.Client.GetStringAsync(U($"/api/relatorios/trocas.csv?de={Hoje:yyyy-MM-dd}&ate={Hoje:yyyy-MM-dd}"), Ct)).ShouldContain(valeB.Codigo);
+
+        var paginaDeVales = (await c.Client.GetFromJsonAsync<PaginaDeValesDto>(U("/api/vendas/vales?situacao=ativos&pagina=2&tamanho=1"), Ct))!;
+        (paginaDeVales.Total, paginaDeVales.Pagina, paginaDeVales.Itens.Count, paginaDeVales.SaldoAtivo).ShouldBe((2, 2, 1, 119.80m));
+        var csvVales = await c.Client.GetStringAsync(U($"/api/relatorios/vales-troca.csv?ids={valeB.Id}&situacao=cancelados"), Ct);
+        csvVales.ShouldContain(valeB.Codigo);
+        csvVales.ShouldNotContain(valeA.Codigo);
     }
 }

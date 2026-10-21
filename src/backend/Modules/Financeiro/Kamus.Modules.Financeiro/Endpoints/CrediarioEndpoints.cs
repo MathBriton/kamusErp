@@ -3,6 +3,7 @@ using Kamus.Modules.Financeiro.Dominio;
 using Kamus.Modules.Financeiro.Persistencia;
 using Kamus.SharedKernel.Auditoria;
 using Kamus.SharedKernel.Busca;
+using Kamus.SharedKernel.Consultas;
 using Kamus.SharedKernel.MultiTenancy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -30,14 +31,19 @@ internal static class CrediarioEndpoints
         string? Motivo, bool BloqueadoManualmente, string? Observacao, IReadOnlyList<ParcelaDto> Parcelas);
     public sealed record LinhaDaCarteira(Guid ClienteId, string ClienteNome, decimal Limite, decimal EmAberto, decimal Atrasado, int DiasDeAtraso, decimal Disponivel,
         bool Bloqueado);
-    public sealed record CarteiraDto(decimal AVencer, decimal Ate30, decimal Ate60, decimal Ate90, decimal Acima90, decimal Total, IReadOnlyList<LinhaDaCarteira> Clientes);
+    /// <summary>
+    /// Faixas e <c>Total</c> (saldo em aberto) sempre sobre toda a carteira. <c>Clientes</c> é a página pedida (ou todos, sem <c>pagina</c>);
+    /// <c>Registros</c> é quantos clientes a busca traz.
+    /// </summary>
+    public sealed record CarteiraDto(decimal AVencer, decimal Ate30, decimal Ate60, decimal Ate90, decimal Acima90, decimal Total, IReadOnlyList<LinhaDaCarteira> Clientes,
+        int Registros, int Pagina, int Tamanho);
     public sealed record RecebimentoDto(Guid BaixaId, decimal Valor, decimal Multa, decimal Juros, decimal Desconto, decimal Total);
     public sealed record ContaResumo(Guid Id, string Nome);
 
     public static IEndpointRouteBuilder MapCrediario(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/financeiro/crediario").RequireAuthorization().WithTags("Crediário");
-        g.MapGet("/carteira", Carteira).WithSummary("Carteira do crediário: saldo por faixa de atraso e por cliente (busca opcional)");
+        g.MapGet("/carteira", Carteira).WithSummary("Carteira do crediário: saldo por faixa de atraso e por cliente (busca opcional; pagina e tamanho)");
         g.MapGet("/clientes/{id:guid}", Cliente).WithSummary("Situação do cliente (limite, em aberto, disponível, bloqueio) e parcelas com encargos de hoje");
         g.MapPut("/clientes/{id:guid}/limite", DefinirLimite).WithSummary("Define o limite e o bloqueio manual do cliente (Dono/Gerente)");
         g.MapGet("/clientes/{id:guid}/carne.pdf", Carne).WithSummary("Carnê em PDF com as parcelas em aberto do cliente");
@@ -61,7 +67,8 @@ internal static class CrediarioEndpoints
             encargos.Multa, encargos.Juros);
     });
 
-    private static async Task<IResult> Carteira(string? busca, FinanceiroDbContext db, Crediario crediario, IEmpresaAtiva empresa, CancellationToken ct)
+    private static async Task<IResult> Carteira(string? busca, int? pagina, int? tamanho, FinanceiroDbContext db, Crediario crediario, IEmpresaAtiva empresa,
+        CancellationToken ct)
     {
         if (BarrarConsulta(empresa) is { } negado) return negado;
         var hoje = crediario.Hoje;
@@ -84,8 +91,10 @@ internal static class CrediarioEndpoints
             })
             .Where(l => string.IsNullOrEmpty(termo) || TextoParaBusca.Normalizar(l.ClienteNome).Contains(termo, StringComparison.Ordinal))
             .OrderByDescending(l => l.DiasDeAtraso).ThenByDescending(l => l.EmAberto).ThenBy(l => l.ClienteNome, StringComparer.CurrentCulture).ToList();
+        // Sem página, todos os clientes (outros chamadores dependem da lista completa).
+        var pag = pagina is null ? new PaginaDeRegistros<LinhaDaCarteira>(clientes, clientes.Count, 1, clientes.Count) : clientes.Paginar(pagina.Value, tamanho ?? Paginacao.TamanhoPadrao);
         return Results.Ok(new CarteiraDto(Faixa(FaixaDeAtraso.AVencer), Faixa(FaixaDeAtraso.Ate30), Faixa(FaixaDeAtraso.Ate60), Faixa(FaixaDeAtraso.Ate90),
-            Faixa(FaixaDeAtraso.Acima90), abertas.Sum(x => x.Parcela.Saldo), clientes));
+            Faixa(FaixaDeAtraso.Acima90), abertas.Sum(x => x.Parcela.Saldo), pag.Itens, pag.Total, pag.Pagina, pag.Tamanho));
     }
 
     private static async Task<IResult> Cliente(Guid id, FinanceiroDbContext db, Crediario crediario, IEmpresaAtiva empresa, CancellationToken ct)

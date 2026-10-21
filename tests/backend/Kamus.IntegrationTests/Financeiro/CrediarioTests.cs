@@ -22,6 +22,7 @@ public sealed class CrediarioTests : IAsyncDisposable
         List<ParcelaDto> Parcelas);
     private sealed record LinhaDto(Guid ClienteId, string ClienteNome, decimal Limite, decimal EmAberto, decimal Atrasado, int DiasDeAtraso, decimal Disponivel, bool Bloqueado);
     private sealed record CarteiraDto(decimal AVencer, decimal Ate30, decimal Ate60, decimal Ate90, decimal Acima90, decimal Total, List<LinhaDto> Clientes);
+    private sealed record PaginaDaCarteiraDto(decimal Total, List<LinhaDto> Clientes, int Registros, int Pagina, int Tamanho);
     private sealed record RecebimentoDto(Guid BaixaId, decimal Valor, decimal Multa, decimal Juros, decimal Total);
     private sealed record VendaDto(Guid Id, int Numero, decimal Total);
     private sealed record LinhaFinDto(string Descricao, decimal Valor, string Situacao);
@@ -137,6 +138,11 @@ public sealed class CrediarioTests : IAsyncDisposable
         carteira.Total.ShouldBe(59.90m);
         carteira.Clientes.Single().ShouldBe(new LinhaDto(c.Maria.Id, "Maria Souza", 500m, 59.90m, carteira.Clientes[0].Atrasado, depois.DiasDeAtraso, 440.10m, false));
         (await c.Client.GetStringAsync(U("/api/relatorios/inadimplencia.csv"), Ct)).ShouldContain("Maria Souza");
+        var pagina = (await c.Client.GetFromJsonAsync<PaginaDaCarteiraDto>(U("/api/financeiro/crediario/carteira?pagina=2&tamanho=20"), Ct))!;
+        (pagina.Total, pagina.Clientes.Count, pagina.Registros, pagina.Pagina).ShouldBe((59.90m, 0, 1, 2));
+        (await c.Client.GetFromJsonAsync<PaginaDaCarteiraDto>(U("/api/financeiro/crediario/carteira"), Ct))!.Registros.ShouldBe(1);
+        (await c.Client.GetStringAsync(U($"/api/relatorios/inadimplencia.csv?ids={Guid.NewGuid()}"), Ct)).ShouldNotContain("Maria Souza");
+        (await c.Client.GetStringAsync(U($"/api/relatorios/inadimplencia.csv?ids={c.Maria.Id}"), Ct)).ShouldContain("Maria Souza");
 
         (await DefinirLimite(c.Client, c.Maria.Id, 500m, bloqueado: true, observacao: "Cheque devolvido")).EnsureSuccessStatusCode();
         await Recusa(await Vender(c, 1, 1, c.Maria.Id), "Cheque devolvido");

@@ -1,3 +1,4 @@
+using Kamus.Modules.Vendas.Aplicacao;
 using Kamus.Modules.Vendas.Dominio;
 using Kamus.Modules.Vendas.Persistencia;
 using Kamus.SharedKernel.Auditoria;
@@ -16,7 +17,8 @@ internal static class ValesEndpoints
 {
     public sealed record ValeDto(Guid Id, string Codigo, Guid? ClienteId, string? ClienteNome, decimal Valor, decimal Saldo, DateOnly EmitidoEm, DateOnly ValidoAte,
         string Situacao, Guid? TrocaId, string? MotivoDoCancelamento);
-    public sealed record ListaDeValesDto(IReadOnlyList<ValeDto> Itens, decimal SaldoAtivo, decimal SaldoVencido);
+    /// <summary>Saldos sobre todos os vales; <c>Itens</c> é a página pedida (ou todos, sem página) e <c>Total</c> quantos os filtros trazem.</summary>
+    public sealed record ListaDeValesDto(IReadOnlyList<ValeDto> Itens, decimal SaldoAtivo, decimal SaldoVencido, int Total, int Pagina, int Tamanho);
     public sealed record CancelarValeRequest(string? Motivo);
 
     public static readonly string[] Situacoes = ["ativos", "usados", "vencidos", "cancelados", "todos"];
@@ -24,7 +26,7 @@ internal static class ValesEndpoints
     public static IEndpointRouteBuilder MapVales(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/vendas/vales").RequireAuthorization().WithTags("Vendas");
-        g.MapGet("/", Listar).WithSummary("Vales-troca (situacao: ativos, usados, vencidos, cancelados, todos; busca por código ou cliente; clienteId)");
+        g.MapGet("/", Listar).WithSummary("Vales-troca (situacao: ativos, usados, vencidos, cancelados, todos; busca por código ou cliente; clienteId; pagina e tamanho)");
         g.MapGet("/por-codigo/{codigo}", PorCodigo).WithSummary("Vale pelo código (para usar como pagamento)");
         g.MapPost("/{id:guid}/cancelar", Cancelar).WithSummary("Cancela o vale com motivo (Dono/Gerente)");
         return app;
@@ -44,13 +46,19 @@ internal static class ValesEndpoints
 
     private static readonly string[] Perfis = [.. Permissoes.Registrar, .. Permissoes.Consultar];
 
+    /// <param name="selecionados">Só estes vales (linhas marcadas na grade), ignorando os demais filtros.</param>
     internal static async Task<ListaDeValesDto> ListaAsync(VendasDbContext db, IEmpresaAtiva empresa, string situacao, string? busca, Guid? clienteId, DateOnly hoje,
-        CancellationToken ct)
+        CancellationToken ct, int? pagina = null, int? tamanho = null, IReadOnlySet<Guid>? selecionados = null)
     {
         var ids = empresa.EmpresaIds;
         var q = db.Vales.AsNoTracking().Where(v => ids.Contains(v.EmpresaId));
         if (clienteId is { } c) q = q.Where(v => v.ClienteId == c);
         var todos = await q.ToListAsync(ct);
+        if (selecionados is { Count: > 0 })
+        {
+            (situacao, busca) = ("todos", null);
+            todos = [.. todos.Where(v => selecionados.Contains(v.Id))];
+        }
         var alvo = situacao switch
         {
             "ativos" => SituacaoDoVale.Ativo,
@@ -63,18 +71,18 @@ internal static class ValesEndpoints
         var itens = todos.Where(v => alvo is null || v.Situacao(hoje) == alvo)
             .Where(v => string.IsNullOrEmpty(termo) || v.Codigo.Contains(busca!.Trim(), StringComparison.OrdinalIgnoreCase)
                 || TextoParaBusca.Normalizar(v.ClienteNome).Contains(termo, StringComparison.Ordinal))
-            .OrderByDescending(v => v.EmitidoEm).ThenBy(v => v.Codigo, StringComparer.Ordinal).Select(v => Dto(v, hoje)).ToList();
-        return new ListaDeValesDto(itens, todos.Where(v => v.Situacao(hoje) == SituacaoDoVale.Ativo).Sum(v => v.Saldo),
-            todos.Where(v => v.Situacao(hoje) == SituacaoDoVale.Vencido).Sum(v => v.Saldo));
+            .OrderByDescending(v => v.EmitidoEm).ThenBy(v => v.Codigo, StringComparer.Ordinal).ToList().PaginarSePedido(pagina, tamanho).Converter(v => Dto(v, hoje));
+        return new ListaDeValesDto(itens.Itens, todos.Where(v => v.Situacao(hoje) == SituacaoDoVale.Ativo).Sum(v => v.Saldo),
+            todos.Where(v => v.Situacao(hoje) == SituacaoDoVale.Vencido).Sum(v => v.Saldo), itens.Total, itens.Pagina, itens.Tamanho);
     }
 
-    private static async Task<IResult> Listar(string? situacao, string? busca, Guid? clienteId, VendasDbContext db, IEmpresaAtiva empresa, TimeProvider relogio,
-        CancellationToken ct)
+    private static async Task<IResult> Listar(string? situacao, string? busca, Guid? clienteId, int? pagina, int? tamanho, VendasDbContext db, IEmpresaAtiva empresa,
+        TimeProvider relogio, CancellationToken ct)
     {
         if (Permissoes.Exigir(empresa, Perfis, "Seu perfil não acessa os vales-troca.") is { } negado) return negado;
         var s = situacao?.ToLowerInvariant() ?? "ativos";
         if (!Situacoes.Contains(s)) return Permissoes.Erro("Situação inválida: ativos, usados, vencidos, cancelados ou todos.");
-        return Results.Ok(await ListaAsync(db, empresa, s, busca, clienteId, CalendarioBrasilia.Hoje(relogio), ct));
+        return Results.Ok(await ListaAsync(db, empresa, s, busca, clienteId, CalendarioBrasilia.Hoje(relogio), ct, pagina, tamanho));
     }
 
     private static async Task<IResult> PorCodigo(string codigo, VendasDbContext db, IEmpresaAtiva empresa, TimeProvider relogio, CancellationToken ct)

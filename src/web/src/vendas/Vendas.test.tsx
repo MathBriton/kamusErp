@@ -47,6 +47,7 @@ function api(extras: Parameters<typeof mockApi>[0] = {}, sessao = sessaoDemo) {
     'GET /api/estoque/lojas': () => json([{ id: 'l1', empresaId: 'e1', nome: 'Loja Centro', ativa: true, quantidade: 3 }]),
     'GET /api/vendedores': () => json([{ id: 'b1', nome: 'Bia', comissaoPercentual: 5, usuarioId: 'u2', ativo: true }]),
     'GET /api/vendas/formas': () => json(formas),
+    'GET /api/vendas/formas?situacao=todas&pagina=1&tamanho=20': () => json({ itens: formas, total: 3, pagina: 1, tamanho: 20 }),
     'GET /api/financeiro/contas': () => json([{ id: 'c1', empresaId: 'e1', nome: 'Caixa da loja', tipo: 'Caixa', saldoInicial: 0, saldoInicialEm: '2026-10-01', saldo: 0, ativa: true }]),
     ...extras,
   })
@@ -156,14 +157,43 @@ describe('Vendas → Registrar venda', () => {
 })
 
 describe('Vendas → Vendas realizadas', () => {
-  const filtro = `de=${inicioDoMes(hojeIso())}&ate=${hojeIso()}&status=todas`
+  const filtro = `de=${inicioDoMes(hojeIso())}&ate=${hojeIso()}&status=todas&pagina=1&tamanho=20`
   const lista = {
     itens: [{ id: 'v7', empresaId: 'e1', numero: 7, data: '2026-10-17', clienteNome: 'Maria', vendedorId: 'b1', vendedorNome: 'Bia', pecas: 2, total: 119.8,
       formas: 'Dinheiro', status: 'Concluida', notaExterna: 'NFC-e 991' }],
-    quantidade: 1, pecas: 2, total: 119.8, ticketMedio: 119.8,
+    quantidade: 1, pecas: 2, total: 119.8, ticketMedio: 119.8, registros: 1, pagina: 1, tamanho: 20,
   }
 
-  it('lista com totais, abre o detalhe e cancela com motivo', async () => {
+  async function gradeCarregada() {
+    const tabela = await screen.findByRole('table', { name: 'Vendas' })
+    await within(tabela).findByText('Maria')
+    return tabela
+  }
+
+  it('grade com totais de todas as filtradas, total de registros, paginação e "Nova venda"', async () => {
+    const pagina = (n: number) => json({ ...lista, itens: [{ ...lista.itens[0], id: `v${n}`, numero: n }], quantidade: 30, total: 3000, registros: 30, pagina: n })
+    api({
+      [`GET /api/vendas?${filtro}`]: () => pagina(1),
+      [`GET /api/vendas?${filtro.replace('status=todas', 'status=canceladas')}`]: () => pagina(1),
+      [`GET /api/vendas?${filtro.replace('status=todas', 'status=canceladas').replace('pagina=1', 'pagina=2')}`]: () => pagina(2),
+    })
+    renderApp('/vendas/realizadas')
+
+    const tabela = await gradeCarregada()
+    expect(within(tabela).getByText('Maria')).toBeInTheDocument()
+    expect(screen.getByText('R$ 3.000,00', { selector: 'dd' })).toBeInTheDocument()
+    expect(screen.getByText('30 registros')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Nova venda/ })).toHaveAttribute('href', '/vendas/registro')
+
+    await userEvent.selectOptions(screen.getByLabelText('Situação'), 'canceladas')
+    await userEvent.click(await screen.findByRole('button', { name: 'Próxima página' }))
+    expect(await within(tabela).findByRole('button', { name: '2' })).toBeInTheDocument()
+    expect(screen.getByText('Página 2 de 2')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    expect(screen.getByLabelText('Situação')).toHaveValue('todas')
+  })
+
+  it('abre o detalhe e cancela com motivo', async () => {
     let motivo: unknown = null
     api({
       [`GET /api/vendas?${filtro}`]: () => json(lista),
@@ -175,11 +205,10 @@ describe('Vendas → Vendas realizadas', () => {
     })
     renderApp('/vendas/realizadas')
 
-    const tabela = await screen.findByRole('table', { name: 'Vendas' })
-    expect(within(tabela).getByText('Maria')).toBeInTheDocument()
+    const tabela = await gradeCarregada()
     expect(screen.getAllByText('R$ 119,80', { selector: 'dd' })).toHaveLength(2)
 
-    await userEvent.click(within(tabela).getByRole('button', { name: '7' }))
+    await userEvent.click(within(tabela).getByRole('button', { name: 'Ver venda nº 7' }))
     const dialogo = await screen.findByRole('dialog', { name: 'Venda nº 7' })
     expect(within(dialogo).getByText('Camiseta básica Azul M')).toBeInTheDocument()
     expect(within(dialogo).getByText('Lucro bruto')).toBeInTheDocument()
@@ -191,13 +220,42 @@ describe('Vendas → Vendas realizadas', () => {
     expect(motivo).toBe('Cliente desistiu')
   })
 
+  it('cancela pela linha com motivo e exporta só as selecionadas', async () => {
+    let motivo: unknown = null
+    const fetch = api({
+      [`GET /api/vendas?${filtro}`]: () => json(lista),
+      'POST /api/vendas/v7/cancelar': (init) => {
+        motivo = corpo(init).motivo
+        return json(venda({ status: 'Cancelada' }))
+      },
+      'GET /api/relatorios/vendas.csv?ids=v7': () => new Response('csv', { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=vendas.csv' } }),
+    })
+    URL.createObjectURL = (() => 'blob:x') as typeof URL.createObjectURL
+    URL.revokeObjectURL = () => {}
+    renderApp('/vendas/realizadas')
+    const tabela = await gradeCarregada()
+
+    await userEvent.click(within(tabela).getByRole('button', { name: 'Cancelar venda nº 7' }))
+    const confirmar = screen.getByRole('dialog', { name: 'Cancelar venda nº 7' })
+    await userEvent.type(within(confirmar).getByLabelText('Motivo do cancelamento'), 'Duplicada')
+    await userEvent.click(within(confirmar).getByRole('button', { name: 'Cancelar venda' }))
+    await waitFor(() => expect(motivo).toBe('Duplicada'))
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Selecionar venda nº 7' }))
+    await userEvent.click(screen.getByRole('button', { name: /Exportar/ }))
+    await userEvent.click(within(screen.getByRole('menu', { name: 'Exportar' })).getByRole('menuitem', { name: /CSV/ }))
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => url === '/api/relatorios/vendas.csv?ids=v7')).toBe(true))
+  })
+
   it('o vendedor vê as suas vendas, sem cancelar nem ver o lucro', async () => {
     api({
       [`GET /api/vendas?${filtro}`]: () => json(lista),
       'GET /api/vendas/v7': () => json(venda({ custoTotal: null, lucroBruto: null })),
     }, sessaoVendedor)
     renderApp('/vendas/realizadas')
-    await userEvent.click(within(await screen.findByRole('table', { name: 'Vendas' })).getByRole('button', { name: '7' }))
+    const tabela = await gradeCarregada()
+    expect(within(tabela).queryByRole('button', { name: 'Cancelar venda nº 7' })).not.toBeInTheDocument()
+    await userEvent.click(within(tabela).getByRole('button', { name: '7' }))
     const dialogo = await screen.findByRole('dialog', { name: 'Venda nº 7' })
     expect(within(dialogo).queryByText('Lucro bruto')).not.toBeInTheDocument()
     expect(within(dialogo).queryByRole('button', { name: 'Cancelar venda' })).not.toBeInTheDocument()
@@ -223,7 +281,8 @@ describe('Vendas → Formas de pagamento', () => {
     renderApp('/vendas/formas-de-pagamento')
 
     const tabela = await screen.findByRole('table', { name: 'Formas de pagamento' })
-    expect(within(tabela).getByText('Caixa da loja')).toBeInTheDocument()
+    expect(await within(tabela).findByText('Caixa da loja')).toBeInTheDocument()
+    expect(screen.getByText('3 registros')).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent('PIX')
 
     await userEvent.click(within(tabela).getByRole('button', { name: 'Editar PIX' }))
@@ -248,6 +307,55 @@ describe('Vendas → Formas de pagamento', () => {
     await userEvent.type(pecas, '6')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar regras' }))
     await waitFor(() => expect(regra).toMatchObject({ prazoDeTrocaDias: 15, limiteCondicionalPecas: 6, limiteCondicionalValor: 1000, prazoCondicionalDias: 2 }))
+  })
+})
+
+describe('Vendas → Formas de pagamento (grade)', () => {
+  const regras = { permitirEstoqueNegativo: true, prazoDeTrocaDias: 30, validadeDoValeDias: 90, prazoCondicionalDias: 2, limiteCondicionalPecas: 0, limiteCondicionalValor: 0 }
+
+  it('filtra por situação e busca, desativa com confirmação, em lote e exporta as selecionadas', async () => {
+    let desativada = false
+    let lote: Record<string, unknown> | null = null
+    const fetch = api({
+      'GET /api/vendas/configuracao': () => json(regras),
+      'GET /api/vendas/formas?situacao=inativas&pagina=1&tamanho=20': () => json({ itens: [], total: 0, pagina: 1, tamanho: 20 }),
+      'GET /api/vendas/formas?situacao=todas&busca=pix&pagina=1&tamanho=20': () => json({ itens: [formas[1]], total: 1, pagina: 1, tamanho: 20 }),
+      'POST /api/vendas/formas/f1/desativar': () => {
+        desativada = true
+        return json({ ...formas[0], ativa: false })
+      },
+      'POST /api/vendas/formas/situacao': (init) => {
+        lote = corpo(init)
+        return json({ alterados: 2 })
+      },
+      'GET /api/relatorios/formas-de-pagamento.csv?ids=f1%2Cf2': () =>
+        new Response('csv', { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=formas.csv' } }),
+    })
+    URL.createObjectURL = (() => 'blob:x') as typeof URL.createObjectURL
+    URL.revokeObjectURL = () => {}
+    renderApp('/vendas/formas-de-pagamento')
+    const tabela = await screen.findByRole('table', { name: 'Formas de pagamento' })
+    await within(tabela).findByText('Caixa da loja')
+
+    await userEvent.click(within(tabela).getByRole('button', { name: 'Desativar Dinheiro' }))
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Desativar forma de pagamento' })).getByRole('button', { name: 'Desativar' }))
+    await waitFor(() => expect(desativada).toBe(true))
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Selecionar Dinheiro' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Selecionar PIX' }))
+    await userEvent.click(screen.getByRole('button', { name: /Exportar/ }))
+    await userEvent.click(within(screen.getByRole('menu', { name: 'Exportar' })).getByRole('menuitem', { name: /CSV/ }))
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => url === '/api/relatorios/formas-de-pagamento.csv?ids=f1%2Cf2')).toBe(true))
+    await userEvent.click(within(screen.getByRole('region', { name: 'Seleção' })).getByRole('button', { name: 'Desativar selecionadas' }))
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Desativar formas de pagamento' })).getByRole('button', { name: 'Desativar' }))
+    await waitFor(() => expect(lote).toEqual({ ids: ['f1', 'f2'], ativo: false }))
+
+    await userEvent.type(screen.getByLabelText('Buscar'), 'pix')
+    await waitFor(() => expect(within(tabela).queryByText('Dinheiro')).not.toBeInTheDocument())
+    expect(screen.getByText('1 registro')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    await userEvent.selectOptions(screen.getByLabelText('Situação'), 'inativas')
+    expect(await screen.findByText('Nenhuma forma de pagamento com esses filtros.')).toBeInTheDocument()
   })
 })
 
