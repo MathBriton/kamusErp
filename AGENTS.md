@@ -202,7 +202,7 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 
 ## 10. Estado atual e próximo passo (ATUALIZE AO TERMINAR)
 
-**Última atualização:** 2026-10-19
+**Última atualização:** 2026-10-21
 
 **Releases:** v0.1.0 → **v0.20.0** lançadas (a v0.20.0 trouxe a central de relatórios). Próxima: **v0.21.0** (segurança para produção).
 Plano de releases em `LEVANTAMENTO.md` → Plano de releases (v0.21.0 segurança, v0.22.0 robustez, v0.23.0 app nas lojas, v1.0.0 produção).
@@ -254,8 +254,12 @@ Plano de releases em `LEVANTAMENTO.md` → Plano de releases (v0.21.0 segurança
   usam `ICatalogoDeProdutos` para cor/tamanho/referência e `Venda.ValoresPagosPorSku` para o desconto rateado), `produtos-sem-giro` e `dre` (Indicadores,
   com os contratos novos `IIndicadoresDeVendas.ResultadoAsync/UltimaVendaPorProdutoAsync`, `IIndicadoresDeEstoque.PorProdutoAsync`,
   `IIndicadoresFinanceiros.PorCategoriaAsync`). Web `relatorios/CentralDeRelatoriosPage` (lista por área, filtros dinâmicos, tabela com totais, exportar).
-- Testes: 541 backend, 175 web, 10 admin, 7 mobile. E2E da central em localhost (áreas, vendas por tamanho + Excel, curva ABC, sem giro, DRE + PDF,
-  vendedora, tema escuro), 3 execuções.
+- **Ajustes pós-v0.20.0 (em `main`, saem na v0.21.0):** sidebar com conjunto explícito de grupos abertos (a rota só abre o seu grupo, nunca
+  fecha outros); central de relatórios em cards (ícone por área, busca, "Todos os relatórios"); menu **Administrativo** no lugar de Configurações
+  (rotas seguem `/configuracoes/...`) com "Usuários e senhas" — `POST /api/usuarios` aceita `senha` opcional (política normal, troca no 1º acesso);
+  produto sem grade envia `gradeId: null` e o middleware `RequisicaoInvalida` (Kamus.Api/Infra) transforma `BadHttpRequestException` em 400 em português.
+- Testes: 544 backend, 181 web, 10 admin, 7 mobile. E2E dos ajustes em localhost (produto sem grade, sidebar, cards, usuário com senha definida,
+  tema escuro), 3 execuções.
 
 **Próximo passo — v0.21.0: segurança para produção** (ver `README.md` → débitos "antes de ir para produção"):
 1. 2FA (TOTP) para o SuperAdmin do Painel Administrativo; revogação do token do painel (sair invalida no servidor) e renovação curta.

@@ -866,3 +866,7 @@ A Fase 0b foi dividida em entregas menores. A numeração final é calculada pel
 | 2026-10-18 | Comissão: troca ajusta pela diferença (positiva ou negativa) no período da troca; fechamento por vendedor e período marca vendas e trocas (não entram de novo), pode gerar conta a pagar (categoria Comissões) e pode ser reaberto se a conta não foi paga; venda fechada ou com troca não é cancelada | Aceita |
 | 2026-10-18 | Datas "de hoje" no web seguem o calendário de Brasília (como a API), não o fuso do navegador | Aceita |
 | 2026-10-17 | Vendas conversam com os outros módulos só pelo SharedKernel: `IMovimentacaoDeEstoque` (Estoque), `IContasAReceber` (Financeiro), `IDiretorioDeVendedores` e `ICatalogoDeProdutos` (Cadastros) | Aceita |
+| 2026-10-21 | Menu "Configurações" vira **"Administrativo"** (Usuários e senhas, Empresas, Lojas, Licença, Histórico); as rotas continuam em `/configuracoes/...` para não quebrar links e notificações | Aceita |
+| 2026-10-21 | Ao criar usuário, o Dono pode **definir a senha** (mesma política: 8+ caracteres, letras e números) ou deixar o sistema gerar; nos dois casos a pessoa troca no primeiro acesso | Aceita |
+| 2026-10-21 | Central de relatórios em **cards** por área (ícone, descrição, "Abrir relatório", busca); o relatório aberto ocupa a tela e "Todos os relatórios" volta | Aceita |
+| 2026-10-21 | Corpo de requisição ilegível (JSON malformado, texto vazio em campo de id/data/número) responde **400 com ProblemDetails em português**, não a página de exceção | Aceita |
