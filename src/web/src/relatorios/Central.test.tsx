@@ -105,6 +105,36 @@ describe('Relatórios → central', () => {
     expect(screen.getByText('Mostrando 1 de 800 linhas. Exporte para ver todas.')).toBeInTheDocument()
   })
 
+  it('cada relatório é um card; abrir mostra só ele e "Todos os relatórios" volta', async () => {
+    api()
+    renderApp('/relatorios')
+
+    const card = await screen.findByRole('button', { name: /DRE gerencial/ })
+    expect(card).toHaveTextContent('Resultado do período.')
+    expect(card).toHaveTextContent('Abrir relatório')
+    await userEvent.click(card)
+
+    expect(await screen.findByRole('heading', { name: 'DRE gerencial', level: 2 })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Vendas' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Todos os relatórios/ }))
+    expect(await screen.findByRole('region', { name: 'Vendas' })).toBeInTheDocument()
+  })
+
+  it('busca filtra os cards pelo título ou pela descrição', async () => {
+    api()
+    renderApp('/relatorios')
+
+    await userEvent.type(await screen.findByRole('searchbox', { name: 'Buscar relatório' }), 'parados')
+
+    expect(screen.getByRole('button', { name: /Produtos sem giro/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /DRE gerencial/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Vendas' })).not.toBeInTheDocument()
+
+    await userEvent.clear(screen.getByRole('searchbox', { name: 'Buscar relatório' }))
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar relatório' }), 'xyz')
+    expect(screen.getByText('Nenhum relatório encontrado para "xyz".')).toBeInTheDocument()
+  })
+
   it('perfil sem relatórios vê o aviso', async () => {
     api({ 'GET /api/relatorios': () => json([]) })
     renderApp('/relatorios')

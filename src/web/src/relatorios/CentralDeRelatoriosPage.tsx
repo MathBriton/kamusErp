@@ -3,6 +3,7 @@ import { useApi } from '../api/useApi'
 import { ErroDeApi } from '../auth/api'
 import { moeda } from '../cadastros/catalogo'
 import { Campo } from '../components/Campo'
+import { Icone, type NomeIcone } from '../components/Icone'
 import { estilos } from '../components/estilos'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { dataBr, hojeIso, somarDias } from '../financeiro/tipos'
@@ -36,6 +37,18 @@ interface Dados {
 }
 
 const ORDEM_DAS_AREAS = ['Vendas', 'Estoque', 'Financeiro', 'Gestão', 'Cadastros', 'Sistema']
+
+const ICONE_DA_AREA: Record<string, NomeIcone> = {
+  Vendas: 'bag',
+  Estoque: 'box',
+  Financeiro: 'wallet',
+  Gestão: 'trendingUp',
+  Cadastros: 'users',
+  Sistema: 'shield',
+}
+
+/** Sem acento e em minúsculas, para a busca achar "gestao" em "Gestão". */
+const normalizar = (texto: string) => texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
 /** Valores iniciais dos filtros (o período vira "de" e "ate"). */
 function valoresPadrao(r: ItemDoCatalogo): Record<string, string> {
@@ -72,12 +85,13 @@ function formatar(valor: string | number | null, tipo: TipoColuna) {
 
 const alinhadoADireita = (tipo: TipoColuna) => tipo === 'Moeda' || tipo === 'Numero' || tipo === 'Inteiro'
 
-/** Central de relatórios: todos os relatórios do perfil por área, com filtros, visualização na tela e exportação. */
+/** Central de relatórios: todos os relatórios do perfil em cards por área; abrir um mostra filtros, visualização na tela e exportação. */
 export function CentralDeRelatoriosPage() {
   const { getJson } = useApi()
   const { selecao } = useEmpresa()
   const [{ catalogo, erro }, setCatalogo] = useState<{ catalogo: ItemDoCatalogo[] | null; erro: string | null }>({ catalogo: null, erro: null })
   const [escolhido, setEscolhido] = useState<ItemDoCatalogo | null>(null)
+  const [busca, setBusca] = useState('')
 
   useEffect(() => {
     const controle = new AbortController()
@@ -89,52 +103,82 @@ export function CentralDeRelatoriosPage() {
     return () => controle.abort()
   }, [getJson, selecao])
 
-  const areas = catalogo
-    ? [...new Set(catalogo.map((r) => r.area))].sort((a, b) => (ORDEM_DAS_AREAS.indexOf(a) + 99) % 99 - (ORDEM_DAS_AREAS.indexOf(b) + 99) % 99 || a.localeCompare(b))
-    : []
+  const termo = normalizar(busca.trim())
+  const visiveis = (catalogo ?? []).filter((r) => !termo || normalizar(`${r.titulo} ${r.descricao ?? ''} ${r.area}`).includes(termo))
+  const areas = [...new Set(visiveis.map((r) => r.area))].sort(
+    (a, b) => (ORDEM_DAS_AREAS.indexOf(a) + 99) % 99 - (ORDEM_DAS_AREAS.indexOf(b) + 99) % 99 || a.localeCompare(b),
+  )
+
+  if (escolhido)
+    return (
+      <div className="mx-auto max-w-7xl">
+        <button type="button" onClick={() => setEscolhido(null)} className="mb-4 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-muted hover:bg-surface-2 hover:text-foreground">
+          <Icone nome="chevronsLeft" className="size-4" />
+          Todos os relatórios
+        </button>
+        <Relatorio key={escolhido.codigo} relatorio={escolhido} />
+      </div>
+    )
 
   return (
     <div className="mx-auto max-w-7xl">
-      <h1 className="text-2xl font-bold tracking-tight">Relatórios</h1>
-      <p className="mt-1 text-sm text-muted">Escolha um relatório, ajuste os filtros e veja na tela ou exporte em PDF, Excel ou CSV.</p>
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold tracking-tight">Relatórios</h1>
+          <p className="mt-1 text-sm text-muted">Clique em um relatório para ajustar os filtros, ver na tela ou exportar em PDF, Excel ou CSV.</p>
+        </div>
+        {catalogo && catalogo.length > 0 && (
+          <label className="relative w-full sm:w-72">
+            <span className="sr-only">Buscar relatório</span>
+            <Icone nome="search" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
+            <input type="search" aria-label="Buscar relatório" placeholder="Buscar relatório..." value={busca} onChange={(e) => setBusca(e.target.value)} className={`${estilos.campo} pl-9`} />
+          </label>
+        )}
+      </div>
 
       {erro && <p role="alert" className={`mt-4 ${estilos.erro}`}>{erro}</p>}
       {catalogo?.length === 0 && <p className="mt-6 text-sm text-muted">Nenhum relatório disponível para o seu perfil nesta empresa.</p>}
-
-      {catalogo && catalogo.length > 0 && (
-        <div className="mt-6 grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
-          <nav className="space-y-5">
-            {areas.map((area) => (
-              <section key={area} aria-label={area}>
-                <h2 className="mb-2 text-xs font-semibold text-muted uppercase">{area}</h2>
-                <ul className="space-y-1">
-                  {catalogo.filter((r) => r.area === area).map((r) => (
-                    <li key={r.codigo}>
-                      <button
-                        type="button"
-                        onClick={() => setEscolhido(r)}
-                        aria-current={escolhido?.codigo === r.codigo}
-                        className={`w-full rounded-lg px-3 py-2 text-left text-sm ${escolhido?.codigo === r.codigo ? 'bg-primary-soft text-primary' : 'hover:bg-surface-2'}`}
-                      >
-                        <span className="block font-semibold">{r.titulo}</span>
-                        {r.descricao && <span className="block text-xs text-muted">{r.descricao}</span>}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </nav>
-
-          <div>
-            {escolhido ? (
-              <Relatorio key={escolhido.codigo} relatorio={escolhido} />
-            ) : (
-              <p className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted">Escolha um relatório na lista.</p>
-            )}
-          </div>
-        </div>
+      {catalogo && catalogo.length > 0 && visiveis.length === 0 && (
+        <p className="mt-6 rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted">{`Nenhum relatório encontrado para "${busca.trim()}".`}</p>
       )}
+
+      <div className="mt-6 space-y-8">
+        {areas.map((area) => (
+          <section key={area} aria-label={area}>
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted">
+              <span className="grid size-7 place-items-center rounded-lg bg-surface-2 text-foreground">
+                <Icone nome={ICONE_DA_AREA[area] ?? 'file'} className="size-4" />
+              </span>
+              {area}
+            </h2>
+            <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {visiveis.filter((r) => r.area === area).map((r) => (
+                <li key={r.codigo}>
+                  <button
+                    type="button"
+                    onClick={() => setEscolhido(r)}
+                    className="group flex h-full w-full flex-col rounded-2xl border border-border bg-surface p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                  >
+                    <span className="flex items-start gap-3">
+                      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+                        <Icone nome={ICONE_DA_AREA[area] ?? 'file'} className="size-5" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block font-semibold">{r.titulo}</span>
+                        {r.descricao && <span className="mt-0.5 block text-sm text-muted">{r.descricao}</span>}
+                      </span>
+                    </span>
+                    <span className="mt-auto flex items-center gap-1 pt-3 text-sm font-semibold text-primary">
+                      Abrir relatório
+                      <Icone nome="arrowRight" className="size-4 transition-transform group-hover:translate-x-0.5" />
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
     </div>
   )
 }
@@ -166,8 +210,12 @@ function Relatorio({ relatorio }: { relatorio: ItemDoCatalogo }) {
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3 rounded-2xl border border-border bg-surface p-4 shadow-sm">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+          <Icone nome={ICONE_DA_AREA[relatorio.area] ?? 'file'} className="size-5" />
+        </span>
         <div className="flex-1">
+          <p className="text-xs font-semibold text-muted uppercase">{relatorio.area}</p>
           <h2 className="text-lg font-bold">{relatorio.titulo}</h2>
           {relatorio.descricao && <p className="text-sm text-muted">{relatorio.descricao}</p>}
         </div>
