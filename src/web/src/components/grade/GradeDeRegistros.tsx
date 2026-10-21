@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
-import { Icone } from '../Icone'
+import { Icone, type NomeIcone } from '../Icone'
 
 export interface Coluna<T> {
   titulo: string
@@ -191,7 +191,7 @@ export function GradeDeRegistros<T>({
 }
 
 /** Botão de ícone para a coluna "Ações" (o rótulo vira o nome acessível e a dica). */
-export function AcaoDaLinha({ rotulo, icone, onClick, perigo = false }: { rotulo: string; icone: 'eye' | 'pencil' | 'power'; onClick: () => void; perigo?: boolean }) {
+export function AcaoDaLinha({ rotulo, icone, onClick, perigo = false }: { rotulo: string; icone: NomeIcone; onClick: () => void; perigo?: boolean }) {
   return (
     <button
       type="button"
