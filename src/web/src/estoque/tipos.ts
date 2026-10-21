@@ -47,8 +47,12 @@ export interface ItemDaPosicao {
   valorEmVenda: number
 }
 
+/** Uma página da posição; os totais somam todas as linhas filtradas. */
 export interface Posicao {
   itens: ItemDaPosicao[]
+  total: number
+  pagina: number
+  tamanho: number
   totalDePecas: number
   valorEmCusto: number | null
   valorEmVenda: number

@@ -18,12 +18,20 @@ internal sealed class RelatorioDePosicao(Lojas lojas, EstoqueDbContext db, ICata
 
     public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
     {
-        var lojaId = Guid.TryParse(parametros.GetValueOrDefault("lojaId"), out var id) ? id : (Guid?)null;
-        var busca = parametros.GetValueOrDefault("busca");
+        // "ids" = produtos selecionados na grade: exporta só eles (em todas as lojas visíveis), ignorando os demais filtros.
+        var produtos = ParametrosDoRelatorio.Ids(parametros);
+        var lojaId = produtos.Count == 0 && Guid.TryParse(parametros.GetValueOrDefault("lojaId"), out var id) ? id : (Guid?)null;
+        var busca = produtos.Count == 0 ? parametros.GetValueOrDefault("busca") : null;
         var filtro = await PosicaoEndpoints.LojasDoFiltroAsync(lojas, lojaId, ct) ?? [];
         var nomes = filtro.ToDictionary(l => l.Id, l => l.Nome);
         var ids = nomes.Keys.ToList();
-        var saldos = await db.Saldos.AsNoTracking().Where(s => ids.Contains(s.LojaId) && s.Quantidade != 0).ToListAsync(ct);
+        var consulta = db.Saldos.AsNoTracking().Where(s => ids.Contains(s.LojaId) && s.Quantidade != 0);
+        if (produtos.Count > 0)
+        {
+            var selecionados = produtos.ToList();
+            consulta = consulta.Where(s => selecionados.Contains(s.ProdutoId));
+        }
+        var saldos = await consulta.ToListAsync(ct);
         var skus = (await catalogo.SkusAsync(saldos.Select(s => s.SkuId).Distinct().ToList(), ct)).ToDictionary(s => s.Id);
 
         var linhas = saldos.Where(s => skus.ContainsKey(s.SkuId) && PosicaoEndpoints.Corresponde(skus[s.SkuId], busca))
@@ -37,6 +45,7 @@ internal sealed class RelatorioDePosicao(Lojas lojas, EstoqueDbContext db, ICata
             ]).ToList();
 
         var filtros = new List<FiltroAplicado>();
+        if (produtos.Count > 0) filtros.Add(ParametrosDoRelatorio.Selecionados(saldos.Select(s => s.ProdutoId).Distinct().Count(), "produto", "produtos"));
         if (lojaId is not null && filtro.Count == 1) filtros.Add(new FiltroAplicado("Loja", filtro[0].Nome));
         if (!string.IsNullOrWhiteSpace(busca)) filtros.Add(new FiltroAplicado("Busca", busca));
         return new DadosDoRelatorio(Titulo,

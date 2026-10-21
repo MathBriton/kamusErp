@@ -1,150 +1,173 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useApi } from '../api/useApi'
 import { ErroDeApi } from '../auth/api'
 import { useAuth } from '../auth/AuthContext'
 import { Campo } from '../components/Campo'
 import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { Confirmacao } from '../components/grade/Confirmacao'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade, useListaPaginada } from '../components/grade/useGrade'
 import { Icone } from '../components/Icone'
+import { BotaoExportar } from '../relatorios/BotaoExportar'
 import { CredenciaisProvisorias } from './CredenciaisProvisorias'
 import { PERFIS, type EmpresaDoCliente, type SenhaProvisoria, type UsuarioDoCliente } from './tipos'
 
-type Janela = { tipo: 'novo' } | { tipo: 'editar'; usuario: UsuarioDoCliente } | { tipo: 'senha'; credenciais: SenhaProvisoria } | null
+type Janela =
+  | { tipo: 'novo' }
+  | { tipo: 'editar'; usuario: UsuarioDoCliente }
+  | { tipo: 'senha'; credenciais: SenhaProvisoria }
+  | { tipo: 'mudarSituacao'; usuario: UsuarioDoCliente }
+  | { tipo: 'mudarSelecionados'; ativo: boolean }
+  | null
 
+const FILTROS = { situacao: 'todos', busca: '', empresaId: '', perfil: '' }
+
+function Situacao({ usuario }: { usuario: UsuarioDoCliente }) {
+  if (!usuario.ativo) return <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted">Inativo</span>
+  if (usuario.deveTrocarSenha)
+    return <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-warning">Aguardando 1º acesso</span>
+  return <span className="rounded-full bg-success-soft px-2 py-0.5 text-xs font-semibold text-success">Ativo</span>
+}
+
+/** Usuários e senhas em grade: filtros, perfil por empresa, ações por linha (editar, redefinir senha, desativar) e em lote. */
 export function UsuariosPage() {
   const { getJson, enviar } = useApi()
   const { estado } = useAuth()
   const euId = estado.status === 'autenticado' ? estado.sessao.usuario.id : ''
-  const [usuarios, setUsuarios] = useState<UsuarioDoCliente[] | null>(null)
+  const grade = useGrade(FILTROS)
+  const [versao, setVersao] = useState(0)
+  const { dados, erro: erroDaLista } = useListaPaginada<{ itens: UsuarioDoCliente[]; total: number }>(`/api/usuarios?${grade.consulta}`, versao, grade.filtros.busca ? 250 : 0)
   const [empresas, setEmpresas] = useState<EmpresaDoCliente[]>([])
   const [erro, setErro] = useState<string | null>(null)
   const [janela, setJanela] = useState<Janela>(null)
-  const [confirmando, setConfirmando] = useState<string | null>(null)
-
-  const carregar = useCallback(async () => {
-    try {
-      const [u, e] = await Promise.all([getJson<UsuarioDoCliente[]>('/api/usuarios'), getJson<EmpresaDoCliente[]>('/api/empresas')])
-      setUsuarios(u)
-      setEmpresas(e)
-    } catch (falha) {
-      setErro(falha instanceof ErroDeApi ? falha.message : 'Não foi possível carregar os usuários.')
-    }
-  }, [getJson])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void carregar(), 0)
-    return () => window.clearTimeout(timer)
-  }, [carregar])
+    const controle = new AbortController()
+    getJson<EmpresaDoCliente[]>('/api/empresas', controle.signal).then(setEmpresas).catch(() => {})
+    return () => controle.abort()
+  }, [getJson])
 
-  async function executar(acao: () => Promise<unknown>) {
+  const recarregar = () => setVersao((v) => v + 1)
+
+  async function redefinir(u: UsuarioDoCliente) {
     setErro(null)
-    setConfirmando(null)
     try {
-      await acao()
-      await carregar()
+      setJanela({ tipo: 'senha', credenciais: await enviar<SenhaProvisoria>('POST', `/api/usuarios/${u.id}/redefinir-senha`) })
     } catch (falha) {
-      setErro(falha instanceof ErroDeApi ? falha.message : 'Não foi possível concluir.')
+      setErro(falha instanceof ErroDeApi ? falha.message : 'Não foi possível redefinir a senha.')
     }
   }
 
-  const redefinir = (u: UsuarioDoCliente) =>
-    void executar(async () => setJanela({ tipo: 'senha', credenciais: await enviar<SenhaProvisoria>('POST', `/api/usuarios/${u.id}/redefinir-senha`) }))
+  const colunas: Coluna<UsuarioDoCliente>[] = [
+    { titulo: 'Nome', celula: (u) => <span className="font-semibold">{u.nome}</span> },
+    { titulo: 'E-mail', celula: (u) => u.email },
+    {
+      titulo: 'Perfis',
+      celula: (u) => (
+        <ul className="space-y-0.5">
+          {u.acessos.map((a) => (
+            <li key={a.empresaId}>{`${a.empresa}: ${a.perfil}`}</li>
+          ))}
+        </ul>
+      ),
+    },
+    { titulo: 'Situação', celula: (u) => <Situacao usuario={u} /> },
+  ]
+
+  const mensagem = erro ?? erroDaLista
 
   return (
     <div className="mx-auto max-w-6xl">
-      <p className="text-xs text-muted">Administrativo</p>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">Usuários e senhas</h1>
-          <p className="mt-1 text-sm text-muted">Crie o acesso de cada pessoa: perfil por empresa e senha (gerada pelo sistema ou definida por você). No primeiro login ela cria uma senha própria.</p>
-        </div>
-        <button type="button" onClick={() => setJanela({ tipo: 'novo' })} className={estilos.botaoPrimario}>
-          Novo usuário
-        </button>
-      </div>
+      <CabecalhoDaPagina
+        secao="Administrativo"
+        titulo="Usuários e senhas"
+        descricao="Crie o acesso de cada pessoa: perfil por empresa e senha (gerada pelo sistema ou definida por você). No primeiro login ela cria uma senha própria."
+        acoes={
+          <>
+            <BotaoExportar relatorio="usuarios" parametros={grade.parametros} selecionados={[...grade.selecionados]} />
+            <button type="button" onClick={() => setJanela({ tipo: 'novo' })} className={estilos.botaoPrimario}>
+              <Icone nome="plus" />
+              Novo usuário
+            </button>
+          </>
+        }
+      />
 
-      {erro && (
-        <p role="alert" className={`mt-5 flex items-center gap-2 ${estilos.erro}`}>
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
+        <label className="min-w-60 flex-1 text-sm">
+          <span className="mb-1 block font-semibold">Buscar</span>
+          <input value={grade.filtros.busca} onChange={(e) => grade.filtrar({ busca: e.target.value })} placeholder="Nome ou e-mail" className={estilos.campo} />
+        </label>
+        <label className="w-40 text-sm">
+          <span className="mb-1 block font-semibold">Situação</span>
+          <select value={grade.filtros.situacao} onChange={(e) => grade.filtrar({ situacao: e.target.value })} className={estilos.campo}>
+            <option value="todos">Todos</option>
+            <option value="ativos">Ativos</option>
+            <option value="inativos">Inativos</option>
+          </select>
+        </label>
+        <label className="w-52 text-sm">
+          <span className="mb-1 block font-semibold">Empresa</span>
+          <select value={grade.filtros.empresaId} onChange={(e) => grade.filtrar({ empresaId: e.target.value })} className={estilos.campo}>
+            <option value="">Todas</option>
+            {empresas.map((e) => (
+              <option key={e.id} value={e.id}>{e.nomeFantasia}</option>
+            ))}
+          </select>
+        </label>
+        <label className="w-44 text-sm">
+          <span className="mb-1 block font-semibold">Perfil</span>
+          <select value={grade.filtros.perfil} onChange={(e) => grade.filtrar({ perfil: e.target.value })} className={estilos.campo}>
+            <option value="">Todos</option>
+            {PERFIS.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        </label>
+      </BarraDeFiltros>
+
+      {mensagem && (
+        <p role="alert" className={`mt-4 flex items-center gap-2 ${estilos.erro}`}>
           <Icone nome="alert" />
-          {erro}
+          {mensagem}
         </p>
       )}
 
-      {usuarios && (
-        <div className="mt-5 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-2 text-left text-xs text-muted uppercase">
-              <tr>
-                <th className="px-4 py-2">Nome</th>
-                <th className="px-4 py-2">E-mail</th>
-                <th className="px-4 py-2">Perfis</th>
-                <th className="px-4 py-2">Situação</th>
-                <th className="px-4 py-2 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {usuarios.map((u) => (
-                <tr key={u.id} className={u.ativo ? '' : 'text-muted'}>
-                  <td className="px-4 py-2.5 font-semibold">{u.nome}</td>
-                  <td className="px-4 py-2.5">{u.email}</td>
-                  <td className="px-4 py-2.5">
-                    <ul className="space-y-0.5">
-                      {u.acessos.map((a) => (
-                        <li key={a.empresaId}>{`${a.empresa}: ${a.perfil}`}</li>
-                      ))}
-                    </ul>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    {!u.ativo ? (
-                      <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted">Inativo</span>
-                    ) : u.deveTrocarSenha ? (
-                      <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-warning">Aguardando 1º acesso</span>
-                    ) : (
-                      <span className="rounded-full bg-success-soft px-2 py-0.5 text-xs font-semibold text-success">Ativo</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <div className="flex flex-wrap justify-end gap-2">
-                      {confirmando === u.id ? (
-                        <>
-                          <span className="self-center text-xs">Encerra as sessões dele.</span>
-                          <button type="button" onClick={() => void executar(() => enviar('POST', `/api/usuarios/${u.id}/desativar`))} className={`${estilos.botao} text-danger`}>
-                            Confirmar
-                          </button>
-                          <button type="button" onClick={() => setConfirmando(null)} className={estilos.botao}>
-                            Voltar
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button type="button" onClick={() => setJanela({ tipo: 'editar', usuario: u })} className={estilos.botao}>
-                            Editar
-                          </button>
-                          {u.id !== euId && u.ativo && (
-                            <>
-                              <button type="button" onClick={() => redefinir(u)} className={estilos.botao}>
-                                Redefinir senha
-                              </button>
-                              <button type="button" onClick={() => setConfirmando(u.id)} className={`${estilos.botao} text-danger`}>
-                                Desativar
-                              </button>
-                            </>
-                          )}
-                          {!u.ativo && (
-                            <button type="button" onClick={() => void executar(() => enviar('POST', `/api/usuarios/${u.id}/reativar`))} className={estilos.botao}>
-                              Reativar
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <GradeDeRegistros
+        rotulo="Usuários"
+        colunas={colunas}
+        itens={dados?.itens ?? (erroDaLista ? [] : null)}
+        chave={(u) => u.id}
+        nome={(u) => u.nome}
+        total={dados?.total ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
+        apagada={(u) => !u.ativo}
+        vazio="Nenhum usuário encontrado com esses filtros."
+        acoes={(u) => (
+          <>
+            <AcaoDaLinha rotulo={`Editar ${u.nome}`} icone="pencil" onClick={() => setJanela({ tipo: 'editar', usuario: u })} />
+            {u.id !== euId && u.ativo && <AcaoDaLinha rotulo={`Redefinir senha de ${u.nome}`} icone="lock" onClick={() => void redefinir(u)} />}
+            {u.id !== euId && (
+              <AcaoDaLinha
+                rotulo={`${u.ativo ? 'Desativar' : 'Reativar'} ${u.nome}`}
+                icone="power"
+                perigo={u.ativo}
+                onClick={() => setJanela({ tipo: 'mudarSituacao', usuario: u })}
+              />
+            )}
+          </>
+        )}
+        acoesEmLote={
+          <>
+            <button type="button" onClick={() => setJanela({ tipo: 'mudarSelecionados', ativo: false })} className={estilos.botao}>Desativar selecionados</button>
+            <button type="button" onClick={() => setJanela({ tipo: 'mudarSelecionados', ativo: true })} className={estilos.botao}>Reativar selecionados</button>
+          </>
+        }
+      />
 
       {(janela?.tipo === 'novo' || janela?.tipo === 'editar') && (
         <FormularioDeUsuario
@@ -153,7 +176,7 @@ export function UsuariosPage() {
           onFechar={() => setJanela(null)}
           onSalvo={(credenciais) => {
             setJanela(credenciais ? { tipo: 'senha', credenciais } : null)
-            void carregar()
+            recarregar()
           }}
         />
       )}
@@ -161,6 +184,40 @@ export function UsuariosPage() {
         <Dialogo titulo="Senha provisória" onFechar={() => setJanela(null)}>
           <CredenciaisProvisorias email={janela.credenciais.email} senha={janela.credenciais.senhaProvisoria} onConcluir={() => setJanela(null)} />
         </Dialogo>
+      )}
+      {janela?.tipo === 'mudarSituacao' && (
+        <Confirmacao
+          titulo={janela.usuario.ativo ? 'Desativar usuário' : 'Reativar usuário'}
+          rotulo={janela.usuario.ativo ? 'Desativar' : 'Reativar'}
+          onCancelar={() => setJanela(null)}
+          onConfirmar={async () => {
+            await enviar('POST', `/api/usuarios/${janela.usuario.id}/${janela.usuario.ativo ? 'desativar' : 'reativar'}`)
+            setJanela(null)
+            recarregar()
+          }}
+        >
+          {janela.usuario.ativo
+            ? <p>{`${janela.usuario.nome} não entra mais no sistema e as sessões abertas são encerradas. Dá para reativar depois.`}</p>
+            : <p>{`${janela.usuario.nome} volta a entrar com a senha atual (conta no limite de usuários do plano).`}</p>}
+        </Confirmacao>
+      )}
+      {janela?.tipo === 'mudarSelecionados' && (
+        <Confirmacao
+          titulo={janela.ativo ? 'Reativar usuários' : 'Desativar usuários'}
+          rotulo={janela.ativo ? 'Reativar' : 'Desativar'}
+          onCancelar={() => setJanela(null)}
+          onConfirmar={async () => {
+            await enviar('POST', '/api/usuarios/situacao', { ids: [...grade.selecionados], ativo: janela.ativo })
+            grade.limparSelecao()
+            setJanela(null)
+            recarregar()
+          }}
+        >
+          <p>
+            {`${janela.ativo ? 'Reativar' : 'Desativar'} ${grade.selecionados.size === 1 ? 'o usuário selecionado' : `os ${grade.selecionados.size} usuários selecionados`}?`}
+            {!janela.ativo && ' As sessões abertas são encerradas.'}
+          </p>
+        </Confirmacao>
       )}
     </div>
   )

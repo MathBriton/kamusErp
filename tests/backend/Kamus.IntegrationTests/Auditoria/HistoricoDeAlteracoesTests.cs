@@ -154,4 +154,20 @@ public sealed class HistoricoDeAlteracoesTests : IAsyncDisposable
 
         registros.Select(r => r.OcorridoEm).ShouldBeInOrder(SortDirection.Descending);
     }
+
+    [Fact]
+    public async Task Relatorio_SoOsRegistrosSelecionados_EPeriodoComFuso()
+    {
+        var (client, _) = await Entrar();
+        var empresas = (await Historico(client, "&entidade=Empresa")).Take(2).ToList();
+
+        var csv = await client.GetStringAsync(new Uri($"/api/relatorios/historico-de-alteracoes.csv?ids={empresas[0].Id}", UriKind.Relative), Ct);
+        var hoje = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(-3)).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var doDia = await Historico(client, $"&de={hoje}T00:00:00-03:00&ate={hoje}T23:59:59-03:00");
+        var futuro = await Historico(client, "&de=2099-01-01T00:00:00-03:00");
+
+        csv.Split("\r\n", StringSplitOptions.RemoveEmptyEntries).Length.ShouldBe(2); // cabeçalho + o selecionado
+        doDia.ShouldNotBeEmpty();
+        futuro.ShouldBeEmpty();
+    }
 }

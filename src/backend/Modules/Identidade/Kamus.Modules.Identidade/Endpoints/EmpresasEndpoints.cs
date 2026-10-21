@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using Kamus.Modules.Identidade.Dominio;
 using Kamus.Modules.Identidade.Persistencia;
+using Kamus.SharedKernel.Busca;
 using Kamus.SharedKernel.Clientes;
+using Kamus.SharedKernel.Consultas;
 using Kamus.SharedKernel.Documentos;
 using Kamus.SharedKernel.MultiTenancy;
 using Microsoft.AspNetCore.Builder;
@@ -29,7 +31,7 @@ internal static class EmpresasEndpoints
             .Produces<EmpresaAtivaResponse>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status403Forbidden);
-        grupo.MapGet("", Listar).WithSummary("Empresas (CNPJs) do cliente — perfil Dono").Produces<IReadOnlyList<EmpresaDoClienteDto>>();
+        grupo.MapGet("", Listar).WithSummary("Empresas (CNPJs) do cliente — perfil Dono. Filtro: busca (nomes ou CNPJ); com pagina, devolve uma página").Produces<IReadOnlyList<EmpresaDoClienteDto>>();
         grupo.MapPost("", Criar).WithSummary("Cadastrar empresa (CNPJ); quem cadastra vira Dono dela. Respeita o limite do plano")
             .Produces<EmpresaDoClienteDto>(StatusCodes.Status201Created).ProducesProblem(StatusCodes.Status409Conflict);
         grupo.MapPut("/{id:guid}", Editar).WithSummary("Alterar razão social e nome fantasia (o CNPJ não muda)")
@@ -52,13 +54,24 @@ internal static class EmpresasEndpoints
         return Results.Ok(new EmpresaAtivaResponse(empresaAtiva.Consolidado, resposta));
     }
 
-    private static EmpresaDoClienteDto ParaDto(Empresa e) => new(e.Id, e.RazaoSocial, e.NomeFantasia, e.Cnpj.Formatado);
+    internal static EmpresaDoClienteDto ParaDto(Empresa e) => new(e.Id, e.RazaoSocial, e.NomeFantasia, e.Cnpj.Formatado);
 
-    private static async Task<IResult> Listar(IEmpresaAtiva empresaAtiva, IdentidadeDbContext db, CancellationToken ct)
+    /// <summary>Empresas do cliente (por nome fantasia), com a busca da tela: nome fantasia, razão social ou CNPJ.</summary>
+    internal static async Task<List<EmpresaDoClienteDto>> FiltrarAsync(IdentidadeDbContext db, string? busca, CancellationToken ct)
+    {
+        IEnumerable<EmpresaDoClienteDto> empresas = (await db.Empresas.AsNoTracking().ToListAsync(ct))
+            .OrderBy(e => e.NomeFantasia, StringComparer.CurrentCulture).Select(ParaDto);
+        if (!string.IsNullOrWhiteSpace(busca))
+            empresas = empresas.Where(e => TextoParaBusca.Contem(e.NomeFantasia, busca) || TextoParaBusca.Contem(e.RazaoSocial, busca) || TextoParaBusca.ContemDigitos(e.Cnpj, busca));
+        return [.. empresas];
+    }
+
+    private static async Task<IResult> Listar(IEmpresaAtiva empresaAtiva, IdentidadeDbContext db, CancellationToken ct,
+        string? busca = null, int? pagina = null, int tamanho = Paginacao.TamanhoPadrao)
     {
         if (Gestao.ExigirDono(empresaAtiva) is { } negado) return negado;
-        var empresas = await db.Empresas.AsNoTracking().ToListAsync(ct);
-        return Results.Ok(empresas.OrderBy(e => e.NomeFantasia, StringComparer.CurrentCulture).Select(ParaDto).ToList());
+        var empresas = await FiltrarAsync(db, busca, ct);
+        return pagina is null ? Results.Ok(empresas) : Results.Ok(empresas.Paginar(pagina.Value, tamanho));
     }
 
     private static async Task<IResult> Criar(

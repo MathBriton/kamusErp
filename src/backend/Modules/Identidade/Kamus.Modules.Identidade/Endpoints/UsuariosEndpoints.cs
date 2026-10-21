@@ -2,7 +2,9 @@ using System.Security.Claims;
 using Kamus.Modules.Identidade.Dominio;
 using Kamus.Modules.Identidade.Persistencia;
 using Kamus.SharedKernel.Auditoria;
+using Kamus.SharedKernel.Busca;
 using Kamus.SharedKernel.Clientes;
+using Kamus.SharedKernel.Consultas;
 using Kamus.SharedKernel.MultiTenancy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -27,7 +29,11 @@ internal static class UsuariosEndpoints
     public static IEndpointRouteBuilder MapUsuarios(this IEndpointRouteBuilder app)
     {
         var grupo = app.MapGroup("/api/usuarios").RequireAuthorization().WithTags("Usuários");
-        grupo.MapGet("", Listar).WithSummary("Usuários do cliente com os perfis por empresa — perfil Dono").Produces<IReadOnlyList<UsuarioDoClienteDto>>();
+        grupo.MapGet("", Listar).WithSummary(
+            "Usuários do cliente com os perfis por empresa — perfil Dono. Filtros: busca (nome ou e-mail), situacao (ativos|inativos|todos), empresaId, perfil; " +
+            "com pagina, devolve uma página").Produces<IReadOnlyList<UsuarioDoClienteDto>>();
+        grupo.MapPost("/situacao", MudarEmLote).WithSummary("Desativar ou reativar vários usuários (mesmas regras da unitária, tudo ou nada)")
+            .Produces<SituacaoEmLoteResponse>();
         grupo.MapPost("", Criar).WithSummary("Cadastrar usuário com senha provisória (troca obrigatória no primeiro acesso)")
             .Produces<SenhaProvisoriaResponse>(StatusCodes.Status201Created).ProducesProblem(StatusCodes.Status409Conflict);
         grupo.MapPut("/{id:guid}", Editar).WithSummary("Alterar nome e perfis por empresa").Produces(StatusCodes.Status204NoContent);
@@ -48,23 +54,75 @@ internal static class UsuariosEndpoints
     private static IQueryable<Usuario> DoCliente(IdentidadeDbContext db, ITenantContext tenant) =>
         db.Usuarios.Where(u => u.TenantId == tenant.TenantId);
 
-    private static async Task<IResult> Listar(IEmpresaAtiva empresaAtiva, ITenantContext tenant, IdentidadeDbContext db, CancellationToken ct)
+    /// <summary>Usuários do cliente com os filtros da tela (ativos primeiro, por nome).</summary>
+    internal static async Task<List<UsuarioDoClienteDto>> FiltrarAsync(IdentidadeDbContext db, ITenantContext tenant, string? busca, string? situacao,
+        Guid? empresaId, string? perfil, CancellationToken ct)
     {
-        if (Gestao.ExigirDono(empresaAtiva) is { } negado) return negado;
-
         var usuarios = await DoCliente(db, tenant).AsNoTracking().ToListAsync(ct);
         var acessos = await (
             from a in db.AcessosEmpresa.AsNoTracking()
             join e in db.Empresas.AsNoTracking() on a.EmpresaId equals e.Id
             select new { a.UsuarioId, a.EmpresaId, e.NomeFantasia, a.Perfil }).ToListAsync(ct);
 
-        return Results.Ok(usuarios
+        IEnumerable<UsuarioDoClienteDto> lista = usuarios
             .OrderByDescending(u => u.Ativo).ThenBy(u => u.Nome, StringComparer.CurrentCulture)
             .Select(u => new UsuarioDoClienteDto(u.Id, u.Nome, u.Email, u.Ativo, u.DeveTrocarSenha, u.UltimoLoginEm,
                 acessos.Where(a => a.UsuarioId == u.Id)
                     .OrderBy(a => a.NomeFantasia, StringComparer.CurrentCulture)
-                    .Select(a => new AcessoDto(a.EmpresaId, a.NomeFantasia, a.Perfil.ToString())).ToList()))
-            .ToList());
+                    .Select(a => new AcessoDto(a.EmpresaId, a.NomeFantasia, a.Perfil.ToString())).ToList()));
+        if (!string.IsNullOrWhiteSpace(busca)) lista = lista.Where(u => TextoParaBusca.Contem(u.Nome, busca) || TextoParaBusca.Contem(u.Email, busca));
+        lista = situacao?.ToLowerInvariant() switch
+        {
+            "ativos" => lista.Where(u => u.Ativo),
+            "inativos" => lista.Where(u => !u.Ativo),
+            _ => lista,
+        };
+        if (empresaId is not null) lista = lista.Where(u => u.Acessos.Any(a => a.EmpresaId == empresaId));
+        if (!string.IsNullOrWhiteSpace(perfil))
+            lista = lista.Where(u => u.Acessos.Any(a => (empresaId is null || a.EmpresaId == empresaId) && string.Equals(a.Perfil, perfil, StringComparison.OrdinalIgnoreCase)));
+        return [.. lista];
+    }
+
+    private static async Task<IResult> Listar(IEmpresaAtiva empresaAtiva, ITenantContext tenant, IdentidadeDbContext db, CancellationToken ct,
+        string? busca = null, string? situacao = null, Guid? empresaId = null, string? perfil = null, int? pagina = null, int tamanho = Paginacao.TamanhoPadrao)
+    {
+        if (Gestao.ExigirDono(empresaAtiva) is { } negado) return negado;
+        var usuarios = await FiltrarAsync(db, tenant, busca, situacao, empresaId, perfil, ct);
+        return pagina is null ? Results.Ok(usuarios) : Results.Ok(usuarios.Paginar(pagina.Value, tamanho));
+    }
+
+    private static async Task<IResult> MudarEmLote(
+        SituacaoEmLoteRequest r, IEmpresaAtiva empresaAtiva, ITenantContext tenant, ILimitesDoCliente limites, IdentidadeDbContext db,
+        TimeProvider relogio, ClaimsPrincipal user, CancellationToken ct)
+    {
+        if (Gestao.ExigirDono(empresaAtiva) is { } negado) return negado;
+        var ids = (r.Ids ?? []).Distinct().ToList();
+        if (ids.Count == 0) return Invalido("Selecione pelo menos um usuário.");
+        var usuarios = await DoCliente(db, tenant).Where(u => ids.Contains(u.Id)).ToListAsync(ct);
+        if (usuarios.Count != ids.Count) return NaoEncontrado();
+        var mudar = usuarios.Where(u => u.Ativo != r.Ativo).ToList();
+
+        if (r.Ativo)
+        {
+            var limite = await LimiteAsync(limites, tenant, ct);
+            if (limite is { } max && mudar.Count > 0 && await DoCliente(db, tenant).CountAsync(u => u.Ativo, ct) + mudar.Count > max)
+                return Gestao.Limite("usuários ativos", max);
+            foreach (var usuario in mudar) usuario.Reativar();
+        }
+        else
+        {
+            if (ids.Contains(UsuarioLogado(user))) return Invalido("Você não pode desativar o próprio usuário.");
+            var restantes = DoCliente(db, tenant).Where(u => u.Ativo && !ids.Contains(u.Id)).Select(u => u.Id);
+            if (!await db.AcessosEmpresa.AnyAsync(a => a.Perfil == Perfil.Dono && restantes.Contains(a.UsuarioId), ct))
+                return Invalido("O cliente precisa de pelo menos um usuário ativo com perfil Dono.");
+            foreach (var usuario in mudar)
+            {
+                usuario.Desativar();
+                await RevogarSessoesAsync(usuario.Id, db, relogio, ct);
+            }
+        }
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(new SituacaoEmLoteResponse(mudar.Count));
     }
 
     /// <summary>Valida e converte os acessos pedidos (empresas do próprio cliente, perfis conhecidos, sem repetição).</summary>

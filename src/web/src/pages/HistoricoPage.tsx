@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react'
-import { useApi } from '../api/useApi'
-import { ErroDeApi } from '../auth/api'
+import { useState } from 'react'
+import { Dialogo } from '../components/Dialogo'
+import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade, useListaPaginada } from '../components/grade/useGrade'
 import { Icone } from '../components/Icone'
-import { useEmpresa } from '../empresa/EmpresaContext'
 import { BotaoExportar } from '../relatorios/BotaoExportar'
 
 interface Alteracao {
@@ -43,127 +46,117 @@ const ESTILO_TIPO: Record<Registro['tipo'], { rotulo: string; classe: string }> 
   Evento: { rotulo: 'Evento', classe: 'bg-surface-2 text-muted' },
 }
 
+const FILTROS = { tipo: '', de: '', ate: '' }
+
 const formatarData = (iso: string) =>
   new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'medium' }).format(new Date(iso))
 
+/** As datas da tela são dias de Brasília; a API recebe o início e o fim do dia com o fuso (UTC−3). */
+function comFuso(parametros: Record<string, string>) {
+  const r = { ...parametros }
+  if (r.de) r.de = `${r.de}T00:00:00-03:00`
+  if (r.ate) r.ate = `${r.ate}T23:59:59-03:00`
+  return r
+}
+
+/** Histórico de alterações em grade paginada: filtros de tipo e período, detalhes de cada registro e exportação. */
 export function HistoricoPage() {
-  const { getJson } = useApi()
-  const { selecao } = useEmpresa()
-  const [tipo, setTipo] = useState('')
-  const [{ pagina, erro }, setResultado] = useState<{ pagina: Pagina | null; erro: string | null }>({ pagina: null, erro: null })
-  const [abertos, setAbertos] = useState<Set<string>>(new Set())
+  const grade = useGrade(FILTROS)
+  const parametros = comFuso(grade.parametros)
+  const consulta = new URLSearchParams({ ...parametros, pagina: String(grade.paginacao.pagina), tamanho: String(grade.paginacao.tamanho) })
+  const { dados, erro } = useListaPaginada<Pagina>(`/api/auditoria?${consulta}`)
+  const [detalhe, setDetalhe] = useState<Registro | null>(null)
 
-  useEffect(() => {
-    const controle = new AbortController()
-    const params = new URLSearchParams({ pagina: '1', tamanho: '50' })
-    if (tipo) params.set('tipo', tipo)
-    getJson<Pagina>(`/api/auditoria?${params}`, controle.signal)
-      .then((resposta) => setResultado({ pagina: resposta, erro: null }))
-      .catch((e: unknown) => {
-        if (controle.signal.aborted) return
-        setResultado({ pagina: null, erro: e instanceof ErroDeApi ? e.message : 'Não foi possível carregar o histórico.' })
-      })
-    return () => controle.abort()
-  }, [getJson, tipo, selecao])
-
-  const alternar = (id: string) =>
-    setAbertos((atual) => {
-      const novo = new Set(atual)
-      if (novo.has(id)) novo.delete(id)
-      else novo.add(id)
-      return novo
-    })
+  const colunas: Coluna<Registro>[] = [
+    {
+      titulo: 'Tipo',
+      celula: (r) => (
+        <span className={`inline-block w-20 rounded-full px-2 py-0.5 text-center text-xs font-semibold ${ESTILO_TIPO[r.tipo].classe}`}>{ESTILO_TIPO[r.tipo].rotulo}</span>
+      ),
+    },
+    { titulo: 'Descrição', celula: (r) => <span className="font-medium">{r.descricao}</span> },
+    { titulo: 'Usuário', celula: (r) => <span className="text-muted">{r.usuarioNome}</span> },
+    { titulo: 'Data/hora', celula: (r) => <span className="whitespace-nowrap text-muted tabular-nums">{formatarData(r.ocorridoEm)}</span> },
+  ]
 
   return (
     <div className="mx-auto max-w-6xl">
-      <p className="text-xs text-muted">Administrativo</p>
-      <h1 className="text-2xl font-bold tracking-tight">Histórico de alterações</h1>
-      <p className="mt-1 text-sm text-muted">
-        Quem incluiu, alterou ou excluiu registros, além de logins e eventos de segurança. O histórico não pode ser editado nem apagado.
-      </p>
+      <CabecalhoDaPagina
+        secao="Administrativo"
+        titulo="Histórico de alterações"
+        descricao="Quem incluiu, alterou ou excluiu registros, além de logins e eventos de segurança. O histórico não pode ser editado nem apagado."
+        acoes={<BotaoExportar relatorio="historico-de-alteracoes" parametros={parametros} selecionados={[...grade.selecionados]} />}
+      />
 
-      <div className="mt-6 flex flex-wrap items-end gap-3">
-        <label className="text-sm">
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
+        <label className="w-60 text-sm">
           <span className="mb-1 block font-semibold">Tipo</span>
-          <select
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value)}
-            className="h-9 rounded-lg border border-border bg-surface px-2.5 text-sm"
-          >
+          <select value={grade.filtros.tipo} onChange={(e) => grade.filtrar({ tipo: e.target.value })} className={estilos.campo}>
             {TIPOS.map((t) => (
-              <option key={t.valor} value={t.valor}>
-                {t.rotulo}
-              </option>
+              <option key={t.valor} value={t.valor}>{t.rotulo}</option>
             ))}
           </select>
         </label>
-        {pagina && (
-          <span className="ml-auto text-sm text-muted">
-            {pagina.total} {pagina.total === 1 ? 'registro' : 'registros'}
-          </span>
-        )}
-        <BotaoExportar relatorio="historico-de-alteracoes" parametros={{ tipo }} />
-      </div>
+        <label className="w-40 text-sm">
+          <span className="mb-1 block font-semibold">De</span>
+          <input type="date" value={grade.filtros.de} onChange={(e) => grade.filtrar({ de: e.target.value })} className={estilos.campo} />
+        </label>
+        <label className="w-40 text-sm">
+          <span className="mb-1 block font-semibold">Até</span>
+          <input type="date" value={grade.filtros.ate} onChange={(e) => grade.filtrar({ ate: e.target.value })} className={estilos.campo} />
+        </label>
+      </BarraDeFiltros>
 
       {erro && (
-        <p role="alert" className="mt-5 flex items-center gap-2 rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger">
+        <p role="alert" className={`mt-4 flex items-center gap-2 ${estilos.erro}`}>
           <Icone nome="alert" />
           {erro}
         </p>
       )}
 
-      {pagina && (
-        <section className="mt-4 rounded-2xl border border-border bg-surface shadow-sm">
-          {pagina.itens.length === 0 ? (
-            <p className="p-8 text-center text-sm text-muted">Nenhum registro encontrado.</p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {pagina.itens.map((r) => (
-                <li key={r.id} className="px-4 py-3">
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                    <span className={`w-20 rounded-full px-2 py-0.5 text-center text-xs font-semibold ${ESTILO_TIPO[r.tipo].classe}`}>
-                      {ESTILO_TIPO[r.tipo].rotulo}
-                    </span>
-                    <span className="min-w-56 flex-1 text-sm font-medium">{r.descricao}</span>
-                    <span className="text-sm text-muted">{r.usuarioNome}</span>
-                    <span className="w-40 text-sm text-muted tabular-nums">{formatarData(r.ocorridoEm)}</span>
-                    {r.alteracoes.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => alternar(r.id)}
-                        aria-expanded={abertos.has(r.id)}
-                        className="text-sm font-semibold text-primary hover:underline"
-                      >
-                        {abertos.has(r.id) ? 'Ocultar' : 'Ver detalhes'}
-                      </button>
-                    )}
-                  </div>
-                  {abertos.has(r.id) && (
-                    <table className="mt-3 w-full overflow-hidden rounded-lg border border-border text-sm">
-                      <thead className="bg-surface-2 text-left text-xs text-muted uppercase">
-                        <tr>
-                          <th className="px-3 py-2">Campo</th>
-                          <th className="px-3 py-2">Antes</th>
-                          <th className="px-3 py-2">Depois</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {r.alteracoes.map((a) => (
-                          <tr key={a.campo}>
-                            <td className="px-3 py-2 font-medium">{a.campo}</td>
-                            <td className="px-3 py-2 text-muted">{a.antes ?? '—'}</td>
-                            <td className="px-3 py-2">{a.depois ?? '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                  {r.ip && <p className="mt-1 text-xs text-muted">IP {r.ip}</p>}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+      <GradeDeRegistros
+        rotulo="Histórico de alterações"
+        colunas={colunas}
+        itens={dados?.itens ?? (erro ? [] : null)}
+        chave={(r) => r.id}
+        nome={(r) => r.descricao}
+        total={dados?.total ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
+        acoes={(r) => <AcaoDaLinha rotulo={`Ver detalhes de ${r.descricao}`} icone="eye" onClick={() => setDetalhe(r)} />}
+      />
+
+      {detalhe && (
+        <Dialogo titulo={detalhe.descricao} onFechar={() => setDetalhe(null)} largo>
+          <div className="space-y-3 text-sm">
+            <p className="text-muted">
+              {`${ESTILO_TIPO[detalhe.tipo].rotulo} · ${detalhe.usuarioNome} · ${formatarData(detalhe.ocorridoEm)}`}
+              {detalhe.ip && ` · IP ${detalhe.ip}`}
+            </p>
+            {detalhe.alteracoes.length === 0 ? (
+              <p className="text-muted">Sem campos alterados (evento).</p>
+            ) : (
+              <table aria-label="Campos alterados" className="w-full overflow-hidden rounded-lg border border-border text-sm">
+                <thead className="bg-surface-2 text-left text-xs text-muted uppercase">
+                  <tr>
+                    <th className="px-3 py-2">Campo</th>
+                    <th className="px-3 py-2">Antes</th>
+                    <th className="px-3 py-2">Depois</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {detalhe.alteracoes.map((a) => (
+                    <tr key={a.campo}>
+                      <td className="px-3 py-2 font-medium">{a.campo}</td>
+                      <td className="px-3 py-2 text-muted">{a.antes ?? '—'}</td>
+                      <td className="px-3 py-2">{a.depois ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </Dialogo>
       )}
     </div>
   )

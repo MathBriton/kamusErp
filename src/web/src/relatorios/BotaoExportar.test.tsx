@@ -20,8 +20,8 @@ function api(exportar: Parameters<typeof mockApi>[0][string]) {
     'GET /api/empresas/ativa': empresaAtivaHandler(),
     'GET /health': () => new Response('Degraded'),
     'GET /api/notificacoes': () => json({ itens: [], naoLidas: 0 }),
-    'GET /api/auditoria?pagina=1&tamanho=50': () => json(historico),
-    'GET /api/auditoria?pagina=1&tamanho=50&tipo=Alteracao': () => json(historico),
+    'GET /api/auditoria?pagina=1&tamanho=20': () => json(historico),
+    'GET /api/auditoria?tipo=Alteracao&pagina=1&tamanho=20': () => json(historico),
     'GET /api/relatorios/historico-de-alteracoes.xlsx?tipo=Alteracao': exportar,
     'GET /api/relatorios/historico-de-alteracoes.pdf': exportar,
   })

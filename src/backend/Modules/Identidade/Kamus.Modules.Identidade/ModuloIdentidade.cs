@@ -36,6 +36,8 @@ public static class ModuloIdentidade
         services.AddScoped<Kamus.SharedKernel.Busca.IProvedorDeBusca, ProvedorDeBuscaIdentidade>();
         services.AddScoped<Kamus.SharedKernel.Clientes.IDiretorioDeClientes, DiretorioDeClientes>();
         services.AddScoped<Kamus.SharedKernel.Clientes.ICadastroDeClientes, CadastroDeClientes>();
+        services.AddScoped<Kamus.SharedKernel.Relatorios.IRelatorio, Relatorios.RelatorioDeUsuarios>();
+        services.AddScoped<Kamus.SharedKernel.Relatorios.IRelatorio, Relatorios.RelatorioDeEmpresas>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(o =>

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router'
 import { useApi } from '../api/useApi'
 import { ErroDeApi } from '../auth/api'
 import { estilos } from '../components/estilos'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
 import { Icone } from '../components/Icone'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { salvarArquivo } from '../relatorios/salvarArquivo'
@@ -113,9 +114,7 @@ export function ImportacaoPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <p className="text-xs text-muted">Cadastros</p>
-      <h1 className="text-2xl font-bold tracking-tight">Importar planilha</h1>
-      <p className="mt-1 text-sm text-muted">Traga os cadastros que você já tem em Excel. Nada é gravado até você confirmar.</p>
+      <CabecalhoDaPagina secao="Cadastros" titulo="Importar planilha" descricao="Traga os cadastros que você já tem em Excel. Nada é gravado até você confirmar." />
 
       <form onSubmit={validar} className="mt-6 space-y-5 rounded-2xl border border-border bg-surface p-5 shadow-sm">
         <fieldset>

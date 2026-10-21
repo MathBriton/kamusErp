@@ -3,6 +3,7 @@ using Kamus.Modules.Estoque.Dominio;
 using Kamus.Modules.Estoque.Persistencia;
 using Kamus.SharedKernel.Busca;
 using Kamus.SharedKernel.Catalogo;
+using Kamus.SharedKernel.Consultas;
 using Kamus.SharedKernel.MultiTenancy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -17,7 +18,8 @@ internal static class PosicaoEndpoints
     private const int LimiteDoKardex = 500;
 
     public sealed record ItemDaPosicaoDto(Guid ProdutoId, string Referencia, string Descricao, int Quantidade, decimal? ValorEmCusto, decimal ValorEmVenda);
-    public sealed record PosicaoDto(IReadOnlyList<ItemDaPosicaoDto> Itens, int TotalDePecas, decimal? ValorEmCusto, decimal ValorEmVenda);
+    /// <summary>Uma página (ou todas as linhas, sem <c>pagina</c>); os totais somam todas as linhas filtradas.</summary>
+    public sealed record PosicaoDto(IReadOnlyList<ItemDaPosicaoDto> Itens, int Total, int Pagina, int Tamanho, int TotalDePecas, decimal? ValorEmCusto, decimal ValorEmVenda);
     public sealed record CelulaDto(Guid SkuId, Guid CorId, string Tamanho, string CodigoDeBarras, bool Ativo, int Quantidade, decimal? CustoMedio, decimal Preco);
     public sealed record LojaDoProdutoDto(Guid LojaId, string Nome, int Quantidade);
     public sealed record MatrizDto(Guid ProdutoId, string Referencia, string Descricao, decimal PrecoVenda, decimal? PrecoCusto, IReadOnlyList<string> Tamanhos,
@@ -29,7 +31,8 @@ internal static class PosicaoEndpoints
     public static IEndpointRouteBuilder MapPosicao(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/estoque").RequireAuthorization().WithTags("Estoque");
-        g.MapGet("/posicao", Posicao).WithSummary("Posição por produto (peças, valor em custo e em venda). Filtros: lojaId, busca");
+        g.MapGet("/posicao", Posicao).WithSummary("Posição por produto (peças, valor em custo e em venda). Filtros: lojaId, busca; pagina e tamanho (sem pagina, todas as linhas)")
+            .Produces<PosicaoDto>();
         g.MapGet("/posicao/{produtoId:guid}", Matriz).WithSummary("Saldo do produto em matriz cor × tamanho, com o total por loja. Filtro: lojaId");
         g.MapGet("/kardex", Kardex).WithSummary($"Extrato de movimentos (mais recentes primeiro, até {LimiteDoKardex}). Filtros: skuId ou produtoId, lojaId");
         return app;
@@ -51,24 +54,34 @@ internal static class PosicaoEndpoints
         return TextoParaBusca.Normalizar($"{sku.Referencia} {sku.Descricao}").Contains(termo, StringComparison.Ordinal) || sku.CodigoDeBarras == busca.Trim();
     }
 
-    private static async Task<IResult> Posicao(Guid? lojaId, string? busca, Lojas lojas, EstoqueDbContext db, ICatalogoDeProdutos catalogo,
-        IEmpresaAtiva empresa, CancellationToken ct)
+    /// <summary>Linhas da posição por produto (com os filtros da tela). Nulo = loja não encontrada.</summary>
+    internal static async Task<List<ItemDaPosicaoDto>?> ItensAsync(Guid? lojaId, string? busca, Lojas lojas, EstoqueDbContext db, ICatalogoDeProdutos catalogo,
+        bool custo, CancellationToken ct)
     {
         var filtro = await LojasDoFiltroAsync(lojas, lojaId, ct);
-        if (filtro is null) return Results.NotFound();
+        if (filtro is null) return null;
         var ids = filtro.Select(l => l.Id).ToList();
         var saldos = await db.Saldos.AsNoTracking().Where(s => ids.Contains(s.LojaId) && s.Quantidade != 0).ToListAsync(ct);
         var skus = (await catalogo.SkusAsync(saldos.Select(s => s.SkuId).Distinct().ToList(), ct)).ToDictionary(s => s.Id);
-        var custo = Permissoes.PodeVerCusto(empresa.Perfil);
 
-        var itens = saldos.Where(s => skus.ContainsKey(s.SkuId) && Corresponde(skus[s.SkuId], busca)).GroupBy(s => s.ProdutoId).Select(g =>
+        return saldos.Where(s => skus.ContainsKey(s.SkuId) && Corresponde(skus[s.SkuId], busca)).GroupBy(s => s.ProdutoId).Select(g =>
         {
             var sku = skus[g.First().SkuId];
             return new ItemDaPosicaoDto(g.Key, sku.Referencia, sku.Descricao, g.Sum(s => s.Quantidade),
                 custo ? g.Sum(s => s.ValorEmCusto) : null, g.Sum(s => s.Quantidade * skus[s.SkuId].PrecoVenda));
         }).OrderBy(i => i.Descricao, StringComparer.CurrentCulture).ThenBy(i => i.Referencia, StringComparer.Ordinal).ToList();
+    }
 
-        return Results.Ok(new PosicaoDto(itens, itens.Sum(i => i.Quantidade), custo ? itens.Sum(i => i.ValorEmCusto) : null, itens.Sum(i => i.ValorEmVenda)));
+    private static async Task<IResult> Posicao(Guid? lojaId, string? busca, Lojas lojas, EstoqueDbContext db, ICatalogoDeProdutos catalogo,
+        IEmpresaAtiva empresa, CancellationToken ct, int? pagina = null, int tamanho = Paginacao.TamanhoPadrao)
+    {
+        var custo = Permissoes.PodeVerCusto(empresa.Perfil);
+        var itens = await ItensAsync(lojaId, busca, lojas, db, catalogo, custo, ct);
+        if (itens is null) return Results.NotFound();
+        var pag = pagina is null ? new PaginaDeRegistros<ItemDaPosicaoDto>(itens, itens.Count, 1, itens.Count) : itens.Paginar(pagina.Value, tamanho);
+
+        return Results.Ok(new PosicaoDto(pag.Itens, pag.Total, pag.Pagina, pag.Tamanho, itens.Sum(i => i.Quantidade),
+            custo ? itens.Sum(i => i.ValorEmCusto) : null, itens.Sum(i => i.ValorEmVenda)));
     }
 
     private static decimal? CustoMedioDe(List<SaldoDeEstoque> saldos)

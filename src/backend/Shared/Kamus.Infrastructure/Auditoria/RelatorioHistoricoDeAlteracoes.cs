@@ -18,8 +18,12 @@ internal sealed class RelatorioHistoricoDeAlteracoes(AuditoriaDbContext db, IEmp
 
     public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
     {
-        var filtros = FiltrosDoHistorico.DosParametros(parametros);
-        var registros = await filtros.Aplicar(db.Registros.AsNoTracking(), empresaAtiva.EmpresaIds).Take(MaximoDeLinhas).ToListAsync(ct);
+        // "ids" = registros selecionados na tela: exporta só eles, ignorando os demais filtros.
+        var ids = ParametrosDoRelatorio.Ids(parametros).ToList();
+        var filtros = ids.Count > 0 ? new FiltrosDoHistorico() : FiltrosDoHistorico.DosParametros(parametros);
+        var consulta = filtros.Aplicar(db.Registros.AsNoTracking(), empresaAtiva.EmpresaIds);
+        if (ids.Count > 0) consulta = consulta.Where(r => ids.Contains(r.Id));
+        var registros = await consulta.Take(MaximoDeLinhas).ToListAsync(ct);
 
         var linhas = registros.Select(r => (IReadOnlyList<object?>)
         [
@@ -42,7 +46,7 @@ internal sealed class RelatorioHistoricoDeAlteracoes(AuditoriaDbContext db, IEmp
                 new ColunaRelatorio("Detalhes", Largura: 4.5f),
             ],
             linhas,
-            Descrever(filtros));
+            ids.Count > 0 ? [ParametrosDoRelatorio.Selecionados(registros.Count, "registro", "registros")] : Descrever(filtros));
     }
 
     /// <summary>Inclusão: "Campo: valor"; exclusão: "Campo: valor anterior"; alteração: "Campo: antes → depois".</summary>

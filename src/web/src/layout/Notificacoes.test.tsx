@@ -13,7 +13,7 @@ function api() {
     'GET /api/notificacoes': () => json(notificacoesDemo),
     'POST /api/notificacoes/n1/lida': () => new Response(null, { status: 204 }),
     'POST /api/notificacoes/lidas': () => new Response(null, { status: 204 }),
-    'GET /api/auditoria?pagina=1&tamanho=50': () => json({ itens: [], total: 0, pagina: 1, tamanho: 50 }),
+    'GET /api/auditoria?pagina=1&tamanho=20': () => json({ itens: [], total: 0, pagina: 1, tamanho: 20 }),
   })
 }
 

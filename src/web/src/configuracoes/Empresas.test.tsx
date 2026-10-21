@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { corpo, empresaAtivaHandler, json, mockApi, sessaoDemo } from '../test/mockApi'
@@ -14,19 +14,38 @@ function api(extras: Parameters<typeof mockApi>[0] = {}) {
     'POST /api/auth/refresh': () => json(sessaoDemo),
     'GET /api/empresas/ativa': empresaAtivaHandler(),
     'GET /health': () => new Response('Healthy'),
-    'GET /api/empresas': () => json(empresas),
+    'GET /api/empresas?pagina=1&tamanho=20': () => json({ itens: empresas, total: 2, pagina: 1, tamanho: 20 }),
     ...extras,
   })
 }
 
 describe('Administrativo → Empresas', () => {
-  it('lista os CNPJs do cliente', async () => {
+  it('grade com os CNPJs do cliente e total de registros', async () => {
     api()
     renderApp('/configuracoes/empresas')
 
     expect(await screen.findByRole('heading', { name: 'Empresas' })).toBeInTheDocument()
     expect(await screen.findByText('Kamus Moda Shopping LTDA')).toBeInTheDocument()
-    expect(screen.getByText('98.765.432/0001-98')).toBeInTheDocument()
+    expect(within(screen.getByRole('table', { name: 'Empresas' })).getByText('98.765.432/0001-98')).toBeInTheDocument()
+    expect(screen.getByText('2 registros')).toBeInTheDocument()
+  })
+
+  it('busca e exporta só as selecionadas', async () => {
+    const fetch = api({
+      'GET /api/empresas?busca=shop&pagina=1&tamanho=20': () => json({ itens: [empresas[1]], total: 1, pagina: 1, tamanho: 20 }),
+      'GET /api/relatorios/empresas.csv?ids=e2': () => new Response('csv', { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=empresas.csv' } }),
+    })
+    URL.createObjectURL = (() => 'blob:x') as typeof URL.createObjectURL
+    URL.revokeObjectURL = () => {}
+    renderApp('/configuracoes/empresas')
+    await screen.findByText('Kamus Moda Shopping LTDA')
+
+    await userEvent.type(screen.getByLabelText('Buscar'), 'shop')
+    expect(await screen.findByText('1 registro')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Selecionar Kamus Moda Shopping' }))
+    await userEvent.click(screen.getByRole('button', { name: /Exportar/ }))
+    await userEvent.click(within(screen.getByRole('menu', { name: 'Exportar' })).getByRole('menuitem', { name: /CSV/ }))
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => url === '/api/relatorios/empresas.csv?ids=e2')).toBe(true))
   })
 
   it('cadastra empresa e avisa o limite do plano quando atingido', async () => {
@@ -64,7 +83,7 @@ describe('Administrativo → Empresas', () => {
     renderApp('/configuracoes/empresas')
     const linha = (await screen.findByText('Kamus Moda Shopping LTDA')).closest('tr')!
 
-    await userEvent.click(within(linha).getByRole('button', { name: 'Editar' }))
+    await userEvent.click(within(linha).getByRole('button', { name: 'Editar Kamus Moda Shopping' }))
     const dialogo = screen.getByRole('dialog', { name: 'Editar empresa' })
     expect(within(dialogo).getByLabelText('CNPJ')).toBeDisabled()
     await userEvent.clear(within(dialogo).getByLabelText('Nome fantasia'))
