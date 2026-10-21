@@ -1,82 +1,78 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useApi } from '../api/useApi'
 import { ErroDeApi } from '../auth/api'
 import { useAuth } from '../auth/AuthContext'
 import { Campo } from '../components/Campo'
 import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade, useListaPaginada } from '../components/grade/useGrade'
 import { Icone } from '../components/Icone'
+import { BotaoExportar } from '../relatorios/BotaoExportar'
 import type { EmpresaDoCliente } from './tipos'
 
 type Edicao = { tipo: 'nova' } | { tipo: 'editar'; empresa: EmpresaDoCliente } | null
 
+const FILTROS = { busca: '' }
+
+/** Empresas (CNPJs) do cliente em grade: busca, editar, "Nova empresa" e exportar (todas ou as selecionadas). */
 export function EmpresasPage() {
-  const { getJson } = useApi()
-  const [empresas, setEmpresas] = useState<EmpresaDoCliente[] | null>(null)
-  const [erro, setErro] = useState<string | null>(null)
+  const grade = useGrade(FILTROS)
+  const [versao, setVersao] = useState(0)
+  const { dados, erro } = useListaPaginada<{ itens: EmpresaDoCliente[]; total: number }>(`/api/empresas?${grade.consulta}`, versao, grade.filtros.busca ? 250 : 0)
   const [edicao, setEdicao] = useState<Edicao>(null)
 
-  const carregar = useCallback(async () => {
-    try {
-      setEmpresas(await getJson<EmpresaDoCliente[]>('/api/empresas'))
-    } catch (falha) {
-      setErro(falha instanceof ErroDeApi ? falha.message : 'Não foi possível carregar as empresas.')
-    }
-  }, [getJson])
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => void carregar(), 0)
-    return () => window.clearTimeout(timer)
-  }, [carregar])
+  const colunas: Coluna<EmpresaDoCliente>[] = [
+    { titulo: 'Nome fantasia', celula: (e) => <span className="font-semibold">{e.nomeFantasia}</span> },
+    { titulo: 'Razão social', celula: (e) => e.razaoSocial },
+    { titulo: 'CNPJ', celula: (e) => <span className="tabular-nums">{e.cnpj}</span> },
+  ]
 
   return (
     <div className="mx-auto max-w-5xl">
-      <p className="text-xs text-muted">Administrativo</p>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">Empresas</h1>
-          <p className="mt-1 text-sm text-muted">Os CNPJs do seu negócio. Quem cadastra uma empresa vira Dono dela.</p>
-        </div>
-        <button type="button" onClick={() => setEdicao({ tipo: 'nova' })} className={estilos.botaoPrimario}>
-          Nova empresa
-        </button>
-      </div>
+      <CabecalhoDaPagina
+        secao="Administrativo"
+        titulo="Empresas"
+        descricao="Os CNPJs do seu negócio. Quem cadastra uma empresa vira Dono dela."
+        acoes={
+          <>
+            <BotaoExportar relatorio="empresas" parametros={grade.parametros} selecionados={[...grade.selecionados]} />
+            <button type="button" onClick={() => setEdicao({ tipo: 'nova' })} className={estilos.botaoPrimario}>
+              <Icone nome="plus" />
+              Nova empresa
+            </button>
+          </>
+        }
+      />
+
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
+        <label className="min-w-60 flex-1 text-sm">
+          <span className="mb-1 block font-semibold">Buscar</span>
+          <input value={grade.filtros.busca} onChange={(e) => grade.filtrar({ busca: e.target.value })} placeholder="Nome fantasia, razão social ou CNPJ" className={estilos.campo} />
+        </label>
+      </BarraDeFiltros>
 
       {erro && (
-        <p role="alert" className={`mt-5 flex items-center gap-2 ${estilos.erro}`}>
+        <p role="alert" className={`mt-4 flex items-center gap-2 ${estilos.erro}`}>
           <Icone nome="alert" />
           {erro}
         </p>
       )}
 
-      {empresas && (
-        <div className="mt-5 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-2 text-left text-xs text-muted uppercase">
-              <tr>
-                <th className="px-4 py-2">Nome fantasia</th>
-                <th className="px-4 py-2">Razão social</th>
-                <th className="px-4 py-2">CNPJ</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {empresas.map((e) => (
-                <tr key={e.id}>
-                  <td className="px-4 py-2.5 font-semibold">{e.nomeFantasia}</td>
-                  <td className="px-4 py-2.5">{e.razaoSocial}</td>
-                  <td className="px-4 py-2.5 tabular-nums">{e.cnpj}</td>
-                  <td className="px-4 py-2.5 text-right">
-                    <button type="button" onClick={() => setEdicao({ tipo: 'editar', empresa: e })} className={`${estilos.botao} ml-auto`}>
-                      Editar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <GradeDeRegistros
+        rotulo="Empresas"
+        colunas={colunas}
+        itens={dados?.itens ?? (erro ? [] : null)}
+        chave={(e) => e.id}
+        nome={(e) => e.nomeFantasia}
+        total={dados?.total ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
+        vazio="Nenhuma empresa encontrada."
+        acoes={(e) => <AcaoDaLinha rotulo={`Editar ${e.nomeFantasia}`} icone="pencil" onClick={() => setEdicao({ tipo: 'editar', empresa: e })} />}
+      />
 
       {edicao && (
         <FormularioDeEmpresa
@@ -84,7 +80,7 @@ export function EmpresasPage() {
           onFechar={() => setEdicao(null)}
           onSalvo={() => {
             setEdicao(null)
-            void carregar()
+            setVersao((v) => v + 1)
           }}
         />
       )}

@@ -86,7 +86,7 @@ describe('Licença do cliente', () => {
 
   it('uma resposta 402 em qualquer tela mostra o bloqueio na hora', async () => {
     let chamadas = 0
-    api(() => json(chamadas++ === 0 ? ativa : suspensa), { 'GET /api/auditoria?pagina=1&tamanho=50': bloqueio })
+    api(() => json(chamadas++ === 0 ? ativa : suspensa), { 'GET /api/auditoria?pagina=1&tamanho=20': bloqueio })
     renderApp('/configuracoes/historico')
 
     expect(await screen.findByRole('heading', { name: 'Acesso temporariamente suspenso' })).toBeInTheDocument()
