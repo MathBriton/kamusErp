@@ -6,9 +6,9 @@ import type { ThemePreference } from '../theme/theme'
 import { MenuUsuario } from './MenuUsuario'
 import { SeletorEmpresa } from './SeletorEmpresa'
 
-const PROXIMO_TEMA: Record<ThemePreference, ThemePreference> = { light: 'dark', dark: 'system', system: 'light' }
-const NOME_TEMA: Record<ThemePreference, string> = { light: 'Claro', dark: 'Escuro', system: 'Sistema' }
-const ICONE_TEMA = { light: 'sun', dark: 'moon', system: 'monitor' } as const
+const PROXIMO_TEMA: Record<ThemePreference, ThemePreference> = { light: 'dark', dark: 'light' }
+const NOME_TEMA: Record<ThemePreference, string> = { light: 'Claro', dark: 'Escuro' }
+const ICONE_TEMA = { light: 'sun', dark: 'moon' } as const
 
 interface Props {
   usuario: { nome: string; email: string }

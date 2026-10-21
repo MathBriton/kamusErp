@@ -5,7 +5,7 @@ const titulos = (perfil: string) => filtrarMenu(MENU, perfil).map((g) => g.titul
 
 describe('menu', () => {
   it('Dono vê todos os módulos', () => {
-    expect(titulos('Dono')).toEqual(['Dashboard', 'Cadastros', 'Estoque', 'Financeiro', 'Vendas', 'Relatórios', 'Administrativo'])
+    expect(titulos('Dono')).toEqual(['Dashboard', 'Cadastros', 'Estoque', 'Financeiro', 'Vendas', 'Administrativo', 'Relatórios'])
   })
 
   it('Vendedor não vê Financeiro nem Administrativo; no Estoque, só a posição', () => {
@@ -28,6 +28,10 @@ describe('menu', () => {
   it('Gerente vê o histórico de alterações, mas não usuários e licença', () => {
     const config = filtrarMenu(MENU, 'Gerente').find((g) => g.titulo === 'Administrativo')
     expect(config?.itens?.map((i) => i.titulo)).toEqual(['Histórico de alterações'])
+  })
+
+  it('Relatórios é sempre o último item do menu, para qualquer perfil', () => {
+    for (const perfil of ['Dono', 'Gerente', 'Vendedor', 'Estoquista', 'Financeiro']) expect(titulos(perfil).at(-1)).toBe('Relatórios')
   })
 
   it('Administrativo começa por Usuários e senhas para o Dono', () => {

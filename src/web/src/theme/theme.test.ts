@@ -1,26 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { applyTheme, readStoredTheme, resolveTheme, storeTheme, THEME_STORAGE_KEY } from './theme'
-
-describe('resolveTheme', () => {
-  it('respeita a escolha explícita do usuário', () => {
-    expect(resolveTheme('light', true)).toBe('light')
-    expect(resolveTheme('dark', false)).toBe('dark')
-  })
-
-  it('no modo sistema segue a preferência do sistema operacional', () => {
-    expect(resolveTheme('system', true)).toBe('dark')
-    expect(resolveTheme('system', false)).toBe('light')
-  })
-})
+import { mockPrefersDark } from '../test/setup'
+import { applyTheme, readStoredTheme, storeTheme, THEME_STORAGE_KEY } from './theme'
 
 describe('preferência salva', () => {
-  it('retorna "system" quando não há nada salvo', () => {
-    expect(readStoredTheme()).toBe('system')
+  it('sem nada salvo, começa pelo tema do sistema operacional (só Claro ou Escuro)', () => {
+    mockPrefersDark(true)
+    expect(readStoredTheme()).toBe('dark')
+    mockPrefersDark(false)
+    expect(readStoredTheme()).toBe('light')
   })
 
-  it('ignora valores inválidos', () => {
+  it('ignora valores inválidos e o antigo "system"', () => {
     localStorage.setItem(THEME_STORAGE_KEY, 'roxo')
-    expect(readStoredTheme()).toBe('system')
+    expect(readStoredTheme()).toBe('light')
+    localStorage.setItem(THEME_STORAGE_KEY, 'system')
+    expect(readStoredTheme()).toBe('light')
   })
 
   it('salva e lê a escolha', () => {

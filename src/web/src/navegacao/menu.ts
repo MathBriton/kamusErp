@@ -79,12 +79,6 @@ export const MENU: GrupoMenu[] = [
     ],
   },
   {
-    titulo: 'Relatórios',
-    icone: 'file',
-    rota: '/relatorios',
-    descricao: 'Central de relatórios por área, com visualização na tela e exportação em PDF, Excel e CSV.',
-  },
-  {
     // Gestão do próprio negócio: quem acessa (usuários e senhas), CNPJs, lojas, licença e histórico.
     // As rotas continuam em /configuracoes/... para não quebrar links e notificações já enviadas.
     titulo: 'Administrativo',
@@ -97,6 +91,12 @@ export const MENU: GrupoMenu[] = [
       { titulo: 'Licença e assinatura', rota: '/configuracoes/licenca', descricao: 'Plano, vencimento e situação da mensalidade.', perfis: ['Dono'] },
       { titulo: 'Histórico de alterações', rota: '/configuracoes/historico', descricao: 'Quem alterou o quê e quando, logins e eventos de segurança.', perfis: GESTAO },
     ],
+  },
+  {
+    titulo: 'Relatórios',
+    icone: 'file',
+    rota: '/relatorios',
+    descricao: 'Central de relatórios por área, com visualização na tela e exportação em PDF, Excel e CSV.',
   },
 ]
 

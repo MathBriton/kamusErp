@@ -20,7 +20,7 @@ describe('Shell', () => {
     api()
     renderApp()
     await screen.findByText(/Olá, Admin/)
-    for (const modulo of ['Dashboard', 'Cadastros', 'Estoque', 'Financeiro', 'Vendas', 'Relatórios', 'Administrativo'])
+    for (const modulo of ['Dashboard', 'Cadastros', 'Estoque', 'Financeiro', 'Vendas', 'Administrativo', 'Relatórios'])
       expect(within(menuLateral()).getByText(modulo)).toBeInTheDocument()
   })
 
@@ -51,6 +51,18 @@ describe('Shell', () => {
     await userEvent.click(grupo('Cadastros'))
     expect(grupo('Cadastros')).toHaveAttribute('aria-expanded', 'false')
     expect(grupo('Estoque')).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('botão de tema alterna só entre Claro e Escuro', async () => {
+    api()
+    renderApp()
+    await screen.findByText(/Olá, Admin/)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tema: Claro (clique para trocar)' }))
+    expect(document.documentElement).toHaveClass('dark')
+    await userEvent.click(screen.getByRole('button', { name: 'Tema: Escuro (clique para trocar)' }))
+    expect(document.documentElement).not.toHaveClass('dark')
+    expect(screen.getByRole('button', { name: 'Tema: Claro (clique para trocar)' })).toBeInTheDocument()
   })
 
   it('recolher o menu guarda a preferência', async () => {

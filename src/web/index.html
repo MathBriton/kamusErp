@@ -6,7 +6,8 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Kamus</title>
     <script>
-      // Aplica o tema antes da primeira pintura (evita o "piscar" branco). Espelha src/theme/theme.ts.
+      // Aplica o tema antes da primeira pintura (evita o "piscar" branco). Espelha src/theme/theme.ts:
+      // Claro ou Escuro; sem escolha salva (ou com o antigo "system"), segue o sistema operacional.
       ;(function () {
         try {
           var p = localStorage.getItem('kamus.theme')
