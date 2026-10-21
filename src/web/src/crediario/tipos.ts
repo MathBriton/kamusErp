@@ -46,6 +46,10 @@ export interface Carteira {
   acima90: number
   total: number
   clientes: LinhaDaCarteira[]
+  /** Clientes com a busca (`total` é o saldo em aberto da carteira). */
+  registros: number
+  pagina: number
+  tamanho: number
 }
 
 export interface RegrasDoCrediario {

@@ -1,14 +1,21 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
 import { useApi } from '../api/useApi'
 import { ErroDeApi } from '../auth/api'
 import { moeda } from '../cadastros/catalogo'
 import { Campo } from '../components/Campo'
 import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { Confirmacao } from '../components/grade/Confirmacao'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade, useListaPaginada } from '../components/grade/useGrade'
+import { Icone } from '../components/Icone'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { dataBr, hojeIso } from '../financeiro/tipos'
 import { BotaoExportar } from '../relatorios/BotaoExportar'
-import { inicioDoMes, PERFIS_DE_GESTAO, porcentagem, PERFIS_QUE_CONSULTAM, PERFIS_QUE_VENDEM, type ListaDeVendas, type Venda } from './tipos'
+import { inicioDoMes, PERFIS_DE_GESTAO, porcentagem, PERFIS_QUE_CONSULTAM, PERFIS_QUE_VENDEM, type LinhaDeVenda, type ListaDeVendas, type Venda } from './tipos'
 import { useVendedores } from './useVendas'
 
 function SeloDaVenda({ status }: { status: Venda['status'] }) {
@@ -19,42 +26,22 @@ function SeloDaVenda({ status }: { status: Venda['status'] }) {
   )
 }
 
-/** Vendas do período com totais (o Vendedor vê só as suas), detalhe e cancelamento. */
+/** Filtros padrão: o mês corrente (a ordem das chaves é a da URL). */
+const filtrosDoMes = () => ({ de: inicioDoMes(hojeIso()), ate: hojeIso(), status: 'todas', vendedorId: '', busca: '' })
+
+/** Vendas do período no padrão de grade: totais de todas as filtradas, detalhe, cancelamento com motivo e exportação (o Vendedor vê só as suas). */
 export function VendasPage() {
-  const { getJson } = useApi()
   const { perfilAtual } = useEmpresa()
   const veTudo = PERFIS_QUE_CONSULTAM.includes(perfilAtual)
-  const vendedores = useVendedores()
-  const [de, setDe] = useState(() => inicioDoMes(hojeIso()))
-  const [ate, setAte] = useState(hojeIso())
-  const [status, setStatus] = useState('todas')
-  const [vendedorId, setVendedorId] = useState('')
-  const [busca, setBusca] = useState('')
-  const [versao, setVersao] = useState(0)
-  const [{ lista, erro }, setEstado] = useState<{ lista: ListaDeVendas | null; erro: string | null }>({ lista: null, erro: null })
-  const [detalhe, setDetalhe] = useState<string | null>(null)
   const permitido = PERFIS_QUE_VENDEM.includes(perfilAtual) || veTudo
-
-  const filtros = useMemo(() => {
-    const f: Record<string, string> = {}
-    if (de) f.de = de
-    if (ate) f.ate = ate
-    f.status = status
-    if (vendedorId) f.vendedorId = vendedorId
-    if (busca.trim()) f.busca = busca.trim()
-    return f
-  }, [de, ate, status, vendedorId, busca])
-
-  useEffect(() => {
-    if (!permitido) return
-    const controle = new AbortController()
-    getJson<ListaDeVendas>(`/api/vendas?${new URLSearchParams(filtros)}`, controle.signal)
-      .then((l) => setEstado({ lista: l, erro: null }))
-      .catch((e: unknown) => {
-        if (!controle.signal.aborted) setEstado({ lista: null, erro: e instanceof ErroDeApi ? e.message : 'Não foi possível carregar as vendas.' })
-      })
-    return () => controle.abort()
-  }, [getJson, filtros, versao, permitido])
+  const podeCancelar = PERFIS_DE_GESTAO.includes(perfilAtual)
+  const vendedores = useVendedores()
+  const [padrao] = useState(filtrosDoMes)
+  const grade = useGrade(padrao)
+  const [versao, setVersao] = useState(0)
+  const { dados: lista, erro } = useListaPaginada<ListaDeVendas>(permitido ? `/api/vendas?${grade.consulta}` : null, versao, grade.filtros.busca ? 250 : 0)
+  const [detalhe, setDetalhe] = useState<string | null>(null)
+  const [cancelar, setCancelar] = useState<LinhaDeVenda | null>(null)
 
   if (!permitido)
     return (
@@ -64,106 +51,143 @@ export function VendasPage() {
       </div>
     )
 
-  return (
-    <div className="mx-auto max-w-6xl">
-      <p className="text-xs text-muted">Vendas</p>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">Vendas realizadas</h1>
-          <p className="mt-1 text-sm text-muted">{veTudo ? 'Todas as vendas da empresa no período.' : 'As vendas que você registrou.'}</p>
-        </div>
-        <BotaoExportar relatorio="vendas" parametros={filtros} />
-      </div>
+  const colunas: Coluna<LinhaDeVenda>[] = [
+    {
+      titulo: 'Nº',
+      celula: (v) => <button type="button" onClick={() => setDetalhe(v.id)} className="font-semibold text-primary hover:underline">{String(v.numero)}</button>,
+    },
+    { titulo: 'Data', celula: (v) => <span className="whitespace-nowrap">{dataBr(v.data)}</span> },
+    { titulo: 'Cliente', celula: (v) => v.clienteNome ?? '—' },
+    { titulo: 'Vendedor', celula: (v) => v.vendedorNome ?? '—' },
+    { titulo: 'Peças', celula: (v) => v.pecas, alinhar: 'direita' },
+    { titulo: 'Pagamento', celula: (v) => v.formas },
+    {
+      titulo: 'Total',
+      celula: (v) => <span className={`font-semibold ${v.status === 'Cancelada' ? 'line-through' : ''}`}>{moeda(v.total)}</span>,
+      alinhar: 'direita',
+    },
+    { titulo: 'Situação', celula: (v) => <SeloDaVenda status={v.status} /> },
+  ]
 
-      <div className="mt-6 grid gap-3 rounded-2xl border border-border bg-surface p-4 shadow-sm sm:grid-cols-5">
-        <Campo rotulo="De">
-          <input type="date" value={de} onChange={(e) => setDe(e.target.value)} className={estilos.campo} />
+  return (
+    <div className="mx-auto max-w-7xl">
+      <CabecalhoDaPagina
+        secao="Vendas"
+        titulo="Vendas realizadas"
+        descricao={veTudo ? 'Todas as vendas da empresa no período.' : 'As vendas que você registrou.'}
+        acoes={
+          <>
+            <BotaoExportar relatorio="vendas" parametros={grade.parametros} selecionados={[...grade.selecionados]} />
+            <Link to="/vendas/registro" className={estilos.botaoPrimario}>
+              <Icone nome="plus" />
+              Nova venda
+            </Link>
+          </>
+        }
+      />
+
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
+        <Campo rotulo="De" className="w-40">
+          <input type="date" value={grade.filtros.de} onChange={(e) => grade.filtrar({ de: e.target.value })} className={estilos.campo} />
         </Campo>
-        <Campo rotulo="Até">
-          <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} className={estilos.campo} />
+        <Campo rotulo="Até" className="w-40">
+          <input type="date" value={grade.filtros.ate} onChange={(e) => grade.filtrar({ ate: e.target.value })} className={estilos.campo} />
         </Campo>
-        <Campo rotulo="Situação">
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className={estilos.campo}>
+        <Campo rotulo="Situação" className="w-40">
+          <select value={grade.filtros.status} onChange={(e) => grade.filtrar({ status: e.target.value })} className={estilos.campo}>
             <option value="todas">Todas</option>
             <option value="concluidas">Concluídas</option>
             <option value="canceladas">Canceladas</option>
           </select>
         </Campo>
-        {veTudo ? (
-          <Campo rotulo="Vendedor">
-            <select value={vendedorId} onChange={(e) => setVendedorId(e.target.value)} className={estilos.campo}>
+        {veTudo && (
+          <Campo rotulo="Vendedor" className="w-48">
+            <select value={grade.filtros.vendedorId} onChange={(e) => grade.filtrar({ vendedorId: e.target.value })} className={estilos.campo}>
               <option value="">Todos</option>
               {vendedores?.map((v) => (
                 <option key={v.id} value={v.id}>{v.nome}</option>
               ))}
             </select>
           </Campo>
-        ) : (
-          <div />
         )}
-        <Campo rotulo="Busca">
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Nº, cliente ou nota" className={estilos.campo} />
+        <Campo rotulo="Busca" className="min-w-48 flex-1">
+          <input value={grade.filtros.busca} onChange={(e) => grade.filtrar({ busca: e.target.value })} placeholder="Nº, cliente ou nota" className={estilos.campo} />
         </Campo>
-      </div>
+      </BarraDeFiltros>
 
       {erro && <p role="alert" className={`mt-4 ${estilos.erro}`}>{erro}</p>}
 
       {lista && (
-        <>
-          <dl className="mt-4 grid gap-3 sm:grid-cols-4">
-            {[
-              ['Vendas', String(lista.quantidade)],
-              ['Peças', String(lista.pecas)],
-              ['Total vendido', moeda(lista.total)],
-              ['Ticket médio', moeda(lista.ticketMedio)],
-            ].map(([rotulo, valor]) => (
-              <div key={rotulo} className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
-                <dt className="text-xs text-muted">{rotulo}</dt>
-                <dd className="text-xl font-bold tabular-nums">{valor}</dd>
-              </div>
-            ))}
-          </dl>
-          <div className="mt-4 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-            {lista.itens.length === 0 ? (
-              <p className="p-8 text-center text-sm text-muted">Nenhuma venda no período.</p>
-            ) : (
-              <table aria-label="Vendas" className="w-full text-sm">
-                <thead className="bg-surface-2 text-left text-xs text-muted uppercase">
-                  <tr>
-                    <th className="px-4 py-2">Nº</th>
-                    <th className="px-4 py-2">Data</th>
-                    <th className="px-4 py-2">Cliente</th>
-                    <th className="px-4 py-2">Vendedor</th>
-                    <th className="px-4 py-2 text-right">Peças</th>
-                    <th className="px-4 py-2">Pagamento</th>
-                    <th className="px-4 py-2 text-right">Total</th>
-                    <th className="px-4 py-2">Situação</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {lista.itens.map((v) => (
-                    <tr key={v.id} className={v.status === 'Cancelada' ? 'text-muted' : ''}>
-                      <td className="px-4 py-2">
-                        <button type="button" onClick={() => setDetalhe(v.id)} className="font-semibold text-primary hover:underline">{String(v.numero)}</button>
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap">{dataBr(v.data)}</td>
-                      <td className="px-4 py-2">{v.clienteNome ?? '—'}</td>
-                      <td className="px-4 py-2">{v.vendedorNome ?? '—'}</td>
-                      <td className="px-4 py-2 text-right tabular-nums">{v.pecas}</td>
-                      <td className="px-4 py-2">{v.formas}</td>
-                      <td className={`px-4 py-2 text-right font-semibold tabular-nums ${v.status === 'Cancelada' ? 'line-through' : ''}`}>{moeda(v.total)}</td>
-                      <td className="px-4 py-2"><SeloDaVenda status={v.status} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </>
+        <dl className="mt-4 grid gap-3 sm:grid-cols-4">
+          {[
+            ['Vendas', String(lista.quantidade)],
+            ['Peças', String(lista.pecas)],
+            ['Total vendido', moeda(lista.total)],
+            ['Ticket médio', moeda(lista.ticketMedio)],
+          ].map(([rotulo, valor]) => (
+            <div key={rotulo} className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+              <dt className="text-xs text-muted">{rotulo}</dt>
+              <dd className="text-xl font-bold tabular-nums">{valor}</dd>
+            </div>
+          ))}
+        </dl>
       )}
 
+      <GradeDeRegistros
+        rotulo="Vendas"
+        colunas={colunas}
+        itens={lista?.itens ?? (erro ? [] : null)}
+        chave={(v) => v.id}
+        nome={(v) => `venda nº ${v.numero}`}
+        total={lista?.registros ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
+        apagada={(v) => v.status === 'Cancelada'}
+        vazio="Nenhuma venda com esses filtros."
+        acoes={(v) => (
+          <>
+            <AcaoDaLinha rotulo={`Ver venda nº ${v.numero}`} icone="eye" onClick={() => setDetalhe(v.id)} />
+            {podeCancelar && v.status === 'Concluida' && (
+              <AcaoDaLinha rotulo={`Cancelar venda nº ${v.numero}`} icone="x" perigo onClick={() => setCancelar(v)} />
+            )}
+          </>
+        )}
+      />
+
       {detalhe && <DetalheDaVenda id={detalhe} onFechar={() => setDetalhe(null)} onMudou={() => setVersao((x) => x + 1)} />}
+      {cancelar && (
+        <CancelarVenda
+          venda={cancelar}
+          onFechar={() => setCancelar(null)}
+          onCancelada={() => {
+            setCancelar(null)
+            setVersao((x) => x + 1)
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+/** Cancelamento direto da linha: pede o motivo (a API recusa sem ele). */
+function CancelarVenda({ venda, onFechar, onCancelada }: { venda: LinhaDeVenda; onFechar: () => void; onCancelada: () => void }) {
+  const { enviar } = useApi()
+  const [motivo, setMotivo] = useState('')
+  return (
+    <Confirmacao
+      titulo={`Cancelar venda nº ${venda.numero}`}
+      rotulo="Cancelar venda"
+      onCancelar={onFechar}
+      onConfirmar={async () => {
+        await enviar('POST', `/api/vendas/${venda.id}/cancelar`, { motivo })
+        onCancelada()
+      }}
+    >
+      <p className="mb-3 text-muted">{`As peças voltam ao estoque e o que entrou no caixa ou ficou a receber é estornado (${moeda(venda.total)}).`}</p>
+      <Campo rotulo="Motivo do cancelamento">
+        <input value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={300} autoFocus className={estilos.campo} />
+      </Campo>
+    </Confirmacao>
   )
 }
 

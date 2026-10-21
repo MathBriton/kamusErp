@@ -6,6 +6,10 @@ import { moeda } from '../cadastros/catalogo'
 import { Campo } from '../components/Campo'
 import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade, useListaPaginada } from '../components/grade/useGrade'
 import { Icone } from '../components/Icone'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { useLojas } from '../estoque/useLojas'
@@ -34,7 +38,7 @@ import { useFormas, useVendedores } from './useVendas'
 
 type Filtro = 'abertas' | 'atrasadas' | 'fechadas' | 'todas'
 
-const FILTROS: { valor: Filtro; rotulo: string }[] = [
+const SITUACOES: { valor: Filtro; rotulo: string }[] = [
   { valor: 'abertas', rotulo: 'Abertas (inclui atrasadas)' },
   { valor: 'atrasadas', rotulo: 'Atrasadas' },
   { valor: 'fechadas', rotulo: 'Fechadas' },
@@ -61,33 +65,23 @@ interface Fechamento {
 
 type Resultado = { tipo: 'aberta'; condicional: Condicional } | { tipo: 'fechada'; fechamento: Fechamento }
 
-/** Condicional (malinha): peças que o cliente leva para provar, com prazo; no retorno, o que ficou vira venda. */
+const FILTROS = { situacao: 'abertas', busca: '' }
+
+/** Condicional (malinha) no padrão de grade: peças que o cliente leva para provar, com prazo; no retorno, o que ficou vira venda. */
 export function CondicionaisPage() {
   const { getJson, baixar } = useApi()
   const { perfilAtual, consolidado } = useEmpresa()
-  const [situacao, setSituacao] = useState<Filtro>('abertas')
-  const [busca, setBusca] = useState('')
-  const [{ lista, erro }, setEstado] = useState<{ lista: ListaDeCondicionais | null; erro: string | null }>({ lista: null, erro: null })
-  const [regras, setRegras] = useState<RegrasDeVenda | null>(null)
-  const [versao, setVersao] = useState(0)
-  const [abrindo, setAbrindo] = useState(false)
-  const [fechando, setFechando] = useState<LinhaDeCondicional | null>(null)
-  const [resultado, setResultado] = useState<Resultado | null>(null)
   const permitido = PERFIS_QUE_VENDEM.includes(perfilAtual) || PERFIS_QUE_CONSULTAM.includes(perfilAtual)
   const podeMovimentar = PERFIS_QUE_VENDEM.includes(perfilAtual) && !consolidado
-
-  useEffect(() => {
-    if (!permitido) return
-    const controle = new AbortController()
-    const filtros = new URLSearchParams({ situacao })
-    if (busca.trim()) filtros.set('busca', busca.trim())
-    getJson<ListaDeCondicionais>(`/api/vendas/condicionais?${filtros}`, controle.signal)
-      .then((l) => setEstado({ lista: l, erro: null }))
-      .catch((e: unknown) => {
-        if (!controle.signal.aborted) setEstado({ lista: null, erro: e instanceof ErroDeApi ? e.message : 'Não foi possível carregar as condicionais.' })
-      })
-    return () => controle.abort()
-  }, [getJson, permitido, situacao, busca, versao])
+  const grade = useGrade(FILTROS)
+  const [versao, setVersao] = useState(0)
+  const { dados: lista, erro } = useListaPaginada<ListaDeCondicionais>(
+    permitido ? `/api/vendas/condicionais?${grade.consulta}` : null, versao, grade.filtros.busca ? 250 : 0)
+  const [regras, setRegras] = useState<RegrasDeVenda | null>(null)
+  const [abrindo, setAbrindo] = useState(false)
+  const [vendo, setVendo] = useState<LinhaDeCondicional | null>(null)
+  const [fechando, setFechando] = useState<LinhaDeCondicional | null>(null)
+  const [resultado, setResultado] = useState<Resultado | null>(null)
 
   useEffect(() => {
     if (!podeMovimentar) return
@@ -121,23 +115,43 @@ export function CondicionaisPage() {
     setVersao((v) => v + 1)
   }
 
+  const colunas: Coluna<LinhaDeCondicional>[] = [
+    { titulo: 'Nº', celula: (k) => k.numero },
+    { titulo: 'Saída', celula: (k) => dataBr(k.data) },
+    { titulo: 'Cliente', celula: (k) => <span className="font-semibold">{k.clienteNome}</span> },
+    { titulo: 'Vendedor', celula: (k) => <span className="text-muted">{k.vendedorNome ?? '—'}</span> },
+    { titulo: 'Peças', celula: (k) => k.pecas, alinhar: 'direita' },
+    { titulo: 'Valor', celula: (k) => moeda(k.valor), alinhar: 'direita' },
+    { titulo: 'Devolver até', celula: (k) => dataBr(k.prazo) },
+    {
+      titulo: 'Situação',
+      celula: (k) => (
+        <>
+          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${SELO[k.situacao]}`}>{k.situacao}</span>
+          {k.vendaNumero !== null && <span className="ml-2 text-xs text-muted">{`venda nº ${k.vendaNumero}`}</span>}
+        </>
+      ),
+    },
+  ]
+
   return (
-    <div className="mx-auto max-w-5xl">
-      <p className="text-xs text-muted">Vendas</p>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">Condicional</h1>
-          <p className="mt-1 text-sm text-muted">
-            O cliente leva as peças para provar e devolve até a data combinada. As peças saem do estoque disponível; no retorno, as devolvidas voltam e as que ele ficou viram venda.
-          </p>
-        </div>
-        <BotaoExportar relatorio="condicionais" parametros={{ situacao }} />
-        {podeMovimentar && regras && (
-          <button type="button" onClick={() => setAbrindo(true)} className={estilos.botaoPrimario}>
-            Nova condicional
-          </button>
-        )}
-      </div>
+    <div className="mx-auto max-w-7xl">
+      <CabecalhoDaPagina
+        secao="Vendas"
+        titulo="Condicional"
+        descricao="O cliente leva as peças para provar e devolve até a data combinada. As peças saem do estoque disponível; no retorno, as devolvidas voltam e as que ele ficou viram venda."
+        acoes={
+          <>
+            <BotaoExportar relatorio="condicionais" parametros={grade.parametros} selecionados={[...grade.selecionados]} />
+            {podeMovimentar && regras && (
+              <button type="button" onClick={() => setAbrindo(true)} className={estilos.botaoPrimario}>
+                <Icone nome="plus" />
+                Nova condicional
+              </button>
+            )}
+          </>
+        }
+      />
 
       {resultado && (
         <div role="status" className="mt-4 space-y-1 rounded-lg bg-success-soft px-3 py-2.5 text-sm text-success">
@@ -167,8 +181,21 @@ export function CondicionaisPage() {
         </div>
       )}
 
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
+        <Campo rotulo="Situação" className="w-56">
+          <select value={grade.filtros.situacao} onChange={(e) => grade.filtrar({ situacao: e.target.value })} className={estilos.campo}>
+            {SITUACOES.map((f) => (
+              <option key={f.valor} value={f.valor}>{f.rotulo}</option>
+            ))}
+          </select>
+        </Campo>
+        <Campo rotulo="Buscar" className="min-w-48 flex-1">
+          <input value={grade.filtros.busca} onChange={(e) => grade.filtrar({ busca: e.target.value })} placeholder="Cliente ou número" className={estilos.campo} />
+        </Campo>
+      </BarraDeFiltros>
+
       {lista && (
-        <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Cartao rotulo="Abertas" valor={String(lista.abertas)} />
           <Cartao rotulo="Atrasadas" valor={String(lista.atrasadas)} destaque={lista.atrasadas > 0} />
           <Cartao rotulo="Peças na rua" valor={String(lista.pecasNaRua)} />
@@ -176,81 +203,93 @@ export function CondicionaisPage() {
         </dl>
       )}
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-[14rem_minmax(0,1fr)]">
-        <Campo rotulo="Situação">
-          <select value={situacao} onChange={(e) => setSituacao(e.target.value as Filtro)} className={estilos.campo}>
-            {FILTROS.map((f) => (
-              <option key={f.valor} value={f.valor}>{f.rotulo}</option>
-            ))}
-          </select>
-        </Campo>
-        <Campo rotulo="Buscar">
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Cliente ou número" className={estilos.campo} />
-        </Campo>
-      </div>
-
       {erro && <p role="alert" className={`mt-4 ${estilos.erro}`}>{erro}</p>}
 
-      {lista && (
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-          {lista.itens.length === 0 ? (
-            <p className="p-8 text-center text-sm text-muted">Nenhuma condicional nesta situação.</p>
-          ) : (
-            <table aria-label="Condicionais" className="w-full text-sm">
-              <thead className="bg-surface-2 text-left text-xs text-muted uppercase">
-                <tr>
-                  <th className="px-4 py-2">Nº</th>
-                  <th className="px-4 py-2">Saída</th>
-                  <th className="px-4 py-2">Cliente</th>
-                  <th className="px-4 py-2">Vendedor</th>
-                  <th className="px-4 py-2 text-right">Peças</th>
-                  <th className="px-4 py-2 text-right">Valor</th>
-                  <th className="px-4 py-2">Devolver até</th>
-                  <th className="px-4 py-2">Situação</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {lista.itens.map((k) => (
-                  <tr key={k.id}>
-                    <td className="px-4 py-2 tabular-nums">{k.numero}</td>
-                    <td className="px-4 py-2">{dataBr(k.data)}</td>
-                    <td className="px-4 py-2 font-semibold">{k.clienteNome}</td>
-                    <td className="px-4 py-2 text-muted">{k.vendedorNome ?? '—'}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{k.pecas}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{moeda(k.valor)}</td>
-                    <td className="px-4 py-2">{dataBr(k.prazo)}</td>
-                    <td className="px-4 py-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${SELO[k.situacao]}`}>{k.situacao}</span>
-                      {k.vendaNumero !== null && <span className="ml-2 text-xs text-muted">{`venda nº ${k.vendaNumero}`}</span>}
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="flex justify-end gap-2">
-                        <button type="button" aria-label={`Termo da condicional ${k.numero}`} onClick={() => void baixarTermo(k.id)} className="text-xs text-primary hover:underline">
-                          Termo
-                        </button>
-                        {podeMovimentar && k.situacao !== 'Fechada' && (
-                          <button type="button" aria-label={`Fechar condicional ${k.numero}`} onClick={() => setFechando(k)} className="text-xs font-semibold text-primary hover:underline">
-                            Fechar
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+      <GradeDeRegistros
+        rotulo="Condicionais"
+        colunas={colunas}
+        itens={lista?.itens ?? (erro ? [] : null)}
+        chave={(k) => k.id}
+        nome={(k) => `condicional nº ${k.numero}`}
+        total={lista?.total ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
+        apagada={(k) => k.situacao === 'Fechada'}
+        vazio="Nenhuma condicional com esses filtros."
+        acoes={(k) => (
+          <>
+            <AcaoDaLinha rotulo={`Ver condicional ${k.numero}`} icone="eye" onClick={() => setVendo(k)} />
+            <AcaoDaLinha rotulo={`Termo da condicional ${k.numero}`} icone="printer" onClick={() => void baixarTermo(k.id)} />
+            {podeMovimentar && k.situacao !== 'Fechada' && (
+              <AcaoDaLinha rotulo={`Fechar condicional ${k.numero}`} icone="check" onClick={() => setFechando(k)} />
+            )}
+          </>
+        )}
+      />
 
       {PERFIS_QUE_CONSULTAM.includes(perfilAtual) && <ConversaoPorVendedor versao={versao} />}
 
       {abrindo && regras && (
         <NovaCondicional regras={regras} gestao={PERFIS_DE_GESTAO.includes(perfilAtual)} onFechar={() => setAbrindo(false)} onAberta={(c) => concluido({ tipo: 'aberta', condicional: c })} />
       )}
+      {vendo && <DetalheDaCondicional linha={vendo} onFechar={() => setVendo(null)} />}
       {fechando && <FecharCondicional linha={fechando} onFechar={() => setFechando(null)} onFechada={(f) => concluido({ tipo: 'fechada', fechamento: f })} />}
     </div>
+  )
+}
+
+/** Peças da condicional (o que levou, o que devolveu) e a venda gerada no fechamento. */
+function DetalheDaCondicional({ linha, onFechar }: { linha: LinhaDeCondicional; onFechar: () => void }) {
+  const { getJson } = useApi()
+  const [condicional, setCondicional] = useState<Condicional | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+
+  useEffect(() => {
+    const controle = new AbortController()
+    getJson<Condicional>(`/api/vendas/condicionais/${linha.id}`, controle.signal)
+      .then(setCondicional)
+      .catch((e: unknown) => {
+        if (!controle.signal.aborted) setErro(e instanceof ErroDeApi ? e.message : 'Não foi possível abrir a condicional.')
+      })
+    return () => controle.abort()
+  }, [getJson, linha.id])
+
+  return (
+    <Dialogo titulo={`Condicional nº ${linha.numero}`} onFechar={onFechar} largo>
+      <div className="space-y-4 text-sm">
+        <p className="text-muted">
+          {`${linha.clienteNome} · saída ${dataBr(linha.data)} · devolver até ${dataBr(linha.prazo)}${linha.vendedorNome ? ` · ${linha.vendedorNome}` : ''}`}
+        </p>
+        {erro && <p role="alert" className={estilos.erro}>{erro}</p>}
+        {condicional && (
+          <>
+            <table aria-label="Peças" className="w-full">
+              <thead className="text-left text-xs text-muted uppercase">
+                <tr>
+                  <th className="py-1">Peça</th>
+                  <th className="py-1 text-right">Levou</th>
+                  <th className="py-1 text-right">Devolveu</th>
+                  <th className="py-1 text-right">Preço</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {condicional.itens.map((i) => (
+                  <tr key={i.skuId}>
+                    <td className="py-1">{i.descricao}</td>
+                    <td className="py-1 text-right tabular-nums">{i.quantidade}</td>
+                    <td className="py-1 text-right tabular-nums">{condicional.situacao === 'Fechada' ? i.devolvidas : '—'}</td>
+                    <td className="py-1 text-right tabular-nums">{moeda(i.precoUnitario)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="font-semibold">{`${pecas(condicional.pecas)} · ${moeda(condicional.valor)}`}</p>
+            {condicional.vendaNumero !== null && <p>{`Virou a venda nº ${condicional.vendaNumero}.`}</p>}
+            {condicional.observacao && <p className="text-muted">{condicional.observacao}</p>}
+          </>
+        )}
+      </div>
+    </Dialogo>
   )
 }
 

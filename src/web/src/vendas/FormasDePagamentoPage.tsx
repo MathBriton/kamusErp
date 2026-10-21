@@ -5,22 +5,41 @@ import { decimal, lerNumero } from '../cadastros/catalogo'
 import { Campo } from '../components/Campo'
 import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { Confirmacao } from '../components/grade/Confirmacao'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade, useListaPaginada } from '../components/grade/useGrade'
+import { Icone } from '../components/Icone'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { useContas } from '../financeiro/useFinanceiro'
-import { entraNaHora, PERFIS_DE_GESTAO, porcentagem, ROTULO_DO_TIPO, type FormaDePagamento, type RegrasDeVenda, type TipoDePagamento } from './tipos'
+import { BotaoExportar } from '../relatorios/BotaoExportar'
+import { entraNaHora, PERFIS_DE_GESTAO, porcentagem, ROTULO_DO_TIPO, type FormaDePagamento, type Pagina, type RegrasDeVenda, type TipoDePagamento } from './tipos'
 import { useFormas } from './useVendas'
 
-/** Formas de pagamento (taxa, prazo, parcelas e conta onde o dinheiro entra) e a regra de estoque negativo. */
+type Janela =
+  | { tipo: 'editar'; forma: FormaDePagamento | null }
+  | { tipo: 'situacao'; forma: FormaDePagamento }
+  | { tipo: 'selecionadas'; ativa: boolean }
+  | null
+
+const FILTROS = { situacao: 'todas', busca: '' }
+
+/** Formas de pagamento no padrão de grade (taxa, prazo, parcelas e conta onde o dinheiro entra) e as regras de venda. */
 export function FormasDePagamentoPage() {
   const { enviar } = useApi()
   const { perfilAtual, consolidado } = useEmpresa()
+  const permitido = PERFIS_DE_GESTAO.includes(perfilAtual) && !consolidado
+  const grade = useGrade(FILTROS)
   const [versao, setVersao] = useState(0)
-  const formas = useFormas(versao)
+  const { dados, erro: erroDaLista } = useListaPaginada<Pagina<FormaDePagamento>>(
+    permitido ? `/api/vendas/formas?${grade.consulta}` : null, versao, grade.filtros.busca ? 250 : 0)
+  const todas = useFormas(versao)
   const contas = useContas()
-  const [editando, setEditando] = useState<FormaDePagamento | 'nova' | null>(null)
+  const [janela, setJanela] = useState<Janela>(null)
   const [erro, setErro] = useState<string | null>(null)
 
-  if (!PERFIS_DE_GESTAO.includes(perfilAtual) || consolidado)
+  if (!permitido)
     return (
       <div className="mx-auto max-w-3xl">
         <h1 className="text-2xl font-bold tracking-tight">Formas de pagamento</h1>
@@ -30,101 +49,147 @@ export function FormasDePagamentoPage() {
       </div>
     )
 
-  const recarregar = () => setVersao((v) => v + 1)
-  const acao = async (caminho: string) => {
+  const recarregar = () => {
+    setJanela(null)
+    setVersao((v) => v + 1)
+  }
+  const adicionarPadrao = async () => {
     setErro(null)
     try {
-      await enviar('POST', caminho)
+      await enviar('POST', '/api/vendas/formas/padrao')
       recarregar()
     } catch (ex) {
       setErro(ex instanceof ErroDeApi ? ex.message : 'Não foi possível concluir.')
     }
   }
   const nomeDaConta = (id: string | null) => (id ? (contas?.find((c) => c.id === id)?.nome ?? '?') : '—')
-  const semConta = formas?.filter((f) => f.ativa && entraNaHora(f.tipo) && !f.contaId) ?? []
+  const semConta = todas?.filter((f) => f.ativa && entraNaHora(f.tipo) && !f.contaId) ?? []
+  const quantas = grade.selecionados.size
+
+  const colunas: Coluna<FormaDePagamento>[] = [
+    {
+      titulo: 'Forma',
+      celula: (f) => (
+        <>
+          <span className={`font-semibold ${f.ativa ? '' : 'line-through'}`}>{f.nome}</span>
+          {f.nome !== ROTULO_DO_TIPO[f.tipo] && <span className="block text-xs text-muted">{ROTULO_DO_TIPO[f.tipo]}</span>}
+        </>
+      ),
+    },
+    { titulo: 'Conta', celula: (f) => nomeDaConta(f.contaId) },
+    {
+      titulo: 'Taxa',
+      celula: (f) => (f.maxParcelas > 1 ? `${porcentagem(f.taxaAVista)} à vista · ${porcentagem(f.taxaParcelado)} parcelado` : porcentagem(f.taxaAVista)),
+      alinhar: 'direita',
+    },
+    { titulo: 'Parcelas', celula: (f) => (f.maxParcelas > 1 ? `até ${f.maxParcelas}x` : '1x'), alinhar: 'direita' },
+    { titulo: 'Prazo', celula: (f) => (f.prazoDias === 0 ? 'na hora' : `${f.prazoDias} ${f.prazoDias === 1 ? 'dia' : 'dias'}`), alinhar: 'direita' },
+    {
+      titulo: 'Situação',
+      celula: (f) => (
+        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${f.ativa ? 'bg-success-soft text-success' : 'bg-surface-2 text-muted'}`}>
+          {f.ativa ? 'Ativa' : 'Inativa'}
+        </span>
+      ),
+    },
+  ]
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <p className="text-xs text-muted">Vendas</p>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">Formas de pagamento</h1>
-          <p className="mt-1 text-sm text-muted">
-            Dinheiro e PIX entram na hora na conta escolhida. Cartões e outras formas viram contas a receber, já sem a taxa, no prazo de cada uma.
-          </p>
-        </div>
-        <button type="button" onClick={() => void acao('/api/vendas/formas/padrao')} className={estilos.botao}>Adicionar formas padrão</button>
-        <button type="button" onClick={() => setEditando('nova')} className={estilos.botaoPrimario}>Nova forma</button>
-      </div>
+    <div className="mx-auto max-w-7xl">
+      <CabecalhoDaPagina
+        secao="Vendas"
+        titulo="Formas de pagamento"
+        descricao="Dinheiro e PIX entram na hora na conta escolhida. Cartões e outras formas viram contas a receber, já sem a taxa, no prazo de cada uma."
+        acoes={
+          <>
+            <BotaoExportar relatorio="formas-de-pagamento" parametros={grade.parametros} selecionados={[...grade.selecionados]} />
+            <button type="button" onClick={() => void adicionarPadrao()} className={estilos.botao}>Adicionar formas padrão</button>
+            <button type="button" onClick={() => setJanela({ tipo: 'editar', forma: null })} className={estilos.botaoPrimario}>
+              <Icone nome="plus" />
+              Nova forma
+            </button>
+          </>
+        }
+      />
 
       {semConta.length > 0 && (
         <p role="alert" className="mt-4 rounded-lg bg-warning-soft px-3 py-2.5 text-sm text-warning">
           {`Defina a conta onde o dinheiro entra para: ${semConta.map((f) => f.nome).join(', ')}. Sem ela, a venda com essa forma é recusada.`}
         </p>
       )}
-      {erro && <p role="alert" className={`mt-4 ${estilos.erro}`}>{erro}</p>}
+      {(erro ?? erroDaLista) && <p role="alert" className={`mt-4 ${estilos.erro}`}>{erro ?? erroDaLista}</p>}
 
-      {formas && (
-        <div className="mt-6 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-          {formas.length === 0 ? (
-            <p className="p-8 text-center text-sm text-muted">Nenhuma forma ainda. Comece pelas formas padrão (dinheiro, PIX, débito e crédito).</p>
-          ) : (
-            <table aria-label="Formas de pagamento" className="w-full text-sm">
-              <thead className="bg-surface-2 text-left text-xs text-muted uppercase">
-                <tr>
-                  <th className="px-4 py-2">Forma</th>
-                  <th className="px-4 py-2">Conta</th>
-                  <th className="px-4 py-2 text-right">Taxa</th>
-                  <th className="px-4 py-2 text-right">Parcelas</th>
-                  <th className="px-4 py-2 text-right">Prazo</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {formas.map((f) => (
-                  <tr key={f.id} className={f.ativa ? '' : 'text-muted'}>
-                    <td className="px-4 py-2">
-                      <span className={`font-semibold ${f.ativa ? '' : 'line-through'}`}>{f.nome}</span>
-                      {f.nome !== ROTULO_DO_TIPO[f.tipo] && <span className="block text-xs text-muted">{ROTULO_DO_TIPO[f.tipo]}</span>}
-                    </td>
-                    <td className="px-4 py-2">{nomeDaConta(f.contaId)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">
-                      {f.maxParcelas > 1 ? `${porcentagem(f.taxaAVista)} à vista · ${porcentagem(f.taxaParcelado)} parcelado` : porcentagem(f.taxaAVista)}
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums">{f.maxParcelas > 1 ? `até ${f.maxParcelas}x` : '1x'}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{f.prazoDias === 0 ? 'na hora' : `${f.prazoDias} ${f.prazoDias === 1 ? 'dia' : 'dias'}`}</td>
-                    <td className="px-4 py-2">
-                      <div className="flex justify-end gap-2">
-                        <button type="button" onClick={() => setEditando(f)} className={estilos.botao} aria-label={`Editar ${f.nome}`}>Editar</button>
-                        <button
-                          type="button"
-                          onClick={() => void acao(`/api/vendas/formas/${f.id}/${f.ativa ? 'desativar' : 'reativar'}`)}
-                          className={estilos.botao}
-                          aria-label={`${f.ativa ? 'Desativar' : 'Reativar'} ${f.nome}`}
-                        >
-                          {f.ativa ? 'Desativar' : 'Reativar'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
+        <Campo rotulo="Buscar" className="min-w-60 flex-1">
+          <input value={grade.filtros.busca} onChange={(e) => grade.filtrar({ busca: e.target.value })} placeholder="Nome da forma" className={estilos.campo} />
+        </Campo>
+        <Campo rotulo="Situação" className="w-40">
+          <select value={grade.filtros.situacao} onChange={(e) => grade.filtrar({ situacao: e.target.value })} className={estilos.campo}>
+            <option value="todas">Todas</option>
+            <option value="ativas">Ativas</option>
+            <option value="inativas">Inativas</option>
+          </select>
+        </Campo>
+      </BarraDeFiltros>
+
+      <GradeDeRegistros
+        rotulo="Formas de pagamento"
+        colunas={colunas}
+        itens={dados?.itens ?? (erroDaLista ? [] : null)}
+        chave={(f) => f.id}
+        nome={(f) => f.nome}
+        total={dados?.total ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
+        apagada={(f) => !f.ativa}
+        vazio={grade.ativos ? 'Nenhuma forma de pagamento com esses filtros.' : 'Nenhuma forma ainda. Comece pelas formas padrão (dinheiro, PIX, débito e crédito).'}
+        acoes={(f) => (
+          <>
+            <AcaoDaLinha rotulo={`Editar ${f.nome}`} icone="pencil" onClick={() => setJanela({ tipo: 'editar', forma: f })} />
+            <AcaoDaLinha rotulo={`${f.ativa ? 'Desativar' : 'Reativar'} ${f.nome}`} icone="power" perigo={f.ativa} onClick={() => setJanela({ tipo: 'situacao', forma: f })} />
+          </>
+        )}
+        acoesEmLote={
+          <>
+            <button type="button" onClick={() => setJanela({ tipo: 'selecionadas', ativa: false })} className={estilos.botao}>Desativar selecionadas</button>
+            <button type="button" onClick={() => setJanela({ tipo: 'selecionadas', ativa: true })} className={estilos.botao}>Reativar selecionadas</button>
+          </>
+        }
+      />
 
       <RegraDeEstoque />
 
-      {editando && (
-        <EdicaoDeForma
-          forma={editando === 'nova' ? null : editando}
-          onFechar={() => setEditando(null)}
-          onSalvo={() => {
-            setEditando(null)
+      {janela?.tipo === 'editar' && <EdicaoDeForma forma={janela.forma} onFechar={() => setJanela(null)} onSalvo={recarregar} />}
+      {janela?.tipo === 'situacao' && (
+        <Confirmacao
+          titulo={janela.forma.ativa ? 'Desativar forma de pagamento' : 'Reativar forma de pagamento'}
+          rotulo={janela.forma.ativa ? 'Desativar' : 'Reativar'}
+          onCancelar={() => setJanela(null)}
+          onConfirmar={async () => {
+            await enviar('POST', `/api/vendas/formas/${janela.forma.id}/${janela.forma.ativa ? 'desativar' : 'reativar'}`)
             recarregar()
           }}
-        />
+        >
+          <p>
+            {janela.forma.ativa
+              ? `"${janela.forma.nome}" deixa de aparecer no registro de venda. As vendas já feitas não mudam.`
+              : `"${janela.forma.nome}" volta a aparecer no registro de venda.`}
+          </p>
+        </Confirmacao>
+      )}
+      {janela?.tipo === 'selecionadas' && (
+        <Confirmacao
+          titulo={janela.ativa ? 'Reativar formas de pagamento' : 'Desativar formas de pagamento'}
+          rotulo={janela.ativa ? 'Reativar' : 'Desativar'}
+          onCancelar={() => setJanela(null)}
+          onConfirmar={async () => {
+            await enviar('POST', '/api/vendas/formas/situacao', { ids: [...grade.selecionados], ativo: janela.ativa })
+            grade.limparSelecao()
+            recarregar()
+          }}
+        >
+          <p>{`${janela.ativa ? 'Reativar' : 'Desativar'} ${quantas === 1 ? 'a forma selecionada' : `as ${quantas} formas selecionadas`}?`}</p>
+        </Confirmacao>
       )}
     </div>
   )

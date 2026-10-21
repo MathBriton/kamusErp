@@ -10,6 +10,7 @@ const carteira = {
     { clienteId: 'p1', clienteNome: 'Maria Souza', limite: 500, emAberto: 139.9, atrasado: 59.9, diasDeAtraso: 30, disponivel: 360.1, bloqueado: true },
     { clienteId: 'p2', clienteNome: 'João', limite: 200, emAberto: 0, atrasado: 0, diasDeAtraso: 0, disponivel: 200, bloqueado: false },
   ],
+  registros: 2, pagina: 1, tamanho: 20,
 }
 const cliente = (extra = {}) => ({
   clienteId: 'p1', clienteNome: 'Maria Souza', limite: 500, emAberto: 139.9, disponivel: 360.1, diasDeAtraso: 30, bloqueado: true,
@@ -28,7 +29,7 @@ function api(extras: Parameters<typeof mockApi>[0] = {}, sessao = sessaoDemo) {
     'POST /api/auth/refresh': () => json(sessao),
     'GET /api/empresas/ativa': empresaAtivaHandler(sessao),
     'GET /health': () => new Response('Healthy'),
-    'GET /api/financeiro/crediario/carteira': () => json(carteira),
+    'GET /api/financeiro/crediario/carteira?pagina=1&tamanho=20': () => json(carteira),
     'GET /api/financeiro/crediario/clientes/p1': () => json(cliente()),
     'GET /api/financeiro/crediario/contas': () => json([{ id: 'c1', nome: 'Caixa da loja' }]),
     'GET /api/financeiro/crediario/configuracao': () => json({ multaPercentual: 2, jurosMensalPercentual: 1, diasParaBloquear: 15 }),
@@ -46,10 +47,34 @@ describe('Crediário → carteira', () => {
     api()
     renderApp('/vendas/crediario')
     const tabela = await screen.findByRole('table', { name: 'Carteira do crediário' })
-    expect(within(tabela).getByText('Maria Souza')).toBeInTheDocument()
+    expect(await within(tabela).findByText('Maria Souza')).toBeInTheDocument()
     expect(within(tabela).getByText('Bloqueado')).toBeInTheDocument()
     expect(screen.getByText('R$ 139,90', { selector: 'dd' })).toBeInTheDocument()
     expect(screen.getByText('1 a 30 dias')).toBeInTheDocument()
+    expect(screen.getByText('2 registros')).toBeInTheDocument()
+  })
+
+  it('busca na grade, abre a ficha pela linha e exporta a inadimplência dos selecionados', async () => {
+    const fetch = api({
+      'GET /api/financeiro/crediario/carteira?busca=jo&pagina=1&tamanho=20': () => json({ ...carteira, clientes: [carteira.clientes[1]], registros: 1 }),
+      'GET /api/relatorios/inadimplencia.csv?ids=p1': () => new Response('csv', { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=i.csv' } }),
+    })
+    renderApp('/vendas/crediario')
+    const tabela = await screen.findByRole('table', { name: 'Carteira do crediário' })
+    await within(tabela).findByText('Maria Souza')
+
+    await userEvent.click(within(tabela).getByRole('button', { name: 'Ver crediário de Maria Souza' }))
+    expect(await screen.findByRole('dialog', { name: 'Crediário de Maria Souza' })).toBeInTheDocument()
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Crediário de Maria Souza' })).getByRole('button', { name: 'Fechar' }))
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Selecionar Maria Souza' }))
+    await userEvent.click(screen.getByRole('button', { name: /Exportar/ }))
+    await userEvent.click(within(screen.getByRole('menu', { name: 'Exportar' })).getByRole('menuitem', { name: /CSV/ }))
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => url === '/api/relatorios/inadimplencia.csv?ids=p1')).toBe(true))
+
+    await userEvent.type(screen.getByLabelText('Buscar cliente'), 'jo')
+    await waitFor(() => expect(within(tabela).queryByText('Maria Souza')).not.toBeInTheDocument())
+    expect(screen.getByText('1 registro')).toBeInTheDocument()
   })
 
   it('recebe a parcela atrasada com multa e juros sugeridos e oferece o recibo', async () => {

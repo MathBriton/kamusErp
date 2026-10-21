@@ -95,10 +95,14 @@ export interface ValeTroca {
   motivoDoCancelamento: string | null
 }
 
+/** Saldos sobre todos os vales; `itens` é a página pedida (ou todos, sem página) e `total` quantos os filtros trazem. */
 export interface ListaDeVales {
   itens: ValeTroca[]
   saldoAtivo: number
   saldoVencido: number
+  total: number
+  pagina: number
+  tamanho: number
 }
 
 export type MotivoDaTroca = 'Tamanho' | 'Cor' | 'Defeito' | 'Desistencia' | 'Outro'
@@ -185,12 +189,24 @@ export interface Fechamento {
   contaAPagarGerada: boolean
 }
 
+/** Totais das vendas concluídas sobre todas as filtradas; `registros` = linhas com os filtros (`total` é o valor vendido). */
 export interface ListaDeVendas {
   itens: LinhaDeVenda[]
   quantidade: number
   pecas: number
   total: number
   ticketMedio: number
+  registros: number
+  pagina: number
+  tamanho: number
+}
+
+/** Página da grade padrão (`?pagina=&tamanho=`). */
+export interface Pagina<T> {
+  itens: T[]
+  total: number
+  pagina: number
+  tamanho: number
 }
 
 export interface ComissaoDoVendedor {
@@ -254,12 +270,16 @@ export interface LinhaDeCondicional {
   vendaNumero: number | null
 }
 
+/** Indicadores "na rua" sobre todas as filtradas; `total` = quantas os filtros trazem. */
 export interface ListaDeCondicionais {
   itens: LinhaDeCondicional[]
   abertas: number
   atrasadas: number
   pecasNaRua: number
   valorNaRua: number
+  total: number
+  pagina: number
+  tamanho: number
 }
 
 export interface Condicional {

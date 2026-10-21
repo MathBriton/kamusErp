@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { useApi } from '../api/useApi'
-import { ErroDeApi } from '../auth/api'
 import { moeda } from '../cadastros/catalogo'
 import { Campo } from '../components/Campo'
-import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { Confirmacao } from '../components/grade/Confirmacao'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade, useListaPaginada } from '../components/grade/useGrade'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { dataBr } from '../financeiro/tipos'
 import { BotaoExportar } from '../relatorios/BotaoExportar'
@@ -17,32 +20,17 @@ const TOM: Record<ValeTroca['situacao'], string> = {
   Cancelado: 'bg-danger-soft text-danger',
 }
 
-/** Vales-troca emitidos nas trocas: saldo, validade e situação; Dono e Gerente cancelam. */
-export function ValesPage() {
-  const { getJson } = useApi()
-  const { perfilAtual } = useEmpresa()
-  const [situacao, setSituacao] = useState('ativos')
-  const [busca, setBusca] = useState('')
-  const [versao, setVersao] = useState(0)
-  const [lista, setLista] = useState<ListaDeVales | null>(null)
-  const [cancelando, setCancelando] = useState<ValeTroca | null>(null)
-  const permitido = PERFIS_QUE_VENDEM.includes(perfilAtual) || PERFIS_QUE_CONSULTAM.includes(perfilAtual)
-  const filtros = useMemo(() => {
-    const f: Record<string, string> = { situacao }
-    if (busca.trim()) f.busca = busca.trim()
-    return f
-  }, [situacao, busca])
+const FILTROS = { situacao: 'ativos', busca: '' }
 
-  useEffect(() => {
-    if (!permitido) return
-    const controle = new AbortController()
-    getJson<ListaDeVales>(`/api/vendas/vales?${new URLSearchParams(filtros)}`, controle.signal)
-      .then(setLista)
-      .catch(() => {
-        if (!controle.signal.aborted) setLista({ itens: [], saldoAtivo: 0, saldoVencido: 0 })
-      })
-    return () => controle.abort()
-  }, [getJson, filtros, versao, permitido])
+/** Vales-troca emitidos nas trocas, no padrão de grade: saldo, validade e situação; Dono e Gerente cancelam com motivo. */
+export function ValesPage() {
+  const { perfilAtual } = useEmpresa()
+  const permitido = PERFIS_QUE_VENDEM.includes(perfilAtual) || PERFIS_QUE_CONSULTAM.includes(perfilAtual)
+  const gestao = PERFIS_DE_GESTAO.includes(perfilAtual)
+  const grade = useGrade(FILTROS)
+  const [versao, setVersao] = useState(0)
+  const { dados: lista, erro } = useListaPaginada<ListaDeVales>(permitido ? `/api/vendas/vales?${grade.consulta}` : null, versao, grade.filtros.busca ? 250 : 0)
+  const [cancelando, setCancelando] = useState<ValeTroca | null>(null)
 
   if (!permitido)
     return (
@@ -52,20 +40,28 @@ export function ValesPage() {
       </div>
     )
 
-  return (
-    <div className="mx-auto max-w-5xl">
-      <p className="text-xs text-muted">Vendas</p>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">Vales-troca</h1>
-          <p className="mt-1 text-sm text-muted">Crédito do cliente gerado nas trocas. É aceito como forma de pagamento, em uma ou mais compras, até a validade.</p>
-        </div>
-        <BotaoExportar relatorio="vales-troca" parametros={filtros} />
-      </div>
+  const colunas: Coluna<ValeTroca>[] = [
+    { titulo: 'Código', celula: (v) => <span className="font-mono font-semibold">{v.codigo}</span> },
+    { titulo: 'Cliente', celula: (v) => v.clienteNome ?? '—' },
+    { titulo: 'Emitido', celula: (v) => dataBr(v.emitidoEm) },
+    { titulo: 'Válido até', celula: (v) => dataBr(v.validoAte) },
+    { titulo: 'Valor', celula: (v) => moeda(v.valor), alinhar: 'direita' },
+    { titulo: 'Saldo', celula: (v) => <span className="font-semibold">{moeda(v.saldo)}</span>, alinhar: 'direita' },
+    { titulo: 'Situação', celula: (v) => <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${TOM[v.situacao]}`}>{v.situacao}</span> },
+  ]
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-4">
-        <Campo rotulo="Situação">
-          <select value={situacao} onChange={(e) => setSituacao(e.target.value)} className={estilos.campo}>
+  return (
+    <div className="mx-auto max-w-7xl">
+      <CabecalhoDaPagina
+        secao="Vendas"
+        titulo="Vales-troca"
+        descricao="Crédito do cliente gerado nas trocas. É aceito como forma de pagamento, em uma ou mais compras, até a validade."
+        acoes={<BotaoExportar relatorio="vales-troca" parametros={grade.parametros} selecionados={[...grade.selecionados]} />}
+      />
+
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
+        <Campo rotulo="Situação" className="w-40">
+          <select value={grade.filtros.situacao} onChange={(e) => grade.filtrar({ situacao: e.target.value })} className={estilos.campo}>
             <option value="ativos">Ativos</option>
             <option value="usados">Usados</option>
             <option value="vencidos">Vencidos</option>
@@ -73,67 +69,46 @@ export function ValesPage() {
             <option value="todos">Todos</option>
           </select>
         </Campo>
-        <Campo rotulo="Busca" className="sm:col-span-1">
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Código ou cliente" className={estilos.campo} />
+        <Campo rotulo="Busca" className="min-w-48 flex-1">
+          <input value={grade.filtros.busca} onChange={(e) => grade.filtrar({ busca: e.target.value })} placeholder="Código ou cliente" className={estilos.campo} />
         </Campo>
-        {lista && (
-          <dl className="contents">
-            <div className="rounded-2xl border border-border bg-surface p-3 shadow-sm">
-              <dt className="text-xs text-muted">Saldo em vales ativos</dt>
-              <dd className="text-lg font-bold tabular-nums">{moeda(lista.saldoAtivo)}</dd>
-            </div>
-            <div className="rounded-2xl border border-border bg-surface p-3 shadow-sm">
-              <dt className="text-xs text-muted">Saldo vencido (não usado)</dt>
-              <dd className="text-lg font-bold tabular-nums">{moeda(lista.saldoVencido)}</dd>
-            </div>
-          </dl>
-        )}
-      </div>
+      </BarraDeFiltros>
+
+      {erro && <p role="alert" className={`mt-4 ${estilos.erro}`}>{erro}</p>}
 
       {lista && (
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-          {lista.itens.length === 0 ? (
-            <p className="p-8 text-center text-sm text-muted">Nenhum vale nesta situação.</p>
-          ) : (
-            <table aria-label="Vales-troca" className="w-full text-sm">
-              <thead className="bg-surface-2 text-left text-xs text-muted uppercase">
-                <tr>
-                  <th className="px-4 py-2">Código</th>
-                  <th className="px-4 py-2">Cliente</th>
-                  <th className="px-4 py-2">Emitido</th>
-                  <th className="px-4 py-2">Válido até</th>
-                  <th className="px-4 py-2 text-right">Valor</th>
-                  <th className="px-4 py-2 text-right">Saldo</th>
-                  <th className="px-4 py-2">Situação</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {lista.itens.map((v) => (
-                  <tr key={v.id}>
-                    <td className="px-4 py-2 font-mono font-semibold">{v.codigo}</td>
-                    <td className="px-4 py-2">{v.clienteNome ?? '—'}</td>
-                    <td className="px-4 py-2">{dataBr(v.emitidoEm)}</td>
-                    <td className="px-4 py-2">{dataBr(v.validoAte)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{moeda(v.valor)}</td>
-                    <td className="px-4 py-2 text-right font-semibold tabular-nums">{moeda(v.saldo)}</td>
-                    <td className="px-4 py-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${TOM[v.situacao]}`}>{v.situacao}</span>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      {PERFIS_DE_GESTAO.includes(perfilAtual) && v.situacao !== 'Cancelado' && v.situacao !== 'Usado' && (
-                        <button type="button" onClick={() => setCancelando(v)} className={`${estilos.botao} text-danger`} aria-label={`Cancelar ${v.codigo}`}>
-                          Cancelar
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+            <dt className="text-xs text-muted">Saldo em vales ativos</dt>
+            <dd className="text-xl font-bold tabular-nums">{moeda(lista.saldoAtivo)}</dd>
+          </div>
+          <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+            <dt className="text-xs text-muted">Saldo vencido (não usado)</dt>
+            <dd className="text-xl font-bold tabular-nums">{moeda(lista.saldoVencido)}</dd>
+          </div>
+        </dl>
       )}
+
+      <GradeDeRegistros
+        rotulo="Vales-troca"
+        colunas={colunas}
+        itens={lista?.itens ?? (erro ? [] : null)}
+        chave={(v) => v.id}
+        nome={(v) => v.codigo}
+        total={lista?.total ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
+        apagada={(v) => v.situacao === 'Cancelado' || v.situacao === 'Usado'}
+        vazio="Nenhum vale com esses filtros."
+        acoes={
+          gestao
+            ? (v) =>
+                v.situacao !== 'Cancelado' && v.situacao !== 'Usado' && (
+                  <AcaoDaLinha rotulo={`Cancelar ${v.codigo}`} icone="x" perigo onClick={() => setCancelando(v)} />
+                )
+            : undefined
+        }
+      />
 
       {cancelando && (
         <CancelarVale
@@ -149,35 +124,24 @@ export function ValesPage() {
   )
 }
 
+/** Cancelamento com motivo (a API recusa sem ele e o erro aparece no diálogo). */
 function CancelarVale({ vale, onFechar, onCancelado }: { vale: ValeTroca; onFechar: () => void; onCancelado: () => void }) {
   const { enviar } = useApi()
   const [motivo, setMotivo] = useState('')
-  const [erro, setErro] = useState<string | null>(null)
-
-  async function cancelar(e: FormEvent) {
-    e.preventDefault()
-    setErro(null)
-    try {
-      await enviar('POST', `/api/vendas/vales/${vale.id}/cancelar`, { motivo })
-      onCancelado()
-    } catch (ex) {
-      setErro(ex instanceof ErroDeApi ? ex.message : 'Não foi possível cancelar.')
-    }
-  }
-
   return (
-    <Dialogo titulo={`Cancelar vale ${vale.codigo}`} onFechar={onFechar}>
-      <form onSubmit={cancelar} className="space-y-4 text-sm">
-        <p className="text-muted">{`O saldo de ${moeda(vale.saldo)} deixa de valer como crédito do cliente.`}</p>
-        <Campo rotulo="Motivo">
-          <input value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={300} autoFocus className={estilos.campo} />
-        </Campo>
-        {erro && <p role="alert" className={estilos.erro}>{erro}</p>}
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onFechar} className={estilos.botao}>Voltar</button>
-          <button type="submit" disabled={!motivo.trim()} className={estilos.botaoPrimario}>Cancelar vale</button>
-        </div>
-      </form>
-    </Dialogo>
+    <Confirmacao
+      titulo={`Cancelar vale ${vale.codigo}`}
+      rotulo="Cancelar vale"
+      onCancelar={onFechar}
+      onConfirmar={async () => {
+        await enviar('POST', `/api/vendas/vales/${vale.id}/cancelar`, { motivo })
+        onCancelado()
+      }}
+    >
+      <p className="mb-3 text-muted">{`O saldo de ${moeda(vale.saldo)} deixa de valer como crédito do cliente.`}</p>
+      <Campo rotulo="Motivo">
+        <input value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={300} autoFocus className={estilos.campo} />
+      </Campo>
+    </Confirmacao>
   )
 }
