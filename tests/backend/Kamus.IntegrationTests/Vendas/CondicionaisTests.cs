@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Kamus.SharedKernel.Tempo;
 using static Kamus.IntegrationTests.Estoque.ApiDoEstoque;
 
@@ -23,6 +24,7 @@ public sealed class CondicionaisTests : IAsyncDisposable
     private sealed record FechamentoDto(CondicionalDto Condicional, int? VendaNumero, decimal? VendaTotal);
     private sealed record LinhaDto(Guid Id, int Numero, string ClienteNome, int Pecas, decimal Valor, string Situacao);
     private sealed record ListaDto(List<LinhaDto> Itens, int Abertas, int Atrasadas, int PecasNaRua, decimal ValorNaRua);
+    private sealed record PaginaDto(List<LinhaDto> Itens, int Total, int Pagina, int Tamanho, int Abertas, int PecasNaRua);
     private sealed record ConversaoDto(Guid? VendedorId, string Vendedor, int Condicionais, int PecasLevadas, int PecasVendidas, decimal ValorLevado,
         decimal ValorVendido, decimal Conversao);
     private sealed record CelulaDto(Guid SkuId, int Quantidade);
@@ -104,6 +106,15 @@ public sealed class CondicionaisTests : IAsyncDisposable
         (lista.Itens.Count, lista.Abertas, lista.Atrasadas, lista.PecasNaRua, lista.ValorNaRua).ShouldBe((3, 3, 1, 6, 359.40m));
         (await c.Client.GetFromJsonAsync<ListaDto>(U("/api/vendas/condicionais?situacao=atrasadas"), Ct))!.Itens.Single().Numero.ShouldBe(2);
         (await c.Client.GetStringAsync(U("/api/relatorios/condicionais.csv?situacao=abertas"), Ct)).ShouldContain("Maria Souza");
+
+        var pagina = (await c.Client.GetFromJsonAsync<PaginaDto>(U("/api/vendas/condicionais?situacao=abertas&pagina=1&tamanho=2"), Ct))!;
+        (pagina.Itens.Count, pagina.Total, pagina.Pagina, pagina.Tamanho, pagina.Abertas, pagina.PecasNaRua).ShouldBe((2, 3, 1, 2, 3, 6));
+        var dados = await c.Client.GetFromJsonAsync<JsonElement>(U($"/api/relatorios/condicionais/dados?ids={liberada.Id}&situacao=fechadas"), Ct);
+        dados.GetProperty("linhas").GetArrayLength().ShouldBe(1);
+        dados.GetProperty("linhas")[0][0].GetInt32().ShouldBe(liberada.Numero);
+        dados.GetProperty("filtros")[0].GetProperty("valor").GetString().ShouldBe("1 condicional");
+        var busca = await c.Client.GetFromJsonAsync<JsonElement>(U("/api/relatorios/condicionais/dados?situacao=todas&busca=2"), Ct);
+        busca.GetProperty("linhas").GetArrayLength().ShouldBe(1);
     }
 
     [Fact]

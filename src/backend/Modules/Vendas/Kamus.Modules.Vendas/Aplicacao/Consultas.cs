@@ -8,13 +8,17 @@ using Microsoft.EntityFrameworkCore;
 namespace Kamus.Modules.Vendas.Aplicacao;
 
 /// <param name="Status">concluidas, canceladas ou todas.</param>
-public sealed record FiltroDeVendas(DateOnly? De, DateOnly? Ate, Guid? VendedorId, string Status, string? Busca, Guid? ClienteId = null);
+/// <param name="Ids">Só estas vendas (linhas selecionadas na grade).</param>
+public sealed record FiltroDeVendas(DateOnly? De, DateOnly? Ate, Guid? VendedorId, string Status, string? Busca, Guid? ClienteId = null, IReadOnlyCollection<Guid>? Ids = null);
 
 public sealed record LinhaDeVenda(Guid Id, Guid EmpresaId, int Numero, DateOnly Data, string? ClienteNome, Guid? VendedorId, string? VendedorNome, int Pecas,
     decimal Total, string Formas, string Status, string? NotaExterna);
 
-/// <summary>Totais só das vendas concluídas.</summary>
-public sealed record ListaDeVendas(IReadOnlyList<LinhaDeVenda> Itens, int Quantidade, int Pecas, decimal Total, decimal TicketMedio);
+/// <summary>
+/// Totais só das vendas concluídas, sempre sobre todas as filtradas. <c>Itens</c> é a página pedida (ou todas, sem página);
+/// <c>Registros</c> é quantas linhas os filtros trazem (<c>Total</c> já é o valor vendido).
+/// </summary>
+public sealed record ListaDeVendas(IReadOnlyList<LinhaDeVenda> Itens, int Quantidade, int Pecas, decimal Total, decimal TicketMedio, int Registros, int Pagina, int Tamanho);
 
 /// <param name="Total">Total das vendas mais a diferença das trocas (base da comissão).</param>
 /// <param name="ComissaoPendente">Parte ainda não incluída em fechamento.</param>
@@ -40,6 +44,11 @@ internal static class Consultas
         if (f.Ate is { } ate) q = q.Where(v => v.Data <= ate);
         if (f.VendedorId is { } vendedor) q = q.Where(v => v.VendedorId == vendedor);
         if (f.ClienteId is { } cliente) q = q.Where(v => v.ClienteId == cliente);
+        if (f.Ids is { } selecionadas)
+        {
+            var lista = selecionadas.ToList();
+            q = q.Where(v => lista.Contains(v.Id));
+        }
         if (f.Status == "concluidas") q = q.Where(v => v.Status == StatusDaVenda.Concluida);
         if (f.Status == "canceladas") q = q.Where(v => v.Status == StatusDaVenda.Cancelada);
         var vendas = await q.ToListAsync(ct);
@@ -55,15 +64,17 @@ internal static class Consultas
 
     public static string Formas(Venda v) => string.Join(" + ", v.Pagamentos.Select(p => p.Parcelas > 1 ? $"{p.FormaNome} {p.Parcelas}x" : p.FormaNome));
 
-    public static async Task<ListaDeVendas> ListarAsync(VendasDbContext db, IEmpresaAtiva empresa, Guid? usuarioId, FiltroDeVendas f, CancellationToken ct)
+    /// <param name="pagina">Sem página, devolve todas as linhas (app e histórico do cliente).</param>
+    public static async Task<ListaDeVendas> ListarAsync(VendasDbContext db, IEmpresaAtiva empresa, Guid? usuarioId, FiltroDeVendas f, CancellationToken ct,
+        int? pagina = null, int? tamanho = null)
     {
         var vendas = await FiltrarAsync(db, empresa, usuarioId, f, ct);
         var concluidas = vendas.Where(v => v.Status == StatusDaVenda.Concluida).ToList();
         var total = concluidas.Sum(v => v.Total);
-        return new ListaDeVendas(
-            vendas.Select(v => new LinhaDeVenda(v.Id, v.EmpresaId, v.Numero, v.Data, v.ClienteNome, v.VendedorId, v.VendedorNome, v.Pecas, v.Total, Formas(v),
-                v.Status.ToString(), v.NotaExterna)).ToList(),
-            concluidas.Count, concluidas.Sum(v => v.Pecas), total, concluidas.Count == 0 ? 0 : Math.Round(total / concluidas.Count, 2));
+        var pag = vendas.PaginarSePedido(pagina, tamanho).Converter(v => new LinhaDeVenda(v.Id, v.EmpresaId, v.Numero, v.Data, v.ClienteNome, v.VendedorId,
+            v.VendedorNome, v.Pecas, v.Total, Formas(v), v.Status.ToString(), v.NotaExterna));
+        return new ListaDeVendas(pag.Itens, concluidas.Count, concluidas.Sum(v => v.Pecas), total, concluidas.Count == 0 ? 0 : Math.Round(total / concluidas.Count, 2),
+            pag.Total, pag.Pagina, pag.Tamanho);
     }
 
     /// <summary>Comissão por vendedor sobre o total das vendas concluídas no período, ajustada pelas trocas (data da troca).</summary>

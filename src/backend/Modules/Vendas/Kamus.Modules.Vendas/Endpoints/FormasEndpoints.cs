@@ -1,6 +1,8 @@
+using Kamus.Modules.Vendas.Aplicacao;
 using Kamus.Modules.Vendas.Dominio;
 using Kamus.Modules.Vendas.Persistencia;
 using Kamus.SharedKernel.Busca;
+using Kamus.SharedKernel.Consultas;
 using Kamus.SharedKernel.Financeiro;
 using Kamus.SharedKernel.MultiTenancy;
 using Microsoft.AspNetCore.Builder;
@@ -23,7 +25,8 @@ internal static class FormasEndpoints
     public static IEndpointRouteBuilder MapFormas(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/vendas").RequireAuthorization().WithTags("Vendas");
-        g.MapGet("/formas", Listar).WithSummary("Formas de pagamento da empresa ativa (todos os perfis veem)");
+        g.MapGet("/formas", Listar).WithSummary("Formas de pagamento da empresa ativa (todos os perfis veem). Filtros: situacao (ativas, inativas, todas), busca; pagina e tamanho devolvem { itens, total, pagina, tamanho }");
+        g.MapPost("/formas/situacao", MudarEmLote).WithSummary("Desativa ou reativa várias formas de uma vez (seleção da grade; Dono/Gerente)").Produces<SituacaoEmLoteResponse>();
         g.MapPost("/formas/padrao", Padrao).WithSummary("Cria as formas padrão que ainda não existem (dinheiro, PIX, débito e crédito)");
         g.MapPost("/formas", Criar).WithSummary("Nova forma de pagamento").Produces<FormaDto>(StatusCodes.Status201Created);
         g.MapPut("/formas/{id:guid}", Atualizar).WithSummary("Altera nome, tipo, conta, taxas, parcelas e prazo");
@@ -36,11 +39,43 @@ internal static class FormasEndpoints
 
     private static FormaDto Dto(FormaDePagamento f) => new(f.Id, f.Nome, f.Tipo.ToString(), f.ContaId, f.TaxaAVista, f.TaxaParcelado, f.MaxParcelas, f.PrazoDias, f.Ativa);
 
-    private static async Task<IResult> Listar(VendasDbContext db, IEmpresaAtiva empresa, CancellationToken ct)
+    public static readonly string[] Situacoes = ["ativas", "inativas", "todas"];
+
+    /// <param name="selecionadas">Só estas formas (linhas marcadas na grade), ignorando os demais filtros.</param>
+    internal static async Task<List<FormaDto>> ListaAsync(VendasDbContext db, IEmpresaAtiva empresa, string situacao, string? busca, CancellationToken ct,
+        IReadOnlySet<Guid>? selecionadas = null)
     {
         var ids = empresa.EmpresaIds;
         var formas = await db.Formas.AsNoTracking().Where(f => ids.Contains(f.EmpresaId)).ToListAsync(ct);
-        return Results.Ok(formas.OrderByDescending(f => f.Ativa).ThenBy(f => f.Tipo).ThenBy(f => f.Nome, StringComparer.CurrentCulture).Select(Dto).ToList());
+        if (selecionadas is { Count: > 0 }) (formas, situacao, busca) = ([.. formas.Where(f => selecionadas.Contains(f.Id))], "todas", null);
+        var termo = TextoParaBusca.Normalizar(busca);
+        return formas.Where(f => situacao == "todas" || f.Ativa == (situacao == "ativas"))
+            .Where(f => string.IsNullOrEmpty(termo) || TextoParaBusca.Normalizar(f.Nome).Contains(termo, StringComparison.Ordinal))
+            .OrderByDescending(f => f.Ativa).ThenBy(f => f.Tipo).ThenBy(f => f.Nome, StringComparer.CurrentCulture).Select(Dto).ToList();
+    }
+
+    /// <summary>Sem <c>pagina</c>, a lista completa (registro de venda, troca, condicional); com <c>pagina</c>, a grade.</summary>
+    private static async Task<IResult> Listar(string? situacao, string? busca, int? pagina, int? tamanho, VendasDbContext db, IEmpresaAtiva empresa, CancellationToken ct)
+    {
+        var s = situacao?.ToLowerInvariant() ?? "todas";
+        if (!Situacoes.Contains(s)) return Permissoes.Erro("Situação inválida: ativas, inativas ou todas.");
+        var formas = await ListaAsync(db, empresa, s, busca, ct);
+        return pagina is null ? Results.Ok(formas) : Results.Ok(formas.PaginarSePedido(pagina, tamanho));
+    }
+
+    private static async Task<IResult> MudarEmLote(SituacaoEmLoteRequest r, VendasDbContext db, IEmpresaAtiva empresa, CancellationToken ct)
+    {
+        if (Permissoes.Exigir(empresa, Permissoes.Gestao, SoGestao) is { } negado) return negado;
+        var ids = (r.Ids ?? []).Distinct().ToList();
+        if (ids.Count == 0) return Permissoes.Erro("Selecione pelo menos uma forma de pagamento.");
+        var formas = await db.Formas.Where(f => ids.Contains(f.Id) && f.EmpresaId == empresa.EmpresaId && f.Ativa != r.Ativo).ToListAsync(ct);
+        foreach (var forma in formas)
+        {
+            if (r.Ativo) forma.Reativar();
+            else forma.Desativar();
+        }
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(new SituacaoEmLoteResponse(formas.Count));
     }
 
     private static async Task<IResult> Padrao(VendasDbContext db, IEmpresaAtiva empresa, CancellationToken ct)

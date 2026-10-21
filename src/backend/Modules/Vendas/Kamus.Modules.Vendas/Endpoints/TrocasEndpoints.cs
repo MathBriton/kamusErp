@@ -43,7 +43,7 @@ internal static class TrocasEndpoints
             .WithSummary("Peças da venda que ainda podem ser devolvidas, com o valor pago por peça e o prazo de troca");
         g.MapGet("/devolviveis", (int numero, VendasDbContext db, IEmpresaAtiva e, TimeProvider r, CancellationToken ct) => Devolviveis(null, numero, db, e, r, ct))
             .WithSummary("O mesmo, pelo nº da venda (qualquer venda da empresa, para quem registra trocas)");
-        g.MapGet("/trocas", Listar).WithSummary("Trocas no período (de, ate, busca, vendaId)");
+        g.MapGet("/trocas", Listar).WithSummary("Trocas no período (de, ate, busca, vendaId; pagina e tamanho devolvem { itens, total, pagina, tamanho })");
         g.MapGet("/trocas/{id:guid}", Obter).WithSummary("Troca com peças devolvidas, levadas, pagamentos e vale");
         g.MapPost("/trocas", Registrar).WithSummary("Registra a troca: devolve ao estoque, baixa as peças levadas e lança a diferença ou emite o vale-troca")
             .Produces<TrocaDto>(StatusCodes.Status201Created);
@@ -86,11 +86,17 @@ internal static class TrocasEndpoints
         return Permissoes.VeTudo(empresa) ? trocas : trocas.Where(t => t.RegistradaPorId == usuarioId);
     }
 
-    private static async Task<IResult> Listar(DateOnly? de, DateOnly? ate, string? busca, Guid? vendaId, VendasDbContext db, IEmpresaAtiva empresa,
-        IUsuarioAtual usuario, CancellationToken ct)
+    /// <param name="selecionadas">Só estas trocas (linhas marcadas na grade), ignorando os demais filtros.</param>
+    internal static async Task<List<LinhaDeTroca>> ListaAsync(VendasDbContext db, IEmpresaAtiva empresa, Guid? usuarioId, DateOnly? de, DateOnly? ate, string? busca,
+        Guid? vendaId, CancellationToken ct, IReadOnlySet<Guid>? selecionadas = null)
     {
-        if (Permissoes.Exigir(empresa, Perfis, "Seu perfil não acessa as vendas.") is { } negado) return negado;
-        var q = Visiveis(db, empresa, usuario.Id);
+        var q = Visiveis(db, empresa, usuarioId);
+        if (selecionadas is { Count: > 0 })
+        {
+            var lista = selecionadas.ToList();
+            (de, ate, busca, vendaId) = (null, null, null, null);
+            q = q.Where(t => lista.Contains(t.Id));
+        }
         if (de is { } d) q = q.Where(t => t.Data >= d);
         if (ate is { } a) q = q.Where(t => t.Data <= a);
         if (vendaId is { } v) q = q.Where(t => t.VendaId == v);
@@ -104,9 +110,18 @@ internal static class TrocasEndpoints
         }
         var valeIds = trocas.Where(t => t.ValeId is not null).Select(t => t.ValeId!.Value).ToList();
         var codigos = await db.Vales.AsNoTracking().Where(x => valeIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Codigo, ct);
-        return Results.Ok(trocas.OrderByDescending(t => t.Data).ThenByDescending(t => t.Numero)
+        return trocas.OrderByDescending(t => t.Data).ThenByDescending(t => t.Numero)
             .Select(t => new LinhaDeTroca(t.Id, t.Numero, t.Data, t.VendaNumero, t.ClienteNome, t.Motivo.ToString(), t.Devolvidos.Sum(x => x.Quantidade), t.ValorDevolvido,
-                t.ValorLevado, t.Diferenca, t.ValeId is { } id ? codigos.GetValueOrDefault(id) : null)).ToList());
+                t.ValorLevado, t.Diferenca, t.ValeId is { } id ? codigos.GetValueOrDefault(id) : null)).ToList();
+    }
+
+    /// <summary>Sem <c>pagina</c>, a lista completa (como antes); com <c>pagina</c>, <c>{ itens, total, pagina, tamanho }</c>.</summary>
+    private static async Task<IResult> Listar(DateOnly? de, DateOnly? ate, string? busca, Guid? vendaId, int? pagina, int? tamanho, VendasDbContext db,
+        IEmpresaAtiva empresa, IUsuarioAtual usuario, CancellationToken ct)
+    {
+        if (Permissoes.Exigir(empresa, Perfis, "Seu perfil não acessa as vendas.") is { } negado) return negado;
+        var linhas = await ListaAsync(db, empresa, usuario.Id, de, ate, busca, vendaId, ct);
+        return pagina is null ? Results.Ok(linhas) : Results.Ok(linhas.PaginarSePedido(pagina, tamanho));
     }
 
     private static async Task<TrocaDto> DtoAsync(VendasDbContext db, Troca t, DateOnly hoje, IReadOnlyList<string>? avisos, CancellationToken ct)
