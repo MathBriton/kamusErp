@@ -65,6 +65,24 @@ describe('Shell', () => {
     expect(screen.getByRole('button', { name: 'Tema: Claro (clique para trocar)' })).toBeInTheDocument()
   })
 
+  it('clicar no logo "kamus" do menu lateral volta ao dashboard', async () => {
+    api()
+    renderApp('/relatorios')
+    await screen.findByRole('heading', { name: 'Relatórios' })
+
+    await userEvent.click(screen.getByRole('link', { name: 'kamus — ir para o dashboard' }))
+
+    expect(await screen.findByRole('heading', { name: /Olá, Admin/ })).toBeInTheDocument()
+  })
+
+  it('barra superior mostra a data e a hora', async () => {
+    api()
+    renderApp()
+    await screen.findByText(/Olá, Admin/)
+
+    expect(screen.getByRole('banner').querySelector('time')).toHaveTextContent(/\d{2}\/\d{2}\/\d{4} · \d{2}:\d{2}/)
+  })
+
   it('recolher o menu guarda a preferência', async () => {
     api()
     renderApp()

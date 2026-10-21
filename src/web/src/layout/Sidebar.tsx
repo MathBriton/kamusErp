@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, useLocation } from 'react-router'
+import { Link, NavLink, useLocation } from 'react-router'
 import { Icone } from '../components/Icone'
 import { Logo } from '../components/Logo'
 import type { GrupoMenu } from '../navegacao/menu'
@@ -45,16 +45,16 @@ export function Sidebar({ menu, recolhido, onAlternarRecolhido, onNavegar }: Pro
     `${itemBase} ${isActive ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface-2 hover:text-foreground'}`
 
   return (
-    <aside className={`flex h-full flex-col border-r border-border bg-surface p-3 ${recolhido ? 'w-[72px]' : 'w-64'}`}>
+    <aside className={`flex h-full flex-col border-r border-border bg-surface p-3 ${recolhido ? 'w-[72px]' : 'w-[260px]'}`}>
       <div className={`flex items-center px-1.5 pb-4 ${recolhido ? 'justify-center' : ''}`}>
-        {recolhido ? (
-          <span className="grid size-9 place-items-center rounded-lg bg-primary font-extrabold text-primary-foreground">K</span>
-        ) : (
-          <>
+        <Link to="/" onClick={onNavegar} aria-label="kamus — ir para o dashboard" title="Ir para o dashboard" className="rounded-lg">
+          {recolhido ? (
+            <span className="grid size-9 place-items-center rounded-lg bg-primary font-extrabold text-primary-foreground">K</span>
+          ) : (
             <Logo />
-            <span className="ml-auto rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-muted">ERP</span>
-          </>
-        )}
+          )}
+        </Link>
+        {!recolhido && <span className="ml-auto rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-muted">ERP</span>}
       </div>
 
       <nav aria-label="Menu principal" className="flex-1 space-y-0.5 overflow-y-auto">

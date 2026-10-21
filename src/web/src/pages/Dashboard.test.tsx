@@ -1,7 +1,7 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
-import { hojeIso, somarDias } from '../financeiro/tipos'
+import { describe, expect, it, vi } from 'vitest'
+import { dataBr, hojeIso, somarDias } from '../financeiro/tipos'
 import { corpo, empresaAtivaHandler, json, mockApi, problema, sessaoDemo, sessaoVendedor } from '../test/mockApi'
 import { renderApp } from '../test/renderApp'
 
@@ -10,7 +10,7 @@ const dias = Array.from({ length: 30 }, (_, i) => ({ data: somarDias(hoje, i - 2
 dias[29] = { data: hoje, vendas: 2, pecas: 3, total: 179.7 }
 
 const cartao = (extra = {}) => ({ total: 179.7, vendas: 2, pecas: 3, ticketMedio: 89.85, totalAnterior: 59.9, variacao: 200, ...extra })
-const compromissos = (extra = {}) => ({ hoje: 0, amanha: 0, proximosSeteDias: 0, vencido: 0, parcelasVencidas: 0, ...extra })
+const compromissos = (extra = {}) => ({ hoje: 0, amanha: 0, proximosSeteDias: 0, vencido: 0, parcelasVencidas: 0, parcelasProximosSeteDias: 0, ...extra })
 const dashboard = (extra = {}) => ({
   periodo: 'hoje',
   de: hoje,
@@ -27,17 +27,18 @@ const dashboard = (extra = {}) => ({
   financeiro: {
     contas: [{ id: 'c1', nome: 'Caixa da loja', tipo: 'Caixa', saldo: 339.6 }],
     saldoTotal: 339.6,
-    aReceber: compromissos({ hoje: 120, proximosSeteDias: 600 }),
-    aPagar: compromissos({ hoje: 30, proximosSeteDias: 30, vencido: 50, parcelasVencidas: 1 }),
+    aReceber: compromissos({ hoje: 120, proximosSeteDias: 600, parcelasProximosSeteDias: 3 }),
+    aPagar: compromissos({ hoje: 30, proximosSeteDias: 30, vencido: 50, parcelasVencidas: 1, parcelasProximosSeteDias: 1 }),
     crediarioEmAtraso: 0,
     clientesEmAtraso: 0,
   },
-  estoque: { pecas: 6, valorDeCusto: 120, valorDeVenda: 359.4, skusNegativos: 0, quebras: [], totalDeQuebras: 0 },
+  estoque: { pecas: 6, valorDeCusto: 120, valorDeVenda: 359.4, skusNegativos: 0, quebras: [], totalDeQuebras: 2 },
   condicionais: { abertas: 1, atrasadas: 1, pecas: 1, valor: 59.9 },
   alertas: [
     { tipo: 'contas_a_pagar_vencidas', gravidade: 'perigo', titulo: '1 conta a pagar vencida', detalhe: 'R$ 50,00 em atraso', link: '/financeiro/contas-a-pagar' },
     { tipo: 'condicionais_atrasadas', gravidade: 'perigo', titulo: '1 condicional atrasada', detalhe: 'Passaram do prazo de devolução', link: '/vendas/condicional' },
   ],
+  primeirosPassos: ['produtos', 'clientes', 'entrada_de_estoque', 'contas_a_pagar', 'primeira_venda'],
   ...extra,
 })
 const vazio = () =>
@@ -45,7 +46,24 @@ const vazio = () =>
     vendas: { ...dashboard().vendas, periodo: cartao({ total: 0, vendas: 0, pecas: 0, ticketMedio: 0, totalAnterior: 0, variacao: null }), ultimos30Dias: dias.map((d) => ({ ...d, vendas: 0, pecas: 0, total: 0 })), maisVendidos: [] },
     estoque: { pecas: 0, valorDeCusto: 0, valorDeVenda: 0, skusNegativos: 0, quebras: [], totalDeQuebras: 0 },
     alertas: [],
+    primeirosPassos: ['produtos', 'clientes'],
   })
+const agora = new Date().toISOString()
+const historico = {
+  itens: [
+    { id: 'h1', ocorridoEm: agora, tipo: 'Evento', evento: 'login', entidade: null, entidadeId: null, descricao: 'Login de admin@kamus.local', usuarioNome: 'Admin Demo', ip: null, alteracoes: [] },
+    { id: 'h2', ocorridoEm: agora, tipo: 'Inclusao', evento: null, entidade: 'Produto', entidadeId: 'p1', descricao: 'Inclusão de Produto', usuarioNome: 'Admin Demo', ip: null, alteracoes: [] },
+    { id: 'h3', ocorridoEm: agora, tipo: 'Evento', evento: 'ajuste_de_estoque', entidade: null, entidadeId: null, descricao: 'Ajuste de estoque: 2 peças (Avaria)', usuarioNome: 'Bia', ip: null, alteracoes: [] },
+    { id: 'h4', ocorridoEm: agora, tipo: 'Inclusao', evento: null, entidade: 'Titulo', entidadeId: 't1', descricao: 'Inclusão de Título', usuarioNome: 'Admin Demo', ip: null, alteracoes: [] },
+    { id: 'h5', ocorridoEm: agora, tipo: 'Inclusao', evento: null, entidade: 'Parcela', entidadeId: 'pa1', descricao: 'Inclusão de Parcela', usuarioNome: 'Admin Demo', ip: null, alteracoes: [] },
+    { id: 'h6', ocorridoEm: agora, tipo: 'Inclusao', evento: null, entidade: 'Categoria', entidadeId: 'c1', descricao: 'Inclusão de Categoria financeira', usuarioNome: 'Admin Demo', ip: null, alteracoes: [] },
+    { id: 'h7', ocorridoEm: agora, tipo: 'Inclusao', evento: null, entidade: 'Categoria', entidadeId: 'c2', descricao: 'Inclusão de Categoria financeira', usuarioNome: 'Admin Demo', ip: null, alteracoes: [] },
+    { id: 'h8', ocorridoEm: agora, tipo: 'Inclusao', evento: null, entidade: 'Sku', entidadeId: 's1', descricao: 'Inclusão de SKU', usuarioNome: 'Admin Demo', ip: null, alteracoes: [] },
+  ],
+  total: 8,
+  pagina: 1,
+  tamanho: 60,
+}
 
 function api(extras: Parameters<typeof mockApi>[0] = {}, sessao = sessaoDemo, empresaAtiva: Parameters<typeof mockApi>[0][string] = empresaAtivaHandler(sessao)) {
   return mockApi({
@@ -53,20 +71,28 @@ function api(extras: Parameters<typeof mockApi>[0] = {}, sessao = sessaoDemo, em
     'GET /api/empresas/ativa': empresaAtiva,
     'GET /health': () => new Response('Degraded'),
     'GET /api/indicadores?periodo=hoje': () => json(dashboard()),
+    'GET /api/auditoria?pagina=1&tamanho=60': () => json(historico),
     ...extras,
   })
 }
 
 describe('Dashboard', () => {
-  it('saúda o usuário e mostra a empresa validada pela API', async () => {
+  it('cabeçalho com saudação, empresa e CNPJ, Nova venda e ações rápidas', async () => {
     api()
     renderApp()
 
     expect(await screen.findByRole('heading', { name: /Olá, Admin/ })).toBeInTheDocument()
-    expect(await screen.findByText('Kamus Moda Centro · 12.345.678/0001-95')).toBeInTheDocument()
+    expect(await screen.findByText('Kamus Moda Centro / CNPJ: 12.345.678/0001-95')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Nova venda/ })).toHaveAttribute('href', '/vendas/registro')
+
+    await userEvent.click(screen.getByRole('button', { name: /Ações rápidas/ }))
+    const menu = screen.getByRole('menu', { name: 'Ações rápidas' })
+    expect(within(menu).getByRole('menuitem', { name: /Novo produto/ })).toHaveAttribute('href', '/cadastros/produtos')
+    expect(within(menu).getByRole('menuitem', { name: /Entrada por XML/ })).toHaveAttribute('href', '/estoque/xml')
+    expect(within(menu).getByRole('menuitem', { name: /Lançar conta a pagar/ })).toHaveAttribute('href', '/financeiro/contas-a-pagar')
   })
 
-  it('mostra vendas com comparação, contas, gráfico, mais vendidos e alertas com link', async () => {
+  it('resumo com vendas, a receber (fluxo previsto) e a pagar (vencidas e títulos a vencer)', async () => {
     api()
     renderApp()
 
@@ -76,18 +102,98 @@ describe('Dashboard', () => {
     expect(within(vendas).getByText('2 vendas · ticket R$ 89,85')).toBeInTheDocument()
     const mes = screen.getByText('Vendas no mês').closest('article')!
     expect(within(mes).getByText('▼ 12,5% vs mês anterior')).toBeInTheDocument()
-    const pagar = screen.getByText('A pagar').closest('article')!
-    expect(within(pagar).getByText('Hoje R$ 30,00')).toBeInTheDocument()
+    const receber = screen.getByText('A receber (7 dias)').closest('article')!
+    expect(within(receber).getByText('R$ 600,00')).toBeInTheDocument()
+    expect(within(receber).getByText('Fluxo previsto')).toBeInTheDocument()
+    expect(within(receber).getByText('Hoje R$ 120,00 · 3 parcelas')).toBeInTheDocument()
+    const pagar = screen.getByText('A pagar (7 dias)').closest('article')!
+    expect(within(pagar).getByText('1 vencida')).toBeInTheDocument()
     expect(within(pagar).getByText('R$ 50,00 vencido')).toBeInTheDocument()
+    expect(within(pagar).getByText('Hoje R$ 30,00 · 1 título a vencer')).toBeInTheDocument()
+  })
 
-    expect(screen.getByRole('img', { name: /Vendas dos últimos 30 dias/ })).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Saldo das contas' })).getByText('R$ 339,60')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Mais vendidos' })).getByText('Camiseta básica · Azul M')).toBeInTheDocument()
+  it('a pagar sem atraso mostra "Em dia"', async () => {
+    api({ 'GET /api/indicadores?periodo=hoje': () => json(dashboard({ financeiro: { ...dashboard().financeiro, aPagar: compromissos({ proximosSeteDias: 30, parcelasProximosSeteDias: 1 }) } })) })
+    renderApp()
 
-    const alertas = screen.getByRole('region', { name: 'Alertas' })
-    expect(within(alertas).getByRole('link', { name: /1 conta a pagar vencida/ })).toHaveAttribute('href', '/financeiro/contas-a-pagar')
-    expect(within(alertas).getByRole('link', { name: /1 condicional atrasada/ })).toHaveAttribute('href', '/vendas/condicional')
+    const pagar = (await screen.findByText('A pagar (7 dias)')).closest('article')!
+    expect(within(pagar).getByText('Em dia')).toBeInTheDocument()
+  })
+
+  it('gráfico de 30 dias com total, intervalo, média diária, itens vendidos e condicionais abertos', async () => {
+    api()
+    renderApp()
+
+    const grafico = await screen.findByRole('region', { name: 'Vendas — últimos 30 dias' })
+    expect(within(grafico).getByRole('img', { name: /Vendas dos últimos 30 dias/ })).toBeInTheDocument()
+    expect(within(grafico).getByText(`${dataBr(somarDias(hoje, -29))} – ${dataBr(hoje)}`)).toBeInTheDocument()
+    expect(within(grafico).getByText('R$ 179,70')).toBeInTheDocument()
+    expect(within(grafico).getByText('R$ 5,99')).toBeInTheDocument()
+    expect(within(grafico).getByText('3 peças')).toBeInTheDocument()
+    expect(within(grafico).getByText('1 peça')).toBeInTheDocument()
+  })
+
+  it('sem vendas no período o gráfico mostra o aviso de espera', async () => {
+    api({ 'GET /api/indicadores?periodo=hoje': () => json(vazio()) })
+    renderApp()
+
+    const grafico = await screen.findByRole('region', { name: 'Vendas — últimos 30 dias' })
+    expect(within(grafico).getByText('Aguardando a primeira venda para desenhar a curva dos últimos 30 dias.')).toBeInTheDocument()
+  })
+
+  it('primeiros passos com progresso, etapas concluídas e atalhos; somem quando tudo está feito', async () => {
+    api({ 'GET /api/indicadores?periodo=hoje': () => json(vazio()) })
+    const { unmount } = renderApp()
+
+    const passos = await screen.findByRole('region', { name: 'Primeiros passos' })
+    expect(within(passos).getByText('2 de 5 concluídos')).toBeInTheDocument()
+    expect(within(passos).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '2')
+    expect(within(passos).getByRole('listitem', { name: /Cadastrar produtos/ })).toHaveTextContent('Concluído')
+    expect(within(passos).getByRole('link', { name: /Importar XML/ })).toHaveAttribute('href', '/estoque/xml')
+    expect(within(passos).getByRole('link', { name: /Lançar/ })).toHaveAttribute('href', '/financeiro/contas-a-pagar')
+    expect(within(passos).getByRole('link', { name: /Registrar venda/ })).toHaveAttribute('href', '/vendas/registro')
+    expect(within(passos).getByText('Marco')).toBeInTheDocument()
+    unmount()
+
+    api()
+    renderApp()
+    await screen.findByText('Vendas hoje')
     expect(screen.queryByRole('region', { name: 'Primeiros passos' })).not.toBeInTheDocument()
+  })
+
+  it('últimos marcos e atualizações com etiqueta por área, sem logins nem registros internos, repetições agrupadas', async () => {
+    api()
+    renderApp()
+
+    const marcos = await screen.findByRole('region', { name: 'Últimos marcos e atualizações' })
+    expect(await within(marcos).findByText('Inclusão de Produto')).toBeInTheDocument()
+    const itens = within(marcos).getAllByRole('listitem')
+    expect(itens).toHaveLength(4)
+    expect(itens[3]).toHaveTextContent('Inclusão de Categoria financeira (2×)')
+    expect(within(marcos).queryByText(/Inclusão de Parcela|Inclusão de SKU/)).not.toBeInTheDocument()
+    expect(itens[0]).toHaveTextContent('CATÁLOGO')
+    expect(itens[1]).toHaveTextContent('ESTOQUE')
+    expect(itens[1]).toHaveTextContent('Bia')
+    expect(itens[2]).toHaveTextContent('FINANCEIRO')
+    expect(within(marcos).queryByText(/Login de/)).not.toBeInTheDocument()
+    expect(within(marcos).getByRole('link', { name: /Ver histórico completo/ })).toHaveAttribute('href', '/configuracoes/historico')
+  })
+
+  it('alertas com link, estoque com atalhos e card de implantação', async () => {
+    api()
+    renderApp()
+
+    const alertas = await screen.findByRole('region', { name: 'Alertas' })
+    expect(await within(alertas).findByRole('link', { name: /1 conta a pagar vencida/ })).toHaveAttribute('href', '/financeiro/contas-a-pagar')
+    const estoque = screen.getByRole('region', { name: 'Estoque' })
+    expect(within(estoque).getByText('R$ 359,40')).toBeInTheDocument()
+    expect(within(estoque).getByText('R$ 120,00')).toBeInTheDocument()
+    expect(within(estoque).getByText('2 produtos com quebra de grade')).toBeInTheDocument()
+    expect(within(estoque).getByRole('link', { name: /Etiquetas/ })).toHaveAttribute('href', '/estoque/etiquetas')
+    expect(within(estoque).getByRole('link', { name: /Grades e cores/ })).toHaveAttribute('href', '/cadastros/grades')
+    expect(within(estoque).getByRole('link', { name: /Ajustes/ })).toHaveAttribute('href', '/estoque/ajustes')
+    expect(screen.getByRole('region', { name: 'Consultoria e implantação' })).toBeInTheDocument()
+    expect(screen.getByRole('complementary', { name: 'Atendimento pelo WhatsApp' })).toHaveTextContent('Dúvidas? Fale com a assistente virtual')
   })
 
   it('trocar o período busca de novo e muda o título do cartão', async () => {
@@ -117,28 +223,40 @@ describe('Dashboard', () => {
     expect(await screen.findByText('Vendas em 7 dias')).toBeInTheDocument()
   })
 
-  it('loja sem dados mostra os primeiros passos', async () => {
-    api({ 'GET /api/indicadores?periodo=hoje': () => json(vazio()) })
-    renderApp()
+  it('atualiza sozinho a cada 60 segundos', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const fetch = api()
+      renderApp()
+      await screen.findByText('Vendas hoje')
+      const chamadas = () => fetch.mock.calls.filter(([url]) => url === '/api/indicadores?periodo=hoje').length
+      const antes = chamadas()
 
-    const passos = await screen.findByRole('region', { name: 'Primeiros passos' })
-    expect(within(passos).getByRole('link', { name: /Cadastrar produtos/ })).toHaveAttribute('href', '/cadastros/produtos')
-    expect(within(screen.getByRole('region', { name: 'Alertas' })).getByText('Sem alertas por enquanto')).toBeInTheDocument()
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000)
+      })
+
+      await waitFor(() => expect(chamadas()).toBe(antes + 1))
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
-  it('vendedor vê só as próprias vendas, sem financeiro', async () => {
-    api({ 'GET /api/indicadores?periodo=hoje': () => json(dashboard({ vendas: { ...dashboard().vendas, somenteAsMinhas: true }, financeiro: null, estoque: null })) }, sessaoVendedor)
+  it('vendedor vê só as próprias vendas, sem financeiro nem marcos', async () => {
+    const fetch = api({ 'GET /api/indicadores?periodo=hoje': () => json(dashboard({ vendas: { ...dashboard().vendas, somenteAsMinhas: true }, financeiro: null, estoque: null })) }, sessaoVendedor)
     renderApp()
 
     expect(await screen.findByText('Minhas vendas hoje')).toBeInTheDocument()
-    expect(screen.queryByText('A pagar')).not.toBeInTheDocument()
+    expect(screen.queryByText('A pagar (7 dias)')).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Saldo das contas' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Últimos marcos e atualizações' })).not.toBeInTheDocument()
+    expect(fetch.mock.calls.some(([url]) => String(url).startsWith('/api/auditoria'))).toBe(false)
   })
 
   it('visão consolidada mostra quantas empresas estão somadas', async () => {
     api()
     renderApp()
-    await screen.findByText('Kamus Moda Centro · 12.345.678/0001-95')
+    await screen.findByText('Kamus Moda Centro / CNPJ: 12.345.678/0001-95')
 
     await userEvent.click(screen.getByRole('button', { name: /Empresa ativa/ }))
     await userEvent.click(screen.getByRole('menuitemradio', { name: /Todas as empresas/ }))

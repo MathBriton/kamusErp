@@ -54,7 +54,7 @@ export function PesquisaGlobal() {
         className="hidden h-10 w-full max-w-md items-center gap-2.5 rounded-lg border border-border bg-surface-2 px-3 text-sm text-muted hover:border-primary md:flex"
       >
         <Icone nome="search" />
-        <span className="flex-1 truncate text-left">Pesquisar empresas, usuários, telas...</span>
+        <span className="flex-1 truncate text-left">Buscar SKU, peças, código de barras, clientes...</span>
         <kbd className="rounded border border-border bg-surface px-1.5 text-[11px]">Ctrl K</kbd>
       </button>
       <button

@@ -45,6 +45,8 @@ export interface Compromissos {
   proximosSeteDias: number
   vencido: number
   parcelasVencidas: number
+  /** Parcelas em aberto que vencem de hoje até daqui a 6 dias. */
+  parcelasProximosSeteDias: number
 }
 
 export interface ResumoFinanceiro {
@@ -83,6 +85,8 @@ export interface Dashboard {
   estoque: ResumoDeEstoque | null
   condicionais: { abertas: number; atrasadas: number; pecas: number; valor: number } | null
   alertas: Alerta[]
+  /** Etapas da implantação já concluídas: produtos, clientes, entrada_de_estoque, contas_a_pagar, primeira_venda. */
+  primeirosPassos: string[]
 }
 
 export interface PreferenciasDoResumo {

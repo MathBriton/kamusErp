@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { PesquisaGlobal } from '../busca/PesquisaGlobal'
 import { Icone } from '../components/Icone'
 import { Sino } from '../notificacoes/Sino'
@@ -29,6 +30,7 @@ export function Topbar({ usuario, onAbrirMenu }: Props) {
       <PesquisaGlobal />
 
       <div className="ml-auto flex items-center gap-2">
+        <Relogio />
         <SeletorEmpresa />
 
         <Sino />
@@ -46,5 +48,29 @@ export function Topbar({ usuario, onAbrirMenu }: Props) {
         <MenuUsuario nome={usuario.nome} email={usuario.email} />
       </div>
     </header>
+  )
+}
+
+const formatoDoRelogio = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Sao_Paulo',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
+/** Data e hora de Brasília (a mesma referência da API), atualizadas a cada 30 s. */
+function Relogio() {
+  const [agora, setAgora] = useState(() => new Date())
+  useEffect(() => {
+    const timer = window.setInterval(() => setAgora(new Date()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  const texto = formatoDoRelogio.format(agora).replace(', ', ' · ').replace(' às ', ' · ')
+  return (
+    <time dateTime={agora.toISOString()} className="hidden px-2 text-sm text-muted tabular-nums xl:block">
+      {texto}
+    </time>
   )
 }
