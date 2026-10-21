@@ -24,14 +24,29 @@ internal sealed class RelatorioDeTitulos(FinanceiroDbContext db, IEmpresaAtiva e
 
     public async Task<DadosDoRelatorio> GerarAsync(IReadOnlyDictionary<string, string?> parametros, CancellationToken ct)
     {
+        var hoje = CalendarioBrasilia.Hoje(relogio);
+        // "ids" = parcelas selecionadas na grade (cada linha da tela é uma parcela): exporta só elas, ignorando os demais filtros.
+        var ids = ParametrosDoRelatorio.Ids(parametros);
         var tipo = TitulosEndpoints.Tipo(parametros.GetValueOrDefault("tipo")) ?? TipoDeTitulo.Pagar;
         var situacao = parametros.GetValueOrDefault("situacao")?.ToLowerInvariant() is { } s && Consultas.Situacoes.Contains(s) ? s : "abertas";
         var (de, ate, busca) = (Data(parametros.GetValueOrDefault("de")), Data(parametros.GetValueOrDefault("ate")), parametros.GetValueOrDefault("busca"));
-        var r = await Consultas.ParcelasAsync(db, empresa, new FiltroDeTitulos(tipo, situacao, de, ate, busca), CalendarioBrasilia.Hoje(relogio), ct);
-
-        var filtros = new List<FiltroAplicado> { new("Situação", situacao) };
-        if (de is not null || ate is not null) filtros.Add(new("Vencimento", $"{de:dd/MM/yyyy} a {ate:dd/MM/yyyy}"));
-        if (!string.IsNullOrWhiteSpace(busca)) filtros.Add(new("Busca", busca));
+        ResultadoDosTitulos r;
+        var filtros = new List<FiltroAplicado>();
+        if (ids.Count > 0)
+        {
+            // A seleção não diz o tipo: procura nos dois e fica com o que tem as parcelas (a tela só seleciona de um tipo por vez).
+            var pagar = await Consultas.ParcelasAsync(db, empresa, new FiltroDeTitulos(TipoDeTitulo.Pagar, "todas", null, null, null, ids), hoje, ct);
+            var receber = await Consultas.ParcelasAsync(db, empresa, new FiltroDeTitulos(TipoDeTitulo.Receber, "todas", null, null, null, ids), hoje, ct);
+            (tipo, r) = receber.Itens.Count > pagar.Itens.Count ? (TipoDeTitulo.Receber, receber) : (TipoDeTitulo.Pagar, pagar);
+            filtros.Add(ParametrosDoRelatorio.Selecionados(r.Itens.Count, "parcela", "parcelas"));
+        }
+        else
+        {
+            r = await Consultas.ParcelasAsync(db, empresa, new FiltroDeTitulos(tipo, situacao, de, ate, busca), hoje, ct);
+            filtros.Add(new("Situação", situacao));
+            if (de is not null || ate is not null) filtros.Add(new("Vencimento", $"{de:dd/MM/yyyy} a {ate:dd/MM/yyyy}"));
+            if (!string.IsNullOrWhiteSpace(busca)) filtros.Add(new("Busca", busca));
+        }
         return new DadosDoRelatorio(tipo == TipoDeTitulo.Pagar ? "Contas a pagar" : "Contas a receber",
         [
             new ColunaRelatorio("Vencimento", TipoColuna.Data, Largura: 0.8f),

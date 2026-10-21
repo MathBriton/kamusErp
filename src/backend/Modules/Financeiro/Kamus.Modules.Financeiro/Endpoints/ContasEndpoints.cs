@@ -2,6 +2,7 @@ using Kamus.Modules.Financeiro.Dominio;
 using Kamus.Modules.Financeiro.Persistencia;
 using Kamus.SharedKernel.Auditoria;
 using Kamus.SharedKernel.Busca;
+using Kamus.SharedKernel.Consultas;
 using Kamus.SharedKernel.MultiTenancy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -22,7 +23,10 @@ internal static class ContasEndpoints
     public static IEndpointRouteBuilder MapContas(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/financeiro").RequireAuthorization().WithTags("Financeiro");
-        g.MapGet("/contas", Listar).WithSummary("Contas financeiras da empresa ativa com o saldo atual");
+        g.MapGet("/contas", Listar).WithSummary("Contas financeiras da empresa ativa com o saldo atual. Filtros: tipo (Caixa/Banco/Carteira), situacao (ativas, inativas, todas), busca; "
+            + "com pagina/tamanho devolve a página ({ itens, total, pagina, tamanho, saldo }), sem pagina a lista inteira");
+        g.MapPost("/contas/situacao", MudarEmLote).WithSummary("Desativar ou reativar várias contas da empresa ativa (desativar exige saldo zero em todas)")
+            .Produces<SituacaoEmLoteResponse>();
         g.MapPost("/contas", Criar).WithSummary("Nova conta (caixa, banco ou carteira) com saldo inicial").Produces<ContaDto>(StatusCodes.Status201Created);
         g.MapPut("/contas/{id:guid}", Atualizar).WithSummary("Altera nome, tipo e saldo inicial");
         g.MapPost("/contas/{id:guid}/desativar", Desativar).WithSummary("Desativa a conta (precisa estar com saldo zero)");
@@ -52,15 +56,66 @@ internal static class ContasEndpoints
     private static ContaDto Dto(ContaFinanceira c, decimal saldo) =>
         new(c.Id, c.EmpresaId, c.Nome, c.Tipo.ToString(), c.SaldoInicial, c.SaldoInicialEm, saldo, c.Ativa);
 
-    private static async Task<IResult> Listar(FinanceiroDbContext db, IEmpresaAtiva empresa, CancellationToken ct)
+    /// <summary>Página da grade; <c>Saldo</c> soma todas as contas filtradas, não só as da página.</summary>
+    public sealed record ListaDeContasDto(IReadOnlyList<ContaDto> Itens, int Total, int Pagina, int Tamanho, decimal Saldo);
+
+    /// <summary>Contas visíveis filtradas, já com o saldo atual — usada pela tela e pelo relatório.</summary>
+    internal static async Task<List<ContaDto>> FiltrarAsync(FinanceiroDbContext db, IEmpresaAtiva empresa, TipoDeConta? tipo, string? situacao, string? busca,
+        CancellationToken ct)
     {
-        if (Permissoes.Barrar(empresa) is { } negado) return negado;
-        var contas = await VisiveisAsync(db, empresa, ct);
+        var termo = TextoParaBusca.Normalizar(busca);
+        var contas = (await VisiveisAsync(db, empresa, ct))
+            .Where(c => tipo is null || c.Tipo == tipo)
+            .Where(c => situacao?.ToLowerInvariant() switch { "ativas" => c.Ativa, "inativas" => !c.Ativa, _ => true })
+            .Where(c => termo.Length == 0 || TextoParaBusca.Normalizar(c.Nome).Contains(termo, StringComparison.Ordinal))
+            .ToList();
         var saldos = await SaldosAsync(db, contas, null, ct);
-        return Results.Ok(contas.Select(c => Dto(c, saldos[c.Id])).ToList());
+        return contas.Select(c => Dto(c, saldos[c.Id])).ToList();
     }
 
-    private static bool TentarTipo(string? texto, out TipoDeConta tipo) =>
+    private static async Task<IResult> Listar(FinanceiroDbContext db, IEmpresaAtiva empresa, CancellationToken ct,
+        string? tipo = null, string? situacao = null, string? busca = null, int? pagina = null, int tamanho = Paginacao.TamanhoPadrao)
+    {
+        if (Permissoes.Barrar(empresa) is { } negado) return negado;
+        TipoDeConta? t = null;
+        if (!string.IsNullOrWhiteSpace(tipo))
+        {
+            if (!TentarTipo(tipo, out var valor)) return Permissoes.Erro("Tipo de conta inválido: use Caixa, Banco ou Carteira.");
+            t = valor;
+        }
+        if (situacao is not null && !CategoriasEndpoints.Situacoes.Contains(situacao.ToLowerInvariant())) return Permissoes.Erro("Situação inválida: ativas, inativas ou todas.");
+        var contas = await FiltrarAsync(db, empresa, t, situacao, busca, ct);
+        // Sem "pagina" devolve a lista inteira (selects das outras telas); a grade manda pagina/tamanho.
+        if (pagina is null) return Results.Ok(contas);
+        var pg = contas.Paginar(pagina.Value, tamanho);
+        return Results.Ok(new ListaDeContasDto(pg.Itens, pg.Total, pg.Pagina, pg.Tamanho, contas.Sum(c => c.Saldo)));
+    }
+
+    private static async Task<IResult> MudarEmLote(SituacaoEmLoteRequest r, FinanceiroDbContext db, IEmpresaAtiva empresa, CancellationToken ct)
+    {
+        if (Permissoes.Barrar(empresa) is { } negado) return negado;
+        var ids = (r.Ids ?? []).Distinct().ToList();
+        if (ids.Count == 0) return Permissoes.Erro("Selecione pelo menos uma conta.");
+        var contas = await db.Contas.Where(c => ids.Contains(c.Id) && c.EmpresaId == empresa.EmpresaId && c.Ativa != r.Ativo).OrderBy(c => c.Nome).ToListAsync(ct);
+        if (!r.Ativo)
+        {
+            // Mesma regra da conta sozinha: só desativa com saldo zero. Se alguma tem saldo, nenhuma muda.
+            var saldos = await SaldosAsync(db, contas, null, ct);
+            var comSaldo = contas.Where(c => saldos[c.Id] != 0).Select(c => c.Nome).ToList();
+            if (comSaldo.Count > 0)
+                return Permissoes.Problema(StatusCodes.Status409Conflict,
+                    $"{string.Join(", ", comSaldo)} ainda {(comSaldo.Count == 1 ? "tem" : "têm")} saldo. Transfira antes de desativar.");
+        }
+        foreach (var conta in contas)
+        {
+            if (r.Ativo) conta.Reativar();
+            else conta.Desativar();
+        }
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(new SituacaoEmLoteResponse(contas.Count));
+    }
+
+    internal static bool TentarTipo(string? texto, out TipoDeConta tipo) =>
         Enum.TryParse(texto, ignoreCase: true, out tipo) && Enum.IsDefined(tipo);
 
     private static async Task<IResult?> NomeRepetidoAsync(FinanceiroDbContext db, Guid empresaId, string? nome, Guid? exceto, CancellationToken ct)

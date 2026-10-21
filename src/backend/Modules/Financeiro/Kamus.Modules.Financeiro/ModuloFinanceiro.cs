@@ -28,6 +28,8 @@ public static class ModuloFinanceiro
         services.AddScoped<IRelatorio, RelatorioDeInadimplencia>();
         services.AddScoped<IRelatorio, RelatorioDeTitulos>();
         services.AddScoped<IRelatorio, RelatorioDeFluxo>();
+        services.AddScoped<IRelatorio, RelatorioDeCategorias>();
+        services.AddScoped<IRelatorio, RelatorioDeContasFinanceiras>();
         return services;
     }
 

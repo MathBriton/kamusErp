@@ -2,6 +2,7 @@ using Kamus.Modules.Financeiro.Aplicacao;
 using Kamus.Modules.Financeiro.Dominio;
 using Kamus.Modules.Financeiro.Persistencia;
 using Kamus.SharedKernel.Auditoria;
+using Kamus.SharedKernel.Consultas;
 using Kamus.SharedKernel.MultiTenancy;
 using Kamus.SharedKernel.Tempo;
 using Microsoft.AspNetCore.Builder;
@@ -26,17 +27,27 @@ internal static class TitulosEndpoints
     public sealed record ParcelaDto(Guid Id, int Numero, DateOnly Vencimento, decimal Valor, decimal ValorPago, decimal Saldo, string Situacao, IReadOnlyList<BaixaDto> Baixas);
     public sealed record TituloDto(Guid Id, Guid EmpresaId, string Tipo, string Descricao, Guid? PessoaId, string? PessoaNome, Guid? CategoriaId, string? Categoria,
         string? Documento, DateOnly Competencia, string? Observacao, decimal ValorTotal, bool Cancelado, string Origem, IReadOnlyList<ParcelaDto> Parcelas);
-    public sealed record ListaDto(IReadOnlyList<LinhaDeParcela> Itens, decimal Valor, decimal Pago, decimal Saldo, decimal Vencido);
+    /// <summary>Valor, Pago, Saldo e Vencido somam todas as linhas filtradas; Itens é só a página (ou tudo, sem <c>pagina</c>).</summary>
+    public sealed record ListaDto(IReadOnlyList<LinhaDeParcela> Itens, decimal Valor, decimal Pago, decimal Saldo, decimal Vencido, int Total, int Pagina, int Tamanho);
+
+    /// <summary>Quita de uma vez as parcelas selecionadas: o saldo inteiro de cada uma, sem juros/multa/desconto, numa conta da empresa ativa.</summary>
+    public sealed record BaixaEmLoteRequest(IReadOnlyList<Guid>? ParcelaIds, Guid ContaId, DateOnly? Data);
+    public sealed record FalhaDaBaixa(Guid ParcelaId, string Descricao, string Motivo);
+    public sealed record BaixaEmLoteResponse(int Baixadas, decimal Total, IReadOnlyList<FalhaDaBaixa> Falhas);
 
     public static IEndpointRouteBuilder MapTitulos(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/financeiro").RequireAuthorization().WithTags("Financeiro");
-        g.MapGet("/titulos", Listar).WithSummary("Parcelas de contas a pagar ou a receber. Filtros: tipo, situacao (abertas, vencidas, pagas, canceladas, todas), de, ate, busca");
+        g.MapGet("/titulos", Listar).WithSummary("Parcelas de contas a pagar ou a receber. Filtros: tipo, situacao (abertas, vencidas, pagas, canceladas, todas), de, ate, busca; pagina/tamanho (sem pagina = todas)")
+            .Produces<ListaDto>();
         g.MapGet("/titulos/{id:guid}", Obter).WithSummary("Título com parcelas e baixas");
         g.MapPost("/titulos", Criar).WithSummary("Novo título com parcelas (repetirMeses para despesas fixas)").Produces<TituloDto>(StatusCodes.Status201Created);
         g.MapPut("/titulos/{id:guid}", Atualizar).WithSummary("Altera descrição, pessoa, categoria, documento, competência e observação");
         g.MapPost("/titulos/{id:guid}/cancelar", Cancelar).WithSummary("Cancela o título (só sem baixas ativas)");
         g.MapPost("/parcelas/{id:guid}/baixas", Baixar).WithSummary("Paga/recebe a parcela (total ou parcial) numa conta financeira").Produces<TituloDto>();
+        g.MapPost("/parcelas/baixas-em-lote", BaixarEmLote)
+            .WithSummary("Quita as parcelas selecionadas (saldo inteiro, sem encargos) numa conta; cada parcela é gravada à parte e as que não deram vêm em falhas")
+            .Produces<BaixaEmLoteResponse>();
         g.MapPost("/baixas/{id:guid}/estornar", Estornar).WithSummary("Estorna a baixa: devolve o saldo da parcela e lança o movimento contrário na conta");
         return app;
     }
@@ -68,15 +79,18 @@ internal static class TitulosEndpoints
         return titulo;
     }
 
-    private static async Task<IResult> Listar(string? tipo, string? situacao, DateOnly? de, DateOnly? ate, string? busca, FinanceiroDbContext db,
-        IEmpresaAtiva empresa, TimeProvider relogio, CancellationToken ct)
+    private static async Task<IResult> Listar(string? tipo, string? situacao, DateOnly? de, DateOnly? ate, string? busca, int? pagina, int? tamanho,
+        FinanceiroDbContext db, IEmpresaAtiva empresa, TimeProvider relogio, CancellationToken ct)
     {
         if (Permissoes.Barrar(empresa) is { } negado) return negado;
         if (Tipo(tipo) is not { } t) return Permissoes.Erro("Informe o tipo: pagar ou receber.");
         var s = situacao?.ToLowerInvariant() ?? "abertas";
         if (!Consultas.Situacoes.Contains(s)) return Permissoes.Erro("Situação inválida: abertas, vencidas, pagas, canceladas ou todas.");
         var r = await Consultas.ParcelasAsync(db, empresa, new FiltroDeTitulos(t, s, de, ate, busca), CalendarioBrasilia.Hoje(relogio), ct);
-        return Results.Ok(new ListaDto(r.Itens, r.Valor, r.Pago, r.Saldo, r.Vencido));
+        // Sem "pagina" devolve todas as linhas (app mobile e telas antigas); a grade do web sempre manda pagina/tamanho.
+        var pg = pagina is null ? new PaginaDeRegistros<LinhaDeParcela>(r.Itens, r.Itens.Count, 1, r.Itens.Count)
+            : r.Itens.Paginar(pagina.Value, tamanho ?? Paginacao.TamanhoPadrao);
+        return Results.Ok(new ListaDto(pg.Itens, r.Valor, r.Pago, r.Saldo, r.Vencido, pg.Total, pg.Pagina, pg.Tamanho));
     }
 
     private static async Task<IResult> Obter(Guid id, FinanceiroDbContext db, IEmpresaAtiva empresa, TimeProvider relogio, CancellationToken ct)
@@ -178,9 +192,7 @@ internal static class TitulosEndpoints
         var hoje = CalendarioBrasilia.Hoje(relogio);
         try
         {
-            var baixa = parcela.Baixar(r.Data ?? hoje, conta.Id, r.Valor, r.Juros, r.Multa, r.Desconto, usuario.Nome, relogio.GetUtcNow());
-            db.Baixas.Add(baixa);
-            db.Movimentos.Add(MovimentoFinanceiro.DaBaixa(titulo, parcela, baixa, relogio.GetUtcNow()));
+            RegistrarBaixa(db, titulo, parcela, r with { Data = r.Data ?? hoje }, usuario, relogio);
         }
         catch (ArgumentException ex)
         {
@@ -192,6 +204,66 @@ internal static class TitulosEndpoints
         }
         await db.SaveChangesAsync(ct);
         return Results.Ok(await ParaDtoAsync(db, titulo, hoje, ct));
+    }
+
+    /// <summary>Regra única da baixa (tela e lote): a parcela valida e cria a baixa; a conta recebe o movimento.</summary>
+    private static Baixa RegistrarBaixa(FinanceiroDbContext db, Titulo titulo, Parcela parcela, BaixaRequest r, IUsuarioAtual usuario, TimeProvider relogio)
+    {
+        var baixa = parcela.Baixar(r.Data!.Value, r.ContaId, r.Valor, r.Juros, r.Multa, r.Desconto, usuario.Nome, relogio.GetUtcNow());
+        db.Baixas.Add(baixa);
+        db.Movimentos.Add(MovimentoFinanceiro.DaBaixa(titulo, parcela, baixa, relogio.GetUtcNow()));
+        return baixa;
+    }
+
+    private static async Task<IResult> BaixarEmLote(BaixaEmLoteRequest r, FinanceiroDbContext db, IEmpresaAtiva empresa, IUsuarioAtual usuario,
+        TimeProvider relogio, CancellationToken ct)
+    {
+        if (Permissoes.Barrar(empresa) is { } negado) return negado;
+        var ids = (r.ParcelaIds ?? []).Distinct().ToList();
+        if (ids.Count == 0) return Permissoes.Erro("Selecione pelo menos uma parcela.");
+        if (ids.Count > Paginacao.TamanhoMaximo) return Permissoes.Erro($"Selecione no máximo {Paginacao.TamanhoMaximo} parcelas por vez.");
+        var conta = await db.Contas.SingleOrDefaultAsync(c => c.Id == r.ContaId && c.EmpresaId == empresa.EmpresaId, ct);
+        if (conta is null) return Permissoes.Erro("Escolha uma conta financeira da empresa ativa.");
+        if (!conta.Ativa) return Permissoes.Erro($"{conta.Nome} está desativada.");
+
+        var data = r.Data ?? CalendarioBrasilia.Hoje(relogio);
+        var titulos = await db.Parcelas.Where(p => ids.Contains(p.Id)).ToDictionaryAsync(p => p.Id, p => p.TituloId, ct);
+        var falhas = new List<FalhaDaBaixa>();
+        var (baixadas, total) = (0, 0m);
+        // Cada parcela é gravada à parte: uma que não dá (cancelada, já paga, de outra empresa) não impede as demais.
+        foreach (var id in ids)
+        {
+            var titulo = titulos.TryGetValue(id, out var tituloId) ? await CarregarAsync(db, empresa, tituloId, ct) : null;
+            if (titulo is null)
+            {
+                falhas.Add(new FalhaDaBaixa(id, "?", "Parcela não encontrada."));
+                continue;
+            }
+            var parcela = titulo.Parcelas.Single(p => p.Id == id);
+            var descricao = titulo.Parcelas.Count > 1 ? $"{titulo.Descricao} ({parcela.Numero}/{titulo.Parcelas.Count})" : titulo.Descricao;
+            string? motivo = null;
+            if (titulo.EmpresaId != conta.EmpresaId) motivo = "A parcela é de outra empresa.";
+            else if (!titulo.Cancelado && parcela.Saldo <= 0) motivo = "A parcela já está quitada.";
+            else
+            {
+                try
+                {
+                    var baixa = RegistrarBaixa(db, titulo, parcela, new BaixaRequest(data, conta.Id, parcela.Saldo, 0m, 0m, 0m), usuario, relogio);
+                    await db.SaveChangesAsync(ct);
+                    (baixadas, total) = (baixadas + 1, total + baixa.Total);
+                }
+                catch (ArgumentException ex)
+                {
+                    motivo = Permissoes.Mensagem(ex);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    motivo = ex.Message;
+                }
+            }
+            if (motivo is not null) falhas.Add(new FalhaDaBaixa(id, descricao, motivo));
+        }
+        return Results.Ok(new BaixaEmLoteResponse(baixadas, total, falhas));
     }
 
     private static async Task<IResult> Estornar(Guid id, FinanceiroDbContext db, IEmpresaAtiva empresa, IUsuarioAtual usuario, IRegistradorDeEventos eventos,
