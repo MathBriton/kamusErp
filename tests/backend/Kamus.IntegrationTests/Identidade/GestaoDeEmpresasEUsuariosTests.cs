@@ -174,6 +174,23 @@ public sealed class GestaoDeEmpresasEUsuariosTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task CriarUsuario_ComSenhaDefinidaPeloDono_EntraComElaETrocaNoPrimeiroAcesso()
+    {
+        var (admin, sessao) = await Entrar();
+        var acessos = new[] { new { empresaId = sessao.Empresas[0].Id, perfil = "Vendedor" } };
+
+        var fraca = await admin.PostAsJsonAsync(U("/api/usuarios"), new { nome = "Bia", email = "bia@kamus.local", senha = "123", acessos }, Ct);
+        fraca.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var resposta = await admin.PostAsJsonAsync(U("/api/usuarios"), new { nome = "Bia", email = "bia@kamus.local", senha = "Loja2026bia", acessos }, Ct);
+        resposta.StatusCode.ShouldBe(HttpStatusCode.Created);
+        (await resposta.Content.ReadFromJsonAsync<CriadoDto>(Ct))!.SenhaProvisoria.ShouldBe("Loja2026bia");
+
+        var (_, sessaoBia) = await Entrar("bia@kamus.local", "Loja2026bia");
+        sessaoBia.Usuario.DeveTrocarSenha.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task TrocarSenha_SenhaAtualErradaOuFraca_400()
     {
         var (admin, _) = await Entrar();

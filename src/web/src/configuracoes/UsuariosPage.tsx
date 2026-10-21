@@ -52,11 +52,11 @@ export function UsuariosPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <p className="text-xs text-muted">Configurações</p>
+      <p className="text-xs text-muted">Administrativo</p>
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">Usuários e permissões</h1>
-          <p className="mt-1 text-sm text-muted">Cada pessoa pode ter um perfil diferente em cada empresa. Usuário novo recebe senha provisória.</p>
+          <h1 className="text-2xl font-bold tracking-tight">Usuários e senhas</h1>
+          <p className="mt-1 text-sm text-muted">Crie o acesso de cada pessoa: perfil por empresa e senha (gerada pelo sistema ou definida por você). No primeiro login ela cria uma senha própria.</p>
         </div>
         <button type="button" onClick={() => setJanela({ tipo: 'novo' })} className={estilos.botaoPrimario}>
           Novo usuário
@@ -178,11 +178,18 @@ function FormularioDeUsuario({ usuario, empresas, onFechar, onSalvo }: {
   const [perfis, setPerfis] = useState<Record<string, string>>(() =>
     Object.fromEntries((usuario?.acessos ?? []).map((a) => [a.empresaId, a.perfil])),
   )
+  const [definirSenha, setDefinirSenha] = useState(false)
+  const [senha, setSenha] = useState('')
+  const [repeticao, setRepeticao] = useState('')
   const [erro, setErro] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
 
   async function salvar(e: FormEvent) {
     e.preventDefault()
+    if (!usuario && definirSenha && senha !== repeticao) {
+      setErro('As senhas não conferem.')
+      return
+    }
     const acessos = empresas.filter((emp) => perfis[emp.id]).map((emp) => ({ empresaId: emp.id, perfil: perfis[emp.id]! }))
     setEnviando(true)
     setErro(null)
@@ -191,7 +198,7 @@ function FormularioDeUsuario({ usuario, empresas, onFechar, onSalvo }: {
         await enviar('PUT', `/api/usuarios/${usuario.id}`, { nome, acessos })
         onSalvo(null)
       } else {
-        onSalvo(await enviar<SenhaProvisoria>('POST', '/api/usuarios', { nome, email, acessos }))
+        onSalvo(await enviar<SenhaProvisoria>('POST', '/api/usuarios', definirSenha ? { nome, email, senha, acessos } : { nome, email, acessos }))
       }
     } catch (falha) {
       setErro(falha instanceof ErroDeApi ? falha.message : 'Não foi possível salvar.')
@@ -231,6 +238,30 @@ function FormularioDeUsuario({ usuario, empresas, onFechar, onSalvo }: {
             ))}
           </div>
         </fieldset>
+        {!usuario && (
+          <fieldset className="space-y-2">
+            <legend className="mb-1.5 text-sm font-semibold">Senha de acesso</legend>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="radio" name="senha" checked={!definirSenha} onChange={() => setDefinirSenha(false)} className="h-4 w-4" />
+              Gerar uma senha provisória
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="radio" name="senha" checked={definirSenha} onChange={() => setDefinirSenha(true)} className="h-4 w-4" />
+              Definir a senha agora
+            </label>
+            {definirSenha && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Campo rotulo="Senha">
+                  <input type="password" autoComplete="new-password" value={senha} onChange={(e) => setSenha(e.target.value)} className={estilos.campo} />
+                </Campo>
+                <Campo rotulo="Repita a senha">
+                  <input type="password" autoComplete="new-password" value={repeticao} onChange={(e) => setRepeticao(e.target.value)} className={estilos.campo} />
+                </Campo>
+                <p className="text-xs text-muted sm:col-span-2">Pelo menos 8 caracteres, com letras e números. No primeiro login a pessoa troca por uma senha só dela.</p>
+              </div>
+            )}
+          </fieldset>
+        )}
         {erro && (
           <p role="alert" className={estilos.erro}>
             {erro}

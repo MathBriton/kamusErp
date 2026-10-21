@@ -262,7 +262,7 @@ export function MovimentacaoPage({ modo }: { modo: Modo }) {
           )}
           {modo === 'transferencia' && ativas.length < 2 && lojas && (
             <p className="text-sm text-muted sm:col-span-2">
-              Para transferir é preciso ter duas lojas na empresa. O Dono cadastra em <Link to="/configuracoes/lojas" className="text-primary underline">Configurações → Lojas</Link>.
+              Para transferir é preciso ter duas lojas na empresa. O Dono cadastra em <Link to="/configuracoes/lojas" className="text-primary underline">Administrativo → Lojas</Link>.
             </p>
           )}
           {travado && <p className="text-xs text-muted sm:col-span-2">Para trocar a loja, esvazie a lista de itens.</p>}

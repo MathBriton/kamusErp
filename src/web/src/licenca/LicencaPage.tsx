@@ -41,7 +41,7 @@ export function LicencaPage() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <p className="text-xs text-muted">Configurações</p>
+      <p className="text-xs text-muted">Administrativo</p>
       <h1 className="text-2xl font-bold tracking-tight">Licença e assinatura</h1>
       <p className="mt-1 text-sm text-muted">Plano, vencimento e situação da mensalidade do Kamus.</p>
 

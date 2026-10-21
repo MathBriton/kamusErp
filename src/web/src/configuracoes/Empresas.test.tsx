@@ -19,7 +19,7 @@ function api(extras: Parameters<typeof mockApi>[0] = {}) {
   })
 }
 
-describe('Configurações → Empresas', () => {
+describe('Administrativo → Empresas', () => {
   it('lista os CNPJs do cliente', async () => {
     api()
     renderApp('/configuracoes/empresas')

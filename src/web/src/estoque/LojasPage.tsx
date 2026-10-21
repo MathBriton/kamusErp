@@ -30,7 +30,7 @@ export function LojasPage() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <p className="text-xs text-muted">Configurações</p>
+      <p className="text-xs text-muted">Administrativo</p>
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex-1">
           <h1 className="text-2xl font-bold tracking-tight">Lojas</h1>

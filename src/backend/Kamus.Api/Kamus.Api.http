@@ -152,6 +152,19 @@ Content-Type: application/json
   "acessos": [{ "empresaId": "{{login.response.body.empresas[0].id}}", "perfil": "Vendedor" }]
 }
 
+### Cadastrar usuário com a senha definida pelo Dono (8+ caracteres, letras e números; troca no primeiro acesso)
+POST {{api}}/api/usuarios
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{
+  "nome": "Caio Lima",
+  "email": "caio@kamus.local",
+  "senha": "Loja2026caio",
+  "acessos": [{ "empresaId": "{{login.response.body.empresas[0].id}}", "perfil": "Vendedor" }]
+}
+
 ### Trocar a própria senha (obrigatório para quem está com senha provisória)
 POST {{api}}/api/auth/trocar-senha
 Authorization: Bearer {{login.response.body.accessToken}}

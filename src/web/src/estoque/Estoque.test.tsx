@@ -188,7 +188,7 @@ describe('Estoque → Entrada, ajuste e transferência', () => {
   })
 })
 
-describe('Configurações → Lojas', () => {
+describe('Administrativo → Lojas', () => {
   it('Dono cria loja e vê o limite do plano', async () => {
     let enviado: Record<string, unknown> | null = null
     api({

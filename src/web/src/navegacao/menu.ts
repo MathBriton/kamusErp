@@ -85,15 +85,17 @@ export const MENU: GrupoMenu[] = [
     descricao: 'Central de relatórios por área, com visualização na tela e exportação em PDF, Excel e CSV.',
   },
   {
-    titulo: 'Configurações',
-    icone: 'sliders',
+    // Gestão do próprio negócio: quem acessa (usuários e senhas), CNPJs, lojas, licença e histórico.
+    // As rotas continuam em /configuracoes/... para não quebrar links e notificações já enviadas.
+    titulo: 'Administrativo',
+    icone: 'shield',
     perfis: GESTAO,
     itens: [
-      { titulo: 'Histórico de alterações', rota: '/configuracoes/historico', descricao: 'Quem alterou o quê e quando, logins e eventos de segurança.', perfis: GESTAO },
+      { titulo: 'Usuários e senhas', rota: '/configuracoes/usuarios', descricao: 'Criar usuários, definir ou redefinir senhas e o perfil em cada empresa.', perfis: ['Dono'] },
       { titulo: 'Empresas', rota: '/configuracoes/empresas', descricao: 'CNPJs do seu negócio: cadastro e dados.', perfis: ['Dono'] },
       { titulo: 'Lojas', rota: '/configuracoes/lojas', descricao: 'Lojas (locais de estoque) de cada empresa.', perfis: ['Dono'] },
-      { titulo: 'Usuários e permissões', rota: '/configuracoes/usuarios', descricao: 'Usuários, perfis por empresa e senhas.', perfis: ['Dono'] },
       { titulo: 'Licença e assinatura', rota: '/configuracoes/licenca', descricao: 'Plano, vencimento e situação da mensalidade.', perfis: ['Dono'] },
+      { titulo: 'Histórico de alterações', rota: '/configuracoes/historico', descricao: 'Quem alterou o quê e quando, logins e eventos de segurança.', perfis: GESTAO },
     ],
   },
 ]

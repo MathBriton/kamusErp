@@ -13,13 +13,14 @@ using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace Kamus.Modules.Identidade.Endpoints;
 
-/// <summary>Configurações → Usuários e permissões (perfil Dono).</summary>
+/// <summary>Administrativo → Usuários e senhas (perfil Dono).</summary>
 internal static class UsuariosEndpoints
 {
     public sealed record AcessoDto(Guid EmpresaId, string Empresa, string Perfil);
     public sealed record UsuarioDoClienteDto(Guid Id, string Nome, string Email, bool Ativo, bool DeveTrocarSenha, DateTimeOffset? UltimoLoginEm, IReadOnlyList<AcessoDto> Acessos);
     public sealed record AcessoRequest(Guid EmpresaId, string? Perfil);
-    public sealed record NovoUsuarioRequest(string? Nome, string? Email, IReadOnlyList<AcessoRequest>? Acessos);
+    /// <summary><c>Senha</c> opcional: sem ela, o sistema gera uma provisória. Em ambos os casos a pessoa troca no primeiro acesso.</summary>
+    public sealed record NovoUsuarioRequest(string? Nome, string? Email, IReadOnlyList<AcessoRequest>? Acessos, string? Senha = null);
     public sealed record UsuarioRequest(string? Nome, IReadOnlyList<AcessoRequest>? Acessos);
     public sealed record SenhaProvisoriaResponse(Guid Id, string Email, string SenhaProvisoria);
 
@@ -109,6 +110,7 @@ internal static class UsuariosEndpoints
         if (Gestao.ExigirDono(empresaAtiva) is { } negado) return negado;
         if (string.IsNullOrWhiteSpace(r.Nome)) return Invalido("Informe o nome.");
         if (Usuario.NormalizarEmail(r.Email) is not { } email) return Invalido("E-mail inválido.");
+        if (!string.IsNullOrEmpty(r.Senha) && PoliticaDeSenha.Validar(r.Senha) is { } senhaFraca) return Invalido(senhaFraca);
         var (acessos, erro) = await LerAcessosAsync(r.Acessos, db, ct);
         if (acessos is null) return Invalido(erro!);
         if (await db.Usuarios.AnyAsync(u => u.Email == email, ct))
@@ -116,12 +118,12 @@ internal static class UsuariosEndpoints
         if (await LimiteAtingidoAsync(limites, tenant, db, ct)) return Gestao.Limite("usuários ativos", (await LimiteAsync(limites, tenant, ct))!.Value);
 
         var usuario = Usuario.Criar(tenant.TenantId!.Value, r.Nome, email);
-        var senha = PoliticaDeSenha.GerarProvisoria();
+        var senha = string.IsNullOrEmpty(r.Senha) ? PoliticaDeSenha.GerarProvisoria() : r.Senha;
         usuario.DefinirSenhaProvisoria(hasher.HashPassword(usuario, senha));
         db.Usuarios.Add(usuario);
         db.AcessosEmpresa.AddRange(acessos.Select(a => AcessoEmpresa.Criar(usuario.Id, a.EmpresaId, a.Perfil)));
         await db.SaveChangesAsync(ct);
-        await eventos.RegistrarAsync("usuario_criado", $"Usuário {usuario.Email} criado com senha provisória", ct: ct);
+        await eventos.RegistrarAsync("usuario_criado", $"Usuário {usuario.Email} criado com senha {(string.IsNullOrEmpty(r.Senha) ? "provisória gerada" : "definida pelo Dono")}", ct: ct);
         return Results.Created($"/api/usuarios/{usuario.Id}", new SenhaProvisoriaResponse(usuario.Id, usuario.Email, senha));
     }
 

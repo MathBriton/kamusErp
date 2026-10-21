@@ -5,13 +5,13 @@ const titulos = (perfil: string) => filtrarMenu(MENU, perfil).map((g) => g.titul
 
 describe('menu', () => {
   it('Dono vê todos os módulos', () => {
-    expect(titulos('Dono')).toEqual(['Dashboard', 'Cadastros', 'Estoque', 'Financeiro', 'Vendas', 'Relatórios', 'Configurações'])
+    expect(titulos('Dono')).toEqual(['Dashboard', 'Cadastros', 'Estoque', 'Financeiro', 'Vendas', 'Relatórios', 'Administrativo'])
   })
 
-  it('Vendedor não vê Financeiro nem Configurações; no Estoque, só a posição', () => {
+  it('Vendedor não vê Financeiro nem Administrativo; no Estoque, só a posição', () => {
     const visiveis = titulos('Vendedor')
     expect(visiveis).not.toContain('Financeiro')
-    expect(visiveis).not.toContain('Configurações')
+    expect(visiveis).not.toContain('Administrativo')
     expect(visiveis).toContain('Vendas')
     const estoque = filtrarMenu(MENU, 'Vendedor').find((g) => g.titulo === 'Estoque')
     expect(estoque?.itens?.map((i) => i.titulo)).toEqual(['Posição de estoque'])
@@ -26,8 +26,13 @@ describe('menu', () => {
   })
 
   it('Gerente vê o histórico de alterações, mas não usuários e licença', () => {
-    const config = filtrarMenu(MENU, 'Gerente').find((g) => g.titulo === 'Configurações')
+    const config = filtrarMenu(MENU, 'Gerente').find((g) => g.titulo === 'Administrativo')
     expect(config?.itens?.map((i) => i.titulo)).toEqual(['Histórico de alterações'])
+  })
+
+  it('Administrativo começa por Usuários e senhas para o Dono', () => {
+    const admin = filtrarMenu(MENU, 'Dono').find((g) => g.titulo === 'Administrativo')
+    expect(admin?.itens?.map((i) => i.titulo)).toEqual(['Usuários e senhas', 'Empresas', 'Lojas', 'Licença e assinatura', 'Histórico de alterações'])
   })
 
   it('grupo sem nenhum item visível some do menu', () => {

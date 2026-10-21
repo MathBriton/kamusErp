@@ -20,7 +20,7 @@ describe('Shell', () => {
     api()
     renderApp()
     await screen.findByText(/Olá, Admin/)
-    for (const modulo of ['Dashboard', 'Cadastros', 'Estoque', 'Financeiro', 'Vendas', 'Relatórios', 'Configurações'])
+    for (const modulo of ['Dashboard', 'Cadastros', 'Estoque', 'Financeiro', 'Vendas', 'Relatórios', 'Administrativo'])
       expect(within(menuLateral()).getByText(modulo)).toBeInTheDocument()
   })
 

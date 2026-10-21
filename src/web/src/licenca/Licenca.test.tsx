@@ -103,7 +103,7 @@ describe('Licença do cliente', () => {
   })
 })
 
-describe('Configurações → Licença', () => {
+describe('Administrativo → Licença', () => {
   const pagamentos = [
     { id: 'p1', valor: 199.9, meses: 1, pagoEm: '2026-10-07', estendeuAte: '2026-11-07', forma: 'Pix' },
   ]
@@ -122,7 +122,7 @@ describe('Configurações → Licença', () => {
     expect(within(tabela).getByText('Pix')).toBeInTheDocument()
   })
 
-  it('fica no menu de Configurações só para o Dono', async () => {
+  it('fica no menu Administrativo só para o Dono', async () => {
     api(() => json(ativa), {}, sessaoVendedor)
     renderApp()
 

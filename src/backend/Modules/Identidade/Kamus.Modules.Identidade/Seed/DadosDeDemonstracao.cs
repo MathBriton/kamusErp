@@ -60,7 +60,7 @@ internal static class DadosDeDemonstracao
         {
             new NovaNotificacao(admin.Id, "boas_vindas", "Bem-vindo ao Kamus", "Este é o ambiente de demonstração, com 2 CNPJs. Use o seletor no topo para trocar de empresa.", "/"),
             new NovaNotificacao(admin.Id, "primeiros_passos", "Comece cadastrando seus produtos", "Produtos com grade (cor × tamanho) chegam na v0.7.0.", "/cadastros/produtos"),
-            new NovaNotificacao(admin.Id, "historico", "Histórico de alterações disponível", "Veja logins, alterações e eventos de segurança em Configurações.", "/configuracoes/historico"),
+            new NovaNotificacao(admin.Id, "historico", "Histórico de alterações disponível", "Veja logins, alterações e eventos de segurança em Administrativo → Histórico de alterações.", "/configuracoes/historico"),
             new NovaNotificacao(vendedora.Id, "boas_vindas", "Bem-vinda ao Kamus", "Você acessa a empresa Kamus Moda Centro com o perfil Vendedor.", "/"),
         })
             await notificador.NotificarAsync(n, ct);

@@ -76,7 +76,7 @@ export function HistoricoPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <p className="text-xs text-muted">Configurações</p>
+      <p className="text-xs text-muted">Administrativo</p>
       <h1 className="text-2xl font-bold tracking-tight">Histórico de alterações</h1>
       <p className="mt-1 text-sm text-muted">
         Quem incluiu, alterou ou excluiu registros, além de logins e eventos de segurança. O histórico não pode ser editado nem apagado.
