@@ -144,6 +144,11 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 - **Versões de pacotes NuGet:** centralizadas em `Directory.Packages.props`.
 - **Analisadores:** `TreatWarningsAsErrors` + `AnalysisLevel latest-recommended`. Logs com `[LoggerMessage]`
   (CA1848). Migrations geradas são ignoradas pelos analisadores via `.editorconfig` (`[**/Migrations/*.cs]`).
+- **Padrão de tela de cadastro/consulta (web):** use `src/web/src/components/grade/` — `CabecalhoDaPagina` (seção, título, ações
+  "Exportar" + "Novo"), `BarraDeFiltros` ("Limpar filtros"), `GradeDeRegistros` (colunas, seleção de linhas com `acoesEmLote`, `acoes` por linha
+  com `AcaoDaLinha`, total de registros, paginação manual 20/50/100 — a API recebe `pagina`/`tamanho` e devolve `itens`/`total`) e `Confirmacao`
+  (inativar/excluir). Filtro novo volta à página 1 e limpa a seleção. `BotaoExportar` recebe `selecionados` (vai `?ids=` para o relatório, que
+  precisa aceitar esse parâmetro). Referência: `cadastros/ProdutosPage.tsx`.
 - **Respostas de erro da API:** `Results.Problem(...)` (ProblemDetails) com `detail` em português, pronto para exibir.
 - **Documentação da API** (`/scalar`, `/openapi/v1.json`) só em Development; requisições prontas em
   `src/backend/Kamus.Api/Kamus.Api.http`.
@@ -258,8 +263,14 @@ Plano de releases em `LEVANTAMENTO.md` → Plano de releases (v0.21.0 segurança
   fecha outros); central de relatórios em cards (ícone por área, busca, "Todos os relatórios"); menu **Administrativo** no lugar de Configurações
   (rotas seguem `/configuracoes/...`) com "Usuários e senhas" — `POST /api/usuarios` aceita `senha` opcional (política normal, troca no 1º acesso);
   produto sem grade envia `gradeId: null` e o middleware `RequisicaoInvalida` (Kamus.Api/Infra) transforma `BadHttpRequestException` em 400 em português.
-- Testes: 544 backend, 181 web, 10 admin, 7 mobile. E2E dos ajustes em localhost (produto sem grade, sidebar, cards, usuário com senha definida,
-  tema escuro), 3 execuções.
+- **Padrão de grade (em `main`):** componentes `components/grade` (ver seção 7) aplicados em **Produtos** (filtros busca/situação/categoria/coleção,
+  ver/editar/inativar por linha, inativar/reativar em lote via `POST /api/produtos/situacao`, exportar selecionados via `ids` no relatório `produtos`).
+  Tema só Claro/Escuro (`theme.ts`: sem escolha salva segue o SO); Relatórios é o último item do menu.
+- Testes: 546 backend, 188 web, 10 admin, 7 mobile. E2E em localhost (grade de produtos com 25 itens, filtros, seleção, CSV/PDF, lote, tema, ordem
+  do menu), 3 execuções.
+
+**Antes da v0.21.0 (pedido do dono):** levar o padrão de grade às demais telas de cadastro/consulta (Clientes, Fornecedores, Vendedores, Contas a
+pagar/receber, Vendas realizadas...), uma por vez, com o relatório de cada uma aceitando `ids`.
 
 **Próximo passo — v0.21.0: segurança para produção** (ver `README.md` → débitos "antes de ir para produção"):
 1. 2FA (TOTP) para o SuperAdmin do Painel Administrativo; revogação do token do painel (sair invalida no servidor) e renovação curta.

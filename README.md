@@ -266,6 +266,9 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | Conta a pagar da NF-e é criada depois da gravação da entrada (outro contexto) | Se falhar, a entrada fica sem a conta a pagar (relançar não duplica, mas a nota já está lançada) | Transação única / outbox quando houver PostgreSQL em produção |
 | Sem DRE, conciliação bancária (OFX) nem centro de custo | Relatórios financeiros básicos | DRE na central de relatórios (v0.18.0); OFX pós-MVP |
 | Pessoa do título é guardada pelo nome (o vínculo com o cadastro é opcional) | Renomear o fornecedor no cadastro não muda títulos antigos | Mostrar o nome atual quando houver vínculo |
+| Padrão de grade (filtros, paginação manual, seleção, total, exportar) só em **Produtos** | As outras telas de cadastro/consulta ainda têm listas próprias | Migrar tela a tela para `components/grade` (próximas: Clientes, Fornecedores, Vendedores, Contas a pagar/receber, Vendas realizadas) |
+| "Exportar selecionados" manda os ids na URL (`?ids=a,b,...`) | Seleção muito grande (centenas de linhas) pode passar do limite de URL | Trocar por POST com corpo se aparecer o caso |
+| Lista de produtos filtra e pagina em memória (lê todos os produtos do tenant) | Lento com catálogos muito grandes | v0.22.0 (consultas agregadas/paginação no banco) |
 
 ## Multi-tenancy em uma frase
 
