@@ -281,6 +281,41 @@ public sealed class ProdutosTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Relatorio_SoOsSelecionados()
+    {
+        var client = await Entrar();
+        var camiseta = await CriarCamiseta(client);
+        var bermuda = await CriarCamiseta(client, "BER-001");
+
+        var csv = await client.GetStringAsync(U($"/api/relatorios/produtos.csv?ids={bermuda.Id}"), Ct);
+
+        csv.ShouldContain("BER-001");
+        csv.ShouldNotContain(camiseta.Referencia);
+        var dados = await client.GetFromJsonAsync<JsonElement>(U($"/api/relatorios/produtos/dados?ids={bermuda.Id},{Guid.NewGuid()}"), Ct);
+        dados.GetProperty("filtros")[0].GetProperty("valor").GetString().ShouldBe("1 produto");
+    }
+
+    [Fact]
+    public async Task SituacaoEmLote_InativaEReativaVarios_VendedorNao()
+    {
+        var client = await Entrar();
+        var a = await CriarCamiseta(client);
+        var b = await CriarCamiseta(client, "CAM-002");
+
+        var inativar = await client.PostAsJsonAsync(U("/api/produtos/situacao"), new { ids = new[] { a.Id, b.Id }, ativo = false }, Ct);
+        inativar.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await inativar.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("alterados").GetInt32().ShouldBe(2);
+        (await client.GetFromJsonAsync<PaginaDto>(U("/api/produtos?situacao=inativos"), Ct))!.Total.ShouldBe(2);
+
+        (await client.PostAsJsonAsync(U("/api/produtos/situacao"), new { ids = new[] { a.Id }, ativo = true }, Ct)).EnsureSuccessStatusCode();
+        (await client.GetFromJsonAsync<PaginaDto>(U("/api/produtos?situacao=ativos"), Ct))!.Itens.Single().Id.ShouldBe(a.Id);
+        (await client.PostAsJsonAsync(U("/api/produtos/situacao"), new { ids = Array.Empty<Guid>(), ativo = true }, Ct)).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var vendedor = await Entrar("vendedor@kamus.local");
+        (await vendedor.PostAsJsonAsync(U("/api/produtos/situacao"), new { ids = new[] { a.Id }, ativo = false }, Ct)).StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task CatalogoDeProdutos_ExpoeProdutoESkusParaOutrosModulos()
     {
         var client = await Entrar();

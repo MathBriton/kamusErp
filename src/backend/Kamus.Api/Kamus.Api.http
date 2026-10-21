@@ -227,8 +227,21 @@ GET {{api}}/api/grades
 Authorization: Bearer {{login.response.body.accessToken}}
 X-Empresa-Id: {{login.response.body.empresas[0].id}}
 
-### Produtos (busca por descrição, referência, marca ou código de barras)
-GET {{api}}/api/produtos?busca=camiseta
+### Produtos (busca por descrição, referência, marca ou código de barras; filtros categoria/colecao/situacao; paginação pagina/tamanho)
+GET {{api}}/api/produtos?busca=camiseta&situacao=ativos&pagina=1&tamanho=20
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+
+### Inativar (ou reativar, ativo=true) vários produtos de uma vez — seleção da grade
+POST {{api}}/api/produtos/situacao
+Authorization: Bearer {{login.response.body.accessToken}}
+X-Empresa-Id: {{login.response.body.empresas[0].id}}
+Content-Type: application/json
+
+{ "ids": ["00000000-0000-0000-0000-000000000000"], "ativo": false }
+
+### Exportar só os produtos selecionados (ids separados por vírgula)
+GET {{api}}/api/relatorios/produtos.csv?ids=00000000-0000-0000-0000-000000000000
 Authorization: Bearer {{login.response.body.accessToken}}
 X-Empresa-Id: {{login.response.body.empresas[0].id}}
 

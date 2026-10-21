@@ -14,10 +14,10 @@ const FORMATOS: { formato: string; rotulo: string; descricao: string; icone: Nom
 type Aviso = { tipo: 'status' | 'erro'; texto: string } | null
 
 /**
- * Botão padrão "Exportar ▾" de toda tela com relatório. Envia os mesmos filtros da tela;
- * a API decide entre devolver o arquivo na hora ou gerar em segundo plano.
+ * Botão padrão "Exportar ▾" de toda tela com relatório. Envia os mesmos filtros da tela — ou, se houver linhas
+ * selecionadas na grade, só elas (parâmetro `ids`); a API decide entre devolver o arquivo na hora ou gerar em segundo plano.
  */
-export function BotaoExportar({ relatorio, parametros = {} }: { relatorio: string; parametros?: Record<string, string> }) {
+export function BotaoExportar({ relatorio, parametros = {}, selecionados = [] }: { relatorio: string; parametros?: Record<string, string>; selecionados?: string[] }) {
   const { baixar } = useApi()
   const [aberto, setAberto] = useState(false)
   const [gerando, setGerando] = useState(false)
@@ -29,7 +29,9 @@ export function BotaoExportar({ relatorio, parametros = {} }: { relatorio: strin
     setAberto(false)
     setGerando(true)
     setAviso(null)
-    const filtros = new URLSearchParams(Object.entries(parametros).filter(([, v]) => v !== ''))
+    const filtros = selecionados.length > 0
+      ? new URLSearchParams({ ids: selecionados.join(',') })
+      : new URLSearchParams(Object.entries(parametros).filter(([, v]) => v !== ''))
     const query = filtros.size ? `?${filtros}` : ''
     try {
       const resultado = await baixar(`/api/relatorios/${relatorio}.${formato}${query}`)
@@ -65,7 +67,9 @@ export function BotaoExportar({ relatorio, parametros = {} }: { relatorio: strin
 
       {aberto && (
         <div role="menu" aria-label="Exportar" className="absolute right-0 z-30 mt-2 w-72 overflow-hidden rounded-xl border border-border bg-surface shadow-lg">
-          <p className="px-3 pt-3 pb-1.5 text-[11px] font-semibold tracking-wider text-muted uppercase">Exportar com os filtros atuais</p>
+          <p className="px-3 pt-3 pb-1.5 text-[11px] font-semibold tracking-wider text-muted uppercase">
+            {selecionados.length > 0 ? `Exportar os ${selecionados.length} selecionados` : 'Exportar com os filtros atuais'}
+          </p>
           <div className="p-1.5 pt-0">
             {FORMATOS.map((f) => (
               <button

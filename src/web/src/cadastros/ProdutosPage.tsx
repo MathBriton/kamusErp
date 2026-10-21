@@ -5,57 +5,107 @@ import { ErroDeApi } from '../auth/api'
 import { Campo } from '../components/Campo'
 import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { Confirmacao } from '../components/grade/Confirmacao'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
 import { Icone } from '../components/Icone'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { BotaoExportar } from '../relatorios/BotaoExportar'
 import { Amostra } from './Amostra'
 import { decimal, lerNumero, moeda, PERFIS_DO_CATALOGO, type Cor, type Grade, type Produto, type ProdutoResumo, type Sku } from './catalogo'
 
-type Janela = { tipo: 'novo' } | { tipo: 'detalhe'; produto: Produto } | { tipo: 'editar'; produto: Produto } | null
+type Janela =
+  | { tipo: 'novo' }
+  | { tipo: 'detalhe'; produto: Produto }
+  | { tipo: 'editar'; produto: Produto; doDetalhe: boolean }
+  | { tipo: 'mudarSituacao'; produto: ProdutoResumo }
+  | { tipo: 'mudarSelecionados'; ativo: boolean }
+  | null
 
+interface Filtros {
+  situacao: string
+  categoria: string
+  colecao: string
+}
+const FILTROS_PADRAO: Filtros = { situacao: 'ativos', categoria: '', colecao: '' }
+
+/** Produtos no padrão das telas de cadastro: filtros, grade paginada com seleção, ações por linha e em lote, exportação. */
 export function ProdutosPage() {
-  const { getJson } = useApi()
+  const { getJson, enviar } = useApi()
   const { perfilAtual } = useEmpresa()
   const podeEditar = PERFIS_DO_CATALOGO.includes(perfilAtual)
   const [params, setParams] = useSearchParams()
   const [busca, setBusca] = useState('')
-  const [situacao, setSituacao] = useState('ativos')
-  const [{ produtos, erro }, setResultado] = useState<{ produtos: ProdutoResumo[] | null; erro: string | null }>({ produtos: null, erro: null })
+  const [filtros, setFiltros] = useState<Filtros>(FILTROS_PADRAO)
+  const [pagina, setPagina] = useState(1)
+  const [tamanho, setTamanho] = useState(20)
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set())
+  const [{ produtos, total, erro }, setResultado] = useState<{ produtos: ProdutoResumo[] | null; total: number; erro: string | null }>({ produtos: null, total: 0, erro: null })
+  const [sugestoes, setSugestoes] = useState<{ categorias: string[]; colecoes: string[] }>({ categorias: [], colecoes: [] })
   const [janela, setJanela] = useState<Janela>(null)
   const [versao, setVersao] = useState(0)
   const idDaUrl = params.get('id')
 
+  const consulta = new URLSearchParams({ situacao: filtros.situacao })
+  if (busca.trim()) consulta.set('busca', busca.trim())
+  if (filtros.categoria) consulta.set('categoria', filtros.categoria)
+  if (filtros.colecao) consulta.set('colecao', filtros.colecao)
+  const parametrosDoRelatorio = Object.fromEntries(consulta)
+  consulta.set('pagina', String(pagina))
+  consulta.set('tamanho', String(tamanho))
+  const url = `/api/produtos?${consulta}`
+
   useEffect(() => {
     const controle = new AbortController()
-    const consulta = new URLSearchParams({ situacao })
-    if (busca.trim()) consulta.set('busca', busca.trim())
     const timer = window.setTimeout(() => {
-      getJson<{ itens: ProdutoResumo[] }>(`/api/produtos?${consulta}`, controle.signal)
-        .then((r) => setResultado({ produtos: r.itens, erro: null }))
+      getJson<{ itens: ProdutoResumo[]; total: number }>(url, controle.signal)
+        .then((r) => setResultado({ produtos: r.itens, total: r.total, erro: null }))
         .catch((e: unknown) => {
-          if (!controle.signal.aborted) setResultado({ produtos: null, erro: e instanceof ErroDeApi ? e.message : 'Não foi possível carregar.' })
+          if (!controle.signal.aborted) setResultado({ produtos: [], total: 0, erro: e instanceof ErroDeApi ? e.message : 'Não foi possível carregar.' })
         })
     }, busca ? 250 : 0)
     return () => {
       window.clearTimeout(timer)
       controle.abort()
     }
-  }, [getJson, situacao, busca, versao])
+  }, [getJson, url, busca, versao])
+
+  useEffect(() => {
+    const controle = new AbortController()
+    getJson<{ categorias: string[]; colecoes: string[] }>('/api/produtos/sugestoes', controle.signal).then(setSugestoes).catch(() => {})
+    return () => controle.abort()
+  }, [getJson, versao])
+
+  // Filtro novo volta para a primeira página e limpa a seleção (as linhas marcadas podem nem aparecer mais).
+  const recomecar = () => {
+    setPagina(1)
+    setSelecionados(new Set())
+  }
+  const filtrar = (mudanca: Partial<Filtros>) => {
+    setFiltros((f) => ({ ...f, ...mudanca }))
+    recomecar()
+  }
+  const limparFiltros = () => {
+    setFiltros(FILTROS_PADRAO)
+    setBusca('')
+    recomecar()
+  }
+  const filtrosAtivos = busca.trim() !== '' || filtros.situacao !== FILTROS_PADRAO.situacao || filtros.categoria !== '' || filtros.colecao !== ''
 
   const abrir = useCallback(
-    (id: string) => {
-      getJson<Produto>(`/api/produtos/${id}`)
-        .then((produto) => setJanela({ tipo: 'detalhe', produto }))
-        .catch(() => {})
+    (id: string, acao: (produto: Produto) => void) => {
+      getJson<Produto>(`/api/produtos/${id}`).then(acao).catch(() => {})
     },
     [getJson],
   )
+  const verDetalhe = useCallback((id: string) => abrir(id, (produto) => setJanela({ tipo: 'detalhe', produto })), [abrir])
 
   useEffect(() => {
     if (!idDaUrl) return
-    const timer = window.setTimeout(() => abrir(idDaUrl), 0)
+    const timer = window.setTimeout(() => verDetalhe(idDaUrl), 0)
     return () => window.clearTimeout(timer)
-  }, [abrir, idDaUrl])
+  }, [verDetalhe, idDaUrl])
 
   const fechar = () => {
     setJanela(null)
@@ -65,37 +115,95 @@ export function ProdutosPage() {
     setJanela({ tipo: 'detalhe', produto })
     setVersao((v) => v + 1)
   }
+  const recarregar = () => {
+    setJanela(null)
+    setVersao((v) => v + 1)
+  }
+
+  const colunas: Coluna<ProdutoResumo>[] = [
+    { titulo: 'Referência', celula: (p) => <span className="font-mono text-xs">{p.referencia}</span> },
+    {
+      titulo: 'Descrição',
+      celula: (p) => (
+        <>
+          <span className="font-semibold">{p.descricao}</span>
+          <span className="block text-xs text-muted">{[p.marca, p.categoria, p.colecao].filter(Boolean).join(' · ')}</span>
+        </>
+      ),
+    },
+    { titulo: 'Cores', celula: (p) => p.cores.join(', ') },
+    { titulo: 'SKUs', celula: (p) => p.skus, alinhar: 'direita' },
+    { titulo: 'Preço', celula: (p) => moeda(p.precoVenda), alinhar: 'direita' },
+    { titulo: 'Markup', celula: (p) => (p.markup === null ? '—' : decimal(p.markup)), alinhar: 'direita' },
+    {
+      titulo: 'Situação',
+      celula: (p) => (
+        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${p.ativo ? 'bg-success-soft text-success' : 'bg-surface-2 text-muted'}`}>
+          {p.ativo ? 'Ativo' : 'Inativo'}
+        </span>
+      ),
+    },
+  ]
 
   return (
     <div className="mx-auto max-w-7xl">
-      <p className="text-xs text-muted">Cadastros</p>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">Produtos</h1>
-          <p className="mt-1 text-sm text-muted">Cada produto gera um SKU por cor × tamanho, com código de barras próprio.</p>
-        </div>
-        {podeEditar && (
-          <button type="button" onClick={() => setJanela({ tipo: 'novo' })} className={estilos.botaoPrimario}>
-            Novo produto
-          </button>
-        )}
-      </div>
+      <CabecalhoDaPagina
+        secao="Cadastros"
+        titulo="Produtos"
+        descricao="Cada produto gera um SKU por cor × tamanho, com código de barras próprio."
+        acoes={
+          <>
+            <BotaoExportar relatorio="produtos" parametros={parametrosDoRelatorio} selecionados={[...selecionados]} />
+            {podeEditar && (
+              <button type="button" onClick={() => setJanela({ tipo: 'novo' })} className={estilos.botaoPrimario}>
+                <Icone nome="plus" />
+                Novo produto
+              </button>
+            )}
+          </>
+        }
+      />
 
-      <div className="mt-6 flex flex-wrap items-end gap-3">
+      <BarraDeFiltros ativos={filtrosAtivos} onLimpar={limparFiltros}>
         <label className="min-w-60 flex-1 text-sm">
           <span className="mb-1 block font-semibold">Buscar</span>
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Descrição, referência, marca ou código de barras" className={estilos.campo} />
+          <input
+            value={busca}
+            onChange={(e) => {
+              setBusca(e.target.value)
+              recomecar()
+            }}
+            placeholder="Descrição, referência, marca ou código de barras"
+            className={estilos.campo}
+          />
         </label>
-        <label className="text-sm">
+        <label className="w-40 text-sm">
           <span className="mb-1 block font-semibold">Situação</span>
-          <select value={situacao} onChange={(e) => setSituacao(e.target.value)} className={estilos.campo}>
+          <select value={filtros.situacao} onChange={(e) => filtrar({ situacao: e.target.value })} className={estilos.campo}>
             <option value="ativos">Ativos</option>
             <option value="inativos">Inativos</option>
             <option value="todos">Todos</option>
           </select>
         </label>
-        <BotaoExportar relatorio="produtos" parametros={{ busca: busca.trim(), situacao }} />
-      </div>
+        <label className="w-48 text-sm">
+          <span className="mb-1 block font-semibold">Categoria</span>
+          <select value={filtros.categoria} onChange={(e) => filtrar({ categoria: e.target.value })} className={estilos.campo}>
+            <option value="">Todas</option>
+            {sugestoes.categorias.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </label>
+        <label className="w-48 text-sm">
+          <span className="mb-1 block font-semibold">Coleção</span>
+          <select value={filtros.colecao} onChange={(e) => filtrar({ colecao: e.target.value })} className={estilos.campo}>
+            <option value="">Todas</option>
+            {sugestoes.colecoes.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </label>
+      </BarraDeFiltros>
 
       {erro && (
         <p role="alert" className={`mt-4 flex items-center gap-2 ${estilos.erro}`}>
@@ -104,54 +212,94 @@ export function ProdutosPage() {
         </p>
       )}
 
-      {produtos && (
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-          {produtos.length === 0 ? (
-            <p className="p-8 text-center text-sm text-muted">Nenhum produto encontrado.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-left text-xs text-muted uppercase">
-                <tr>
-                  <th className="px-4 py-2">Referência</th>
-                  <th className="px-4 py-2">Descrição</th>
-                  <th className="px-4 py-2">Cores</th>
-                  <th className="px-4 py-2 text-right">SKUs</th>
-                  <th className="px-4 py-2 text-right">Preço</th>
-                  <th className="px-4 py-2 text-right">Markup</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {produtos.map((p) => (
-                  <tr key={p.id} className={p.ativo ? '' : 'text-muted'}>
-                    <td className="px-4 py-2.5 font-mono text-xs">{p.referencia}</td>
-                    <td className="px-4 py-2.5">
-                      <button type="button" onClick={() => abrir(p.id)} className="text-left font-semibold hover:text-primary hover:underline">
-                        {p.descricao}
-                      </button>
-                      <span className="block text-xs text-muted">{[p.marca, p.categoria, p.colecao].filter(Boolean).join(' · ')}</span>
-                    </td>
-                    <td className="px-4 py-2.5">{p.cores.join(', ')}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{p.skus}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{moeda(p.precoVenda)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{p.markup === null ? '—' : decimal(p.markup)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+      <GradeDeRegistros
+        rotulo="Produtos"
+        colunas={colunas}
+        itens={produtos}
+        chave={(p) => p.id}
+        nome={(p) => p.descricao}
+        total={total}
+        pagina={pagina}
+        tamanho={tamanho}
+        onPagina={setPagina}
+        onTamanho={(t) => {
+          setTamanho(t)
+          setPagina(1)
+        }}
+        selecao={{ selecionados, onMudar: setSelecionados }}
+        apagada={(p) => !p.ativo}
+        vazio="Nenhum produto encontrado com esses filtros."
+        acoes={(p) => (
+          <>
+            <AcaoDaLinha rotulo={`Ver ${p.descricao}`} icone="eye" onClick={() => verDetalhe(p.id)} />
+            {podeEditar && (
+              <>
+                <AcaoDaLinha rotulo={`Editar ${p.descricao}`} icone="pencil" onClick={() => abrir(p.id, (produto) => setJanela({ tipo: 'editar', produto, doDetalhe: false }))} />
+                <AcaoDaLinha
+                  rotulo={`${p.ativo ? 'Inativar' : 'Reativar'} ${p.descricao}`}
+                  icone="power"
+                  perigo={p.ativo}
+                  onClick={() => setJanela({ tipo: 'mudarSituacao', produto: p })}
+                />
+              </>
+            )}
+          </>
+        )}
+        acoesEmLote={
+          podeEditar && (
+            <>
+              <button type="button" onClick={() => setJanela({ tipo: 'mudarSelecionados', ativo: false })} className={estilos.botao}>Inativar selecionados</button>
+              <button type="button" onClick={() => setJanela({ tipo: 'mudarSelecionados', ativo: true })} className={estilos.botao}>Reativar selecionados</button>
+            </>
+          )
+        }
+      />
 
       {janela?.tipo === 'novo' && <FormularioDeProduto produto={null} onFechar={fechar} onSalvo={atualizado} />}
-      {janela?.tipo === 'editar' && <FormularioDeProduto produto={janela.produto} onFechar={() => setJanela({ tipo: 'detalhe', produto: janela.produto })} onSalvo={atualizado} />}
+      {janela?.tipo === 'editar' && (
+        <FormularioDeProduto
+          produto={janela.produto}
+          onFechar={() => (janela.doDetalhe ? setJanela({ tipo: 'detalhe', produto: janela.produto }) : setJanela(null))}
+          onSalvo={atualizado}
+        />
+      )}
       {janela?.tipo === 'detalhe' && (
         <DetalheDoProduto
           produto={janela.produto}
           podeEditar={podeEditar}
           onFechar={fechar}
-          onEditar={() => setJanela({ tipo: 'editar', produto: janela.produto })}
+          onEditar={() => setJanela({ tipo: 'editar', produto: janela.produto, doDetalhe: true })}
           onAtualizado={atualizado}
         />
+      )}
+      {janela?.tipo === 'mudarSituacao' && (
+        <Confirmacao
+          titulo={janela.produto.ativo ? 'Inativar produto' : 'Reativar produto'}
+          rotulo={janela.produto.ativo ? 'Inativar' : 'Reativar'}
+          onCancelar={() => setJanela(null)}
+          onConfirmar={async () => {
+            await enviar('POST', `/api/produtos/${janela.produto.id}/${janela.produto.ativo ? 'inativar' : 'reativar'}`)
+            recarregar()
+          }}
+        >
+          {janela.produto.ativo
+            ? <p>{`"${janela.produto.descricao}" deixa de aparecer nas vendas e entradas. O histórico e o estoque continuam guardados e dá para reativar depois.`}</p>
+            : <p>{`"${janela.produto.descricao}" volta a aparecer nas vendas e entradas.`}</p>}
+        </Confirmacao>
+      )}
+      {janela?.tipo === 'mudarSelecionados' && (
+        <Confirmacao
+          titulo={janela.ativo ? 'Reativar produtos' : 'Inativar produtos'}
+          rotulo={janela.ativo ? 'Reativar' : 'Inativar'}
+          onCancelar={() => setJanela(null)}
+          onConfirmar={async () => {
+            await enviar('POST', '/api/produtos/situacao', { ids: [...selecionados], ativo: janela.ativo })
+            setSelecionados(new Set())
+            recarregar()
+          }}
+        >
+          <p>{`${janela.ativo ? 'Reativar' : 'Inativar'} ${selecionados.size === 1 ? 'o produto selecionado' : `os ${selecionados.size} produtos selecionados`}?`}</p>
+        </Confirmacao>
       )}
     </div>
   )

@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { corpo, empresaAtivaHandler, json, mockApi, problema, sessaoDemo, sessaoVendedor } from '../test/mockApi'
@@ -25,7 +25,7 @@ function api(extras: Parameters<typeof mockApi>[0] = {}, sessao = sessaoDemo) {
     'POST /api/auth/refresh': () => json(sessao),
     'GET /api/empresas/ativa': empresaAtivaHandler(sessao),
     'GET /health': () => new Response('Healthy'),
-    'GET /api/produtos?situacao=ativos': () => json({ itens: [resumo], total: 1, pagina: 1, tamanho: 50 }),
+    'GET /api/produtos?situacao=ativos&pagina=1&tamanho=20': () => json({ itens: [resumo], total: 1, pagina: 1, tamanho: 20 }),
     'GET /api/grades': () => json(grades),
     'GET /api/cores': () => json(cores),
     'GET /api/produtos/sugestoes': () => json({ marcas: ['Kamus'], categorias: ['Camisetas'], colecoes: ['Verão 2027'] }),
@@ -35,15 +35,102 @@ function api(extras: Parameters<typeof mockApi>[0] = {}, sessao = sessaoDemo) {
 }
 
 describe('Cadastros → Produtos', () => {
-  it('lista com cores, quantidade de SKUs, preço e markup', async () => {
+  it('grade com colunas, situação, total de registros e paginação', async () => {
     api()
     renderApp('/cadastros/produtos')
 
-    const linha = (await screen.findByText('CAM-001')).closest('tr')!
+    await screen.findByText('CAM-001')
+    const linha = within(screen.getByRole('table', { name: 'Produtos' })).getByRole('row', { name: /CAM-001/ })
     expect(within(linha).getByText('Azul, Preto')).toBeInTheDocument()
     expect(within(linha).getByText('5')).toBeInTheDocument()
     expect(within(linha).getByText('R$ 59,90')).toBeInTheDocument()
     expect(within(linha).getByText('2,50')).toBeInTheDocument()
+    expect(within(linha).getByText('Ativo')).toBeInTheDocument()
+    expect(screen.getByText('1 registro')).toBeInTheDocument()
+    expect(screen.getByText('Página 1 de 1')).toBeInTheDocument()
+  })
+
+  it('filtros de categoria e coleção, página seguinte e limpar filtros', async () => {
+    const pagina = (n: number) => json({ itens: [{ ...resumo, id: `p${n}`, referencia: `REF-${n}` }], total: 45, pagina: n, tamanho: 20 })
+    api({
+      'GET /api/produtos?situacao=ativos&pagina=1&tamanho=20': () => pagina(1),
+      'GET /api/produtos?situacao=ativos&categoria=Camisetas&pagina=1&tamanho=20': () => pagina(1),
+      'GET /api/produtos?situacao=ativos&categoria=Camisetas&pagina=2&tamanho=20': () => pagina(2),
+      'GET /api/produtos?situacao=ativos&categoria=Camisetas&colecao=Ver%C3%A3o+2027&pagina=1&tamanho=20': () => pagina(1),
+    })
+    renderApp('/cadastros/produtos')
+    await screen.findByText('REF-1')
+
+    await userEvent.selectOptions(await screen.findByLabelText('Categoria'), 'Camisetas')
+    await userEvent.click(await screen.findByRole('button', { name: 'Próxima página' }))
+    expect(await screen.findByText('REF-2')).toBeInTheDocument()
+    expect(screen.getByText('Página 2 de 3')).toBeInTheDocument()
+
+    await userEvent.selectOptions(screen.getByLabelText('Coleção'), 'Verão 2027')
+    expect(await screen.findByText('REF-1')).toBeInTheDocument()
+    expect(screen.getByText('Página 1 de 3')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    expect(screen.getByLabelText('Categoria')).toHaveValue('')
+    expect(screen.getByLabelText('Coleção')).toHaveValue('')
+  })
+
+  it('ações da linha: ver, editar e inativar com confirmação', async () => {
+    let inativado = false
+    api({
+      'POST /api/produtos/p1/inativar': () => {
+        inativado = true
+        return new Response(null, { status: 204 })
+      },
+    })
+    renderApp('/cadastros/produtos')
+    await screen.findByText('CAM-001')
+    const linha = screen.getByRole('table', { name: 'Produtos' }).querySelector('tbody tr')!
+
+    await userEvent.click(within(linha as HTMLElement).getByRole('button', { name: 'Ver Camiseta Básica Gola V' }))
+    expect(await screen.findByRole('table', { name: 'Grade de Camiseta Básica Gola V' })).toBeInTheDocument()
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Camiseta Básica Gola V' })).getByRole('button', { name: 'Fechar' }))
+
+    await userEvent.click(within(linha as HTMLElement).getByRole('button', { name: 'Editar Camiseta Básica Gola V' }))
+    const edicao = await screen.findByRole('dialog', { name: 'Editar Camiseta Básica Gola V' })
+    expect(within(edicao).getByLabelText('Descrição')).toHaveValue('Camiseta Básica Gola V')
+    await userEvent.click(within(edicao).getByRole('button', { name: 'Cancelar' }))
+
+    await userEvent.click(within(linha as HTMLElement).getByRole('button', { name: 'Inativar Camiseta Básica Gola V' }))
+    const confirmar = screen.getByRole('dialog', { name: 'Inativar produto' })
+    expect(confirmar).toHaveTextContent('Camiseta Básica Gola V')
+    await userEvent.click(within(confirmar).getByRole('button', { name: 'Inativar' }))
+    await waitFor(() => expect(inativado).toBe(true))
+  })
+
+  it('seleção: inativa em lote e exporta só os selecionados', async () => {
+    let lote: Record<string, unknown> | null = null
+    const fetch = api({
+      'POST /api/produtos/situacao': (init) => {
+        lote = corpo(init)
+        return json({ alterados: 1 })
+      },
+      'GET /api/relatorios/produtos.csv?ids=p1': () => new Response('csv', { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=produtos.csv' } }),
+    })
+    URL.createObjectURL = (() => 'blob:x') as typeof URL.createObjectURL
+    URL.revokeObjectURL = () => {}
+    renderApp('/cadastros/produtos')
+    await screen.findByText('CAM-001')
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Selecionar Camiseta Básica Gola V' }))
+    const barra = screen.getByRole('region', { name: 'Seleção' })
+    expect(barra).toHaveTextContent('1 selecionado')
+
+    await userEvent.click(screen.getByRole('button', { name: /Exportar/ }))
+    const menu = screen.getByRole('menu', { name: 'Exportar' })
+    expect(menu).toHaveTextContent('Exportar os 1 selecionados')
+    await userEvent.click(within(menu).getByRole('menuitem', { name: /CSV/ }))
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => url === '/api/relatorios/produtos.csv?ids=p1')).toBe(true))
+
+    await userEvent.click(within(barra).getByRole('button', { name: 'Inativar selecionados' }))
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Inativar produtos' })).getByRole('button', { name: 'Inativar' }))
+    await waitFor(() => expect(lote).toEqual({ ids: ['p1'], ativo: false }))
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Seleção' })).not.toBeInTheDocument())
   })
 
   it('novo produto: escolhe grade e cores, mostra o markup e envia', async () => {

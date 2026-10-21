@@ -18,7 +18,12 @@ internal sealed class RelatorioDeProdutos(CadastrosDbContext db) : IRelatorio
     {
         var busca = parametros.GetValueOrDefault("busca");
         var situacao = parametros.GetValueOrDefault("situacao");
-        var produtos = await ProdutosEndpoints.FiltrarAsync(db, busca, parametros.GetValueOrDefault("categoria"), parametros.GetValueOrDefault("colecao"), situacao, ct);
+        // "ids" = linhas selecionadas na grade (separadas por vírgula): exporta só elas, ignorando os demais filtros.
+        var ids = LerIds(parametros.GetValueOrDefault("ids"));
+        var produtos = ids.Count > 0
+            ? await ProdutosEndpoints.FiltrarAsync(db, null, null, null, "todos", ct)
+            : await ProdutosEndpoints.FiltrarAsync(db, busca, parametros.GetValueOrDefault("categoria"), parametros.GetValueOrDefault("colecao"), situacao, ct);
+        if (ids.Count > 0) produtos = [.. produtos.Where(p => ids.Contains(p.Id))];
         var cores = await db.Cores.AsNoTracking().ToDictionaryAsync(c => c.Id, c => c.Nome, ct);
 
         var linhas = produtos.SelectMany(p => p.Skus.Where(s => s.Ativo).OrderBy(s => cores.GetValueOrDefault(s.CorId)).ThenBy(s => s.OrdemTamanho)
@@ -29,7 +34,8 @@ internal sealed class RelatorioDeProdutos(CadastrosDbContext db) : IRelatorio
             ])).ToList();
 
         var filtros = new List<FiltroAplicado>();
-        if (!string.IsNullOrWhiteSpace(busca)) filtros.Add(new FiltroAplicado("Busca", busca));
+        if (ids.Count > 0) filtros.Add(new FiltroAplicado("Selecionados", produtos.Count == 1 ? "1 produto" : $"{produtos.Count} produtos"));
+        else if (!string.IsNullOrWhiteSpace(busca)) filtros.Add(new FiltroAplicado("Busca", busca));
         return new DadosDoRelatorio(Titulo,
         [
             new ColunaRelatorio("Referência", Largura: 1f),
@@ -44,4 +50,8 @@ internal sealed class RelatorioDeProdutos(CadastrosDbContext db) : IRelatorio
             new ColunaRelatorio("Markup", TipoColuna.Numero, Largura: 0.6f),
         ], linhas, filtros);
     }
+
+    private static HashSet<Guid> LerIds(string? valor) =>
+        [.. (valor ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(v => Guid.TryParse(v, out var id) ? id : Guid.Empty).Where(id => id != Guid.Empty)];
 }

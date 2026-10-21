@@ -16,6 +16,8 @@ internal static class ProdutosEndpoints
     public sealed record ProdutoRequest(
         string? Referencia, string? Descricao, string? Marca, string? Categoria, string? Colecao, string? ReferenciaDoFornecedor,
         Guid? FornecedorId, decimal PrecoVenda, decimal? PrecoCusto, Guid? GradeId, IReadOnlyList<Guid>? CorIds);
+    public sealed record SituacaoEmLoteRequest(IReadOnlyList<Guid>? Ids, bool Ativo);
+    public sealed record SituacaoEmLoteResponse(int Alterados);
     public sealed record SkuRequest(string? CodigoDeBarras, decimal? PrecoVenda, bool Ativo);
     public sealed record SkuDto(Guid Id, Guid CorId, string Tamanho, int OrdemTamanho, string CodigoDeBarras, decimal? PrecoVenda, decimal Preco, bool Ativo);
     public sealed record ProdutoDto(
@@ -43,6 +45,7 @@ internal static class ProdutosEndpoints
             .WithSummary("Inativar produto").Produces(StatusCodes.Status204NoContent);
         g.MapPost("/{id:guid}/reativar", (Guid id, IEmpresaAtiva e, CadastrosDbContext db, CancellationToken ct) => Mudar(id, e, db, p => p.Reativar(), ct))
             .WithSummary("Reativar produto").Produces(StatusCodes.Status204NoContent);
+        g.MapPost("/situacao", MudarEmLote).WithSummary("Inativar ou reativar vários produtos de uma vez (seleção da grade)").Produces<SituacaoEmLoteResponse>();
         return app;
     }
 
@@ -216,5 +219,20 @@ internal static class ProdutosEndpoints
         acao(produto);
         await db.SaveChangesAsync(ct);
         return Results.NoContent();
+    }
+
+    private static async Task<IResult> MudarEmLote(SituacaoEmLoteRequest r, IEmpresaAtiva empresa, CadastrosDbContext db, CancellationToken ct)
+    {
+        if (!Permissoes.Catalogo.Contains(empresa.Perfil)) return NaoPode;
+        var ids = (r.Ids ?? []).Distinct().ToList();
+        if (ids.Count == 0) return Problema(StatusCodes.Status400BadRequest, "Selecione pelo menos um produto.");
+        var produtos = await db.Produtos.Where(p => ids.Contains(p.Id) && p.Ativo != r.Ativo).ToListAsync(ct);
+        foreach (var produto in produtos)
+        {
+            if (r.Ativo) produto.Reativar();
+            else produto.Inativar();
+        }
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(new SituacaoEmLoteResponse(produtos.Count));
     }
 }
