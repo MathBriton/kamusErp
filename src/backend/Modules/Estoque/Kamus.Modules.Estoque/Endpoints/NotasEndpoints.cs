@@ -4,10 +4,13 @@ using Kamus.Modules.Estoque.Dominio;
 using Kamus.Modules.Estoque.NotasFiscais;
 using Kamus.Modules.Estoque.Persistencia;
 using Kamus.SharedKernel.Auditoria;
+using Kamus.SharedKernel.Busca;
 using Kamus.SharedKernel.Catalogo;
+using Kamus.SharedKernel.Consultas;
 using Kamus.SharedKernel.Documentos;
 using Kamus.SharedKernel.Financeiro;
 using Kamus.SharedKernel.MultiTenancy;
+using Kamus.SharedKernel.Tempo;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -39,7 +42,9 @@ internal static class NotasEndpoints
     public static IEndpointRouteBuilder MapNotas(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/estoque/notas").RequireAuthorization().WithTags("Estoque");
-        g.MapGet("/", Listar).WithSummary("Notas importadas na empresa ativa (mais recentes primeiro)");
+        g.MapGet("/", Listar).WithSummary(
+            "Notas importadas na empresa ativa (mais recentes primeiro). Filtros: situacao (pendentes|lancadas|descartadas|todas = sem as descartadas), " +
+            "busca (número, fornecedor, CNPJ ou chave), de/ate (emissão); com pagina, devolve uma página");
         g.MapPost("/", Importar).DisableAntiforgery()
             .WithSummary("Importa o XML da NF-e (campo 'arquivo'); itens com de-para ou EAN conhecido já vêm vinculados").Produces<NotaDto>(StatusCodes.Status201Created);
         g.MapGet("/{id:guid}", Obter).WithSummary("Nota com os itens em conferência");
@@ -87,14 +92,44 @@ internal static class NotasEndpoints
             i.Distribuicao.Select(d => skus.TryGetValue(d.SkuId, out var s)
                 ? new DistribuicaoDto(d.SkuId, s.Cor, s.Tamanho, d.Quantidade) : new DistribuicaoDto(d.SkuId, "?", "?", d.Quantidade)).ToList());
 
-    private static async Task<IResult> Listar(EstoqueDbContext db, IEmpresaAtiva empresa, CancellationToken ct)
+    /// <summary>Situação interna (exportar selecionadas): todas, inclusive as descartadas.</summary>
+    internal const string InclusiveDescartadas = "inclusive-descartadas";
+
+    /// <summary>Notas das empresas indicadas com os filtros da tela, mais recentes primeiro (com os itens, para contar os pendentes).</summary>
+    internal static async Task<List<NotaDeEntrada>> FiltrarAsync(EstoqueDbContext db, IReadOnlyList<Guid> empresas, string? situacao, string? busca,
+        DateOnly? de, DateOnly? ate, CancellationToken ct)
+    {
+        var consulta = db.Notas.AsNoTracking().Include(n => n.Itens).ThenInclude(i => i.Distribuicao).Where(n => empresas.Contains(n.EmpresaId));
+        consulta = situacao?.ToLowerInvariant() switch
+        {
+            "pendentes" => consulta.Where(n => n.Status == StatusDaNota.Pendente),
+            "lancadas" => consulta.Where(n => n.Status == StatusDaNota.Lancada),
+            "descartadas" => consulta.Where(n => n.Status == StatusDaNota.Descartada),
+            InclusiveDescartadas => consulta,
+            _ => consulta.Where(n => n.Status != StatusDaNota.Descartada),
+        };
+        IEnumerable<NotaDeEntrada> notas = await consulta.ToListAsync(ct);
+        static DateOnly Dia(DateTimeOffset momento) => DateOnly.FromDateTime(momento.ToOffset(CalendarioBrasilia.Fuso).DateTime);
+        if (de is not null) notas = notas.Where(n => Dia(n.EmitidaEm) >= de);
+        if (ate is not null) notas = notas.Where(n => Dia(n.EmitidaEm) <= ate);
+        if (!string.IsNullOrWhiteSpace(busca))
+        {
+            var termo = busca.Trim();
+            notas = notas.Where(n => n.Numero == termo.TrimStart('0') || n.Numero == termo || n.Chave == termo || TextoParaBusca.Contem(n.FornecedorNome, termo)
+                || TextoParaBusca.ContemDigitos(n.FornecedorDocumento, termo));
+        }
+        return [.. notas.OrderByDescending(n => n.ImportadaEm)];
+    }
+
+    internal static ResumoDto Resumir(NotaDeEntrada n) => new(n.Id, n.Numero, n.Serie, n.EmitidaEm, n.FornecedorNome, n.ValorTotal, n.Status.ToString(),
+        n.Itens.Count, n.Itens.Count(i => i.Situacao == SituacaoDoItem.Pendente), n.ImportadaEm);
+
+    private static async Task<IResult> Listar(EstoqueDbContext db, IEmpresaAtiva empresa, CancellationToken ct,
+        string? situacao = null, string? busca = null, DateOnly? de = null, DateOnly? ate = null, int? pagina = null, int tamanho = Paginacao.TamanhoPadrao)
     {
         if (Barrar(empresa) is { } negado) return negado;
-        var notas = await db.Notas.AsNoTracking().Include(n => n.Itens).ThenInclude(i => i.Distribuicao)
-            .Where(n => n.EmpresaId == empresa.EmpresaId && n.Status != StatusDaNota.Descartada)
-            .OrderByDescending(n => n.ImportadaEm).Take(200).ToListAsync(ct);
-        return Results.Ok(notas.Select(n => new ResumoDto(n.Id, n.Numero, n.Serie, n.EmitidaEm, n.FornecedorNome, n.ValorTotal, n.Status.ToString(),
-            n.Itens.Count, n.Itens.Count(i => i.Situacao == SituacaoDoItem.Pendente), n.ImportadaEm)).ToList());
+        var notas = await FiltrarAsync(db, [empresa.EmpresaId!.Value], situacao, busca, de, ate, ct);
+        return pagina is null ? Results.Ok(notas.Select(Resumir).ToList()) : Results.Ok(notas.Paginar(pagina.Value, tamanho).Converter(Resumir));
     }
 
     private static async Task<IResult> Importar(IFormFile? arquivo, EstoqueDbContext db, ICatalogoDeProdutos catalogo, IDiretorioDeFornecedores fornecedores,

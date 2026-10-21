@@ -3,7 +3,9 @@ using Kamus.Modules.Estoque.Dominio;
 using Kamus.Modules.Estoque.Persistencia;
 using Kamus.SharedKernel.Auditoria;
 using Kamus.SharedKernel.Catalogo;
+using Kamus.SharedKernel.Consultas;
 using Kamus.SharedKernel.MultiTenancy;
+using Kamus.SharedKernel.Tempo;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -39,7 +41,8 @@ internal static class InventariosEndpoints
     public static IEndpointRouteBuilder MapInventarios(this IEndpointRouteBuilder app)
     {
         var g = app.MapGroup("/api/estoque/inventarios").RequireAuthorization().WithTags("Estoque");
-        g.MapGet("/", Listar).WithSummary("Inventários das lojas visíveis (mais recentes primeiro)");
+        g.MapGet("/", Listar).WithSummary(
+            "Inventários das lojas visíveis (mais recentes primeiro). Filtros: situacao (Aberto|Concluido|Cancelado), lojaId, de/ate (abertura); com pagina, devolve uma página");
         g.MapPost("/", Abrir).WithSummary("Abre o inventário da loja e tira a foto do saldo (um aberto por loja)").Produces<InventarioDto>(StatusCodes.Status201Created);
         g.MapGet("/{id:guid}", Obter).WithSummary("Situação do inventário");
         g.MapGet("/{id:guid}/produtos/{produtoId:guid}", Contagem).WithSummary("Grade do produto com as quantidades já contadas (sem o saldo: contagem cega)");
@@ -73,14 +76,28 @@ internal static class InventariosEndpoints
             contados.Count, contados.Sum(x => x.Contado!.Value), i.OperacaoId);
     }
 
-    private static async Task<IResult> Listar(Lojas lojas, EstoqueDbContext db, IEmpresaAtiva empresa, CancellationToken ct)
+    /// <summary>Inventários das lojas visíveis com os filtros da tela, mais recentes primeiro.</summary>
+    internal static async Task<List<InventarioDto>> FiltrarAsync(Lojas lojas, EstoqueDbContext db, string? situacao, Guid? lojaId, DateOnly? de, DateOnly? ate,
+        CancellationToken ct)
+    {
+        var nomes = (await lojas.VisiveisAsync(ct)).ToDictionary(l => l.Id, l => l.Nome);
+        var ids = nomes.Keys.Where(id => lojaId is null || id == lojaId).ToList();
+        var consulta = db.Inventarios.AsNoTracking().Include(i => i.Itens).Where(i => ids.Contains(i.LojaId));
+        if (Enum.TryParse<StatusDoInventario>(situacao, ignoreCase: true, out var status) && Enum.IsDefined(status))
+            consulta = consulta.Where(i => i.Status == status);
+        IEnumerable<Inventario> inventarios = await consulta.ToListAsync(ct);
+        static DateOnly Dia(DateTimeOffset momento) => DateOnly.FromDateTime(momento.ToOffset(CalendarioBrasilia.Fuso).DateTime);
+        if (de is not null) inventarios = inventarios.Where(i => Dia(i.AbertoEm) >= de);
+        if (ate is not null) inventarios = inventarios.Where(i => Dia(i.AbertoEm) <= ate);
+        return [.. inventarios.OrderByDescending(i => i.AbertoEm).Select(i => ParaDto(i, nomes[i.LojaId]))];
+    }
+
+    private static async Task<IResult> Listar(Lojas lojas, EstoqueDbContext db, IEmpresaAtiva empresa, CancellationToken ct,
+        string? situacao = null, Guid? lojaId = null, DateOnly? de = null, DateOnly? ate = null, int? pagina = null, int tamanho = Paginacao.TamanhoPadrao)
     {
         if (Barrar(empresa) is { } negado) return negado;
-        var nomes = (await lojas.VisiveisAsync(ct)).ToDictionary(l => l.Id, l => l.Nome);
-        var ids = nomes.Keys.ToList();
-        var inventarios = await db.Inventarios.AsNoTracking().Include(i => i.Itens).Where(i => ids.Contains(i.LojaId))
-            .OrderByDescending(i => i.AbertoEm).Take(100).ToListAsync(ct);
-        return Results.Ok(inventarios.Select(i => ParaDto(i, nomes[i.LojaId])).ToList());
+        var inventarios = await FiltrarAsync(lojas, db, situacao, lojaId, de, ate, ct);
+        return pagina is null ? Results.Ok(inventarios) : Results.Ok(inventarios.Paginar(pagina.Value, tamanho));
     }
 
     private static async Task<IResult> Abrir(AbrirRequest r, Lojas lojas, EstoqueDbContext db, IEmpresaAtiva empresa, IUsuarioAtual usuario,

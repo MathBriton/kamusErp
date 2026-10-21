@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { corpo, empresaAtivaHandler, json, mockApi, problema, sessaoDemo, sessaoVendedor } from '../test/mockApi'
@@ -21,7 +21,7 @@ const matriz = {
 }
 const posicao = {
   itens: [{ produtoId: 'p1', referencia: 'CAM-001', descricao: 'Camiseta Básica', quantidade: 19, valorEmCusto: 418, valorEmVenda: 1138.1 }],
-  totalDePecas: 19, valorEmCusto: 418, valorEmVenda: 1138.1,
+  total: 1, pagina: 1, tamanho: 20, totalDePecas: 19, valorEmCusto: 418, valorEmVenda: 1138.1,
 }
 const kardex = [
   { id: 'm2', ocorridoEm: '2026-10-14T15:00:00Z', tipo: 'Ajuste', lojaId: 'l1', loja: 'Kamus Moda Centro', lojaRelacionada: null, referencia: 'CAM-001', cor: 'Azul', tamanho: 'M',
@@ -37,7 +37,7 @@ function api(extras: Parameters<typeof mockApi>[0] = {}, sessao = sessaoDemo) {
     'GET /api/empresas/ativa': empresaAtivaHandler(sessao),
     'GET /health': () => new Response('Healthy'),
     'GET /api/estoque/lojas': () => json(lojas),
-    'GET /api/estoque/posicao': () => json(posicao),
+    'GET /api/estoque/posicao?pagina=1&tamanho=20': () => json(posicao),
     'GET /api/estoque/posicao/p1': () => json(matriz),
     'GET /api/estoque/posicao/p1?lojaId=l1': () => json(matriz),
     'GET /api/estoque/kardex?skuId=2': () => json(kardex),
@@ -47,16 +47,18 @@ function api(extras: Parameters<typeof mockApi>[0] = {}, sessao = sessaoDemo) {
 }
 
 describe('Estoque → Posição', () => {
-  it('lista produtos com peças e valores; abre a matriz e o kardex do SKU', async () => {
+  it('grade com peças, valores, totais e paginação; "Ver" abre a matriz e o kardex do SKU', async () => {
     api()
     renderApp('/estoque/posicao')
 
-    const linha = (await screen.findByText('CAM-001')).closest('tr')!
+    await screen.findByText('CAM-001')
+    const linha = within(screen.getByRole('table', { name: 'Posição de estoque' })).getByRole('row', { name: /CAM-001/ })
     expect(within(linha).getByText('19')).toBeInTheDocument()
     expect(within(linha).getByText('R$ 418,00')).toBeInTheDocument()
     expect(screen.getByText('R$ 1.138,10', { selector: 'dd' })).toBeInTheDocument()
+    expect(screen.getByText('1 registro')).toBeInTheDocument()
 
-    await userEvent.click(within(linha).getByRole('button', { name: 'Camiseta Básica' }))
+    await userEvent.click(within(linha).getByRole('button', { name: 'Ver Camiseta Básica' }))
     const grade = await screen.findByRole('table', { name: 'Estoque de Camiseta Básica' })
     expect(within(grade).getByRole('button', { name: 'Preto G: 4' })).toBeInTheDocument()
     expect(within(screen.getByRole('list', { name: 'Por loja' })).getByText('Depósito:')).toBeInTheDocument()
@@ -68,16 +70,41 @@ describe('Estoque → Posição', () => {
     expect(within(extrato).getByText('+16')).toBeInTheDocument()
   })
 
+  it('filtra por loja (totais da resposta) e exporta só os selecionados', async () => {
+    const fetch = api({
+      'GET /api/estoque/posicao?lojaId=l1&pagina=1&tamanho=20': () => json({ ...posicao, totalDePecas: 7, total: 41 }),
+      'GET /api/estoque/posicao?lojaId=l1&pagina=2&tamanho=20': () => json({ ...posicao, pagina: 2, totalDePecas: 7, total: 41 }),
+      'GET /api/relatorios/posicao-de-estoque.csv?ids=p1': () => new Response('csv', { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=posicao.csv' } }),
+    })
+    URL.createObjectURL = (() => 'blob:x') as typeof URL.createObjectURL
+    URL.revokeObjectURL = () => {}
+    renderApp('/estoque/posicao')
+    await screen.findByText('CAM-001')
+
+    const loja = screen.getByLabelText('Loja')
+    await within(loja).findByRole('option', { name: 'Depósito' })
+    await userEvent.selectOptions(loja, 'l1')
+    expect(await screen.findByText('7', { selector: 'dd' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Próxima página' }))
+    expect(await screen.findByText('Página 2 de 3')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Selecionar Camiseta Básica' }))
+    await userEvent.click(screen.getByRole('button', { name: /Exportar/ }))
+    await userEvent.click(within(screen.getByRole('menu', { name: 'Exportar' })).getByRole('menuitem', { name: /CSV/ }))
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => url === '/api/relatorios/posicao-de-estoque.csv?ids=p1')).toBe(true))
+  })
+
   it('vendedor vê quantidades, sem custo, sem kardex e sem exportar', async () => {
-    api({ 'GET /api/estoque/posicao': () => json({ ...posicao, valorEmCusto: null, itens: [{ ...posicao.itens[0], valorEmCusto: null }] }) }, sessaoVendedor)
+    api({ 'GET /api/estoque/posicao?pagina=1&tamanho=20': () => json({ ...posicao, valorEmCusto: null, itens: [{ ...posicao.itens[0], valorEmCusto: null }] }) }, sessaoVendedor)
     renderApp('/estoque/posicao')
 
     await screen.findByText('CAM-001')
     expect(screen.queryByText('Valor em custo')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Exportar/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Entrada de mercadoria' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'Selecionar Camiseta Básica' })).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Camiseta Básica' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Ver Camiseta Básica' }))
     expect(await screen.findByLabelText('Azul M: 15')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Azul M: 15' })).not.toBeInTheDocument()
   })
@@ -189,9 +216,13 @@ describe('Estoque → Entrada, ajuste e transferência', () => {
 })
 
 describe('Administrativo → Lojas', () => {
-  it('Dono cria loja e vê o limite do plano', async () => {
+  const paginaDeLojas = (itens = lojas) => json({ itens, total: itens.length, pagina: 1, tamanho: 20 })
+  const lojasApi = (extras: Parameters<typeof mockApi>[0] = {}) =>
+    api({ 'GET /api/estoque/lojas?situacao=todas&pagina=1&tamanho=20': () => paginaDeLojas(), ...extras })
+
+  it('grade com peças, situação e total; Dono cria loja e vê o limite do plano', async () => {
     let enviado: Record<string, unknown> | null = null
-    api({
+    lojasApi({
       'POST /api/estoque/lojas': (init) => {
         enviado = corpo(init)
         return problema(409, 'Seu plano permite até 2 lojas. Fale com o suporte para ampliar.')
@@ -199,6 +230,9 @@ describe('Administrativo → Lojas', () => {
     })
     renderApp('/configuracoes/lojas')
     expect(await screen.findByText('19 peças')).toBeInTheDocument()
+    const linha = within(screen.getByRole('table', { name: 'Lojas' })).getByRole('row', { name: /Depósito/ })
+    expect(within(linha).getByText('Ativa')).toBeInTheDocument()
+    expect(screen.getByText('2 registros')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Nova loja' }))
     await userEvent.type(screen.getByLabelText('Nome'), 'Loja Shopping')
@@ -208,12 +242,65 @@ describe('Administrativo → Lojas', () => {
     expect(enviado).toEqual({ nome: 'Loja Shopping' })
   })
 
-  it('desativar loja com estoque mostra o motivo', async () => {
-    api({ 'POST /api/estoque/lojas/l1/desativar': () => problema(409, 'Kamus Moda Centro ainda tem estoque.') })
+  it('filtra por situação e busca', async () => {
+    lojasApi({
+      'GET /api/estoque/lojas?situacao=inativas&pagina=1&tamanho=20': () => paginaDeLojas([{ ...lojas[1]!, ativa: false }]),
+      'GET /api/estoque/lojas?situacao=inativas&busca=dep&pagina=1&tamanho=20': () => paginaDeLojas([{ ...lojas[1]!, ativa: false }]),
+    })
+    renderApp('/configuracoes/lojas')
+    await screen.findByText('19 peças')
+
+    await userEvent.selectOptions(screen.getByLabelText('Situação'), 'inativas')
+    expect(await screen.findByText('Inativa')).toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText('Buscar'), 'dep')
+    expect(await screen.findByText('1 registro')).toBeInTheDocument()
+  })
+
+  it('renomear e desativar com confirmação (mostra o motivo da recusa)', async () => {
+    let renomeado: Record<string, unknown> | null = null
+    lojasApi({
+      'PUT /api/estoque/lojas/l2': (init) => {
+        renomeado = corpo(init)
+        return json({ ...lojas[1], nome: 'Depósito Central' })
+      },
+      'POST /api/estoque/lojas/l1/desativar': () => problema(409, 'Kamus Moda Centro ainda tem estoque.'),
+    })
     renderApp('/configuracoes/lojas')
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Desativar Kamus Moda Centro' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Renomear Depósito' }))
+    const dialogo = screen.getByRole('dialog', { name: 'Renomear loja' })
+    await userEvent.clear(within(dialogo).getByLabelText('Nome'))
+    await userEvent.type(within(dialogo).getByLabelText('Nome'), 'Depósito Central')
+    await userEvent.click(within(dialogo).getByRole('button', { name: 'Salvar' }))
+    await waitFor(() => expect(renomeado).toEqual({ nome: 'Depósito Central' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('ainda tem estoque')
+    await userEvent.click(await screen.findByRole('button', { name: 'Desativar Kamus Moda Centro' }))
+    const confirmar = screen.getByRole('dialog', { name: 'Desativar loja' })
+    await userEvent.click(within(confirmar).getByRole('button', { name: 'Desativar' }))
+    expect(await within(confirmar).findByRole('alert')).toHaveTextContent('ainda tem estoque')
+  })
+
+  it('seleção: desativa em lote e exporta só as selecionadas', async () => {
+    let lote: Record<string, unknown> | null = null
+    const fetch = lojasApi({
+      'POST /api/estoque/lojas/situacao': (init) => {
+        lote = corpo(init)
+        return json({ alterados: 1 })
+      },
+      'GET /api/relatorios/lojas.pdf?ids=l2': () => new Response('%PDF', { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=lojas.pdf' } }),
+    })
+    URL.createObjectURL = (() => 'blob:x') as typeof URL.createObjectURL
+    URL.revokeObjectURL = () => {}
+    renderApp('/configuracoes/lojas')
+
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Selecionar Depósito' }))
+    await userEvent.click(screen.getByRole('button', { name: /Exportar/ }))
+    await userEvent.click(within(screen.getByRole('menu', { name: 'Exportar' })).getByRole('menuitem', { name: /PDF/ }))
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => url === '/api/relatorios/lojas.pdf?ids=l2')).toBe(true))
+
+    await userEvent.click(within(screen.getByRole('region', { name: 'Seleção' })).getByRole('button', { name: 'Desativar selecionadas' }))
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Desativar lojas' })).getByRole('button', { name: 'Desativar' }))
+    await waitFor(() => expect(lote).toEqual({ ids: ['l2'], ativo: false }))
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Seleção' })).not.toBeInTheDocument())
   })
 })

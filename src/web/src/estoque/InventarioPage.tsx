@@ -6,6 +6,10 @@ import { moeda } from '../cadastros/catalogo'
 import { Campo } from '../components/Campo'
 import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade, useListaPaginada } from '../components/grade/useGrade'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { BotaoExportar } from '../relatorios/BotaoExportar'
 import { BuscaDeProduto } from './BuscaDeProduto'
@@ -68,13 +72,31 @@ function Selo({ status }: { status: Inventario['status'] }) {
   return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS[status].classe}`}>{STATUS[status].rotulo}</span>
 }
 
-/** Inventário: abrir (foto do saldo), contar sem ver o saldo (grade ou leitor), conferir divergências e concluir. */
+const FILTROS = { situacao: '', lojaId: '', de: '', ate: '' }
+
+/** Inventário: abrir (foto do saldo), contar sem ver o saldo (grade ou leitor), conferir divergências e concluir. A lista fica numa grade com filtros. */
 export function InventarioPage() {
-  const { getJson, enviar } = useApi()
-  const { perfilAtual, consolidado } = useEmpresa()
+  const { perfilAtual } = useEmpresa()
   const [params, setParams] = useSearchParams()
   const id = params.get('id')
-  const [lista, setLista] = useState<Inventario[] | null>(null)
+
+  if (!PERFIS_QUE_MOVIMENTAM.includes(perfilAtual))
+    return (
+      <div className="mx-auto max-w-3xl">
+        <CabecalhoDaPagina secao="Estoque" titulo="Inventário" />
+        <p className={`mt-4 ${estilos.erro}`}>Só Dono, Gerente e Estoquista fazem inventário.</p>
+      </div>
+    )
+
+  if (id) return <DetalheDoInventario id={id} onVoltar={() => setParams({})} />
+  return <ListaDeInventarios onAbrir={(novo) => setParams({ id: novo })} />
+}
+
+function ListaDeInventarios({ onAbrir }: { onAbrir: (id: string) => void }) {
+  const { enviar } = useApi()
+  const { consolidado } = useEmpresa()
+  const grade = useGrade(FILTROS)
+  const { dados, erro: erroDaLista } = useListaPaginada<{ itens: Inventario[]; total: number }>(`/api/estoque/inventarios?${grade.consulta}`)
   const lojas = useLojas()
   const ativas = lojas?.filter((l) => l.ativa) ?? []
   const [lojaId, setLojaId] = useState('')
@@ -82,43 +104,40 @@ export function InventarioPage() {
   const [erro, setErro] = useState<string | null>(null)
   const lojaEscolhida = lojaId || (ativas.length === 1 ? ativas[0]!.id : '')
 
-  useEffect(() => {
-    if (id || !PERFIS_QUE_MOVIMENTAM.includes(perfilAtual)) return
-    const controle = new AbortController()
-    getJson<Inventario[]>('/api/estoque/inventarios', controle.signal)
-      .then(setLista)
-      .catch(() => {})
-    return () => controle.abort()
-  }, [getJson, id, perfilAtual])
-
-  if (!PERFIS_QUE_MOVIMENTAM.includes(perfilAtual))
-    return (
-      <div className="mx-auto max-w-3xl">
-        <h1 className="text-2xl font-bold tracking-tight">Inventário</h1>
-        <p className={`mt-4 ${estilos.erro}`}>Só Dono, Gerente e Estoquista fazem inventário.</p>
-      </div>
-    )
-
-  if (id) return <DetalheDoInventario id={id} onVoltar={() => setParams({})} />
-
   async function abrir(e: FormEvent) {
     e.preventDefault()
     setErro(null)
     try {
       const novo = await enviar<Inventario>('POST', '/api/estoque/inventarios', { lojaId: lojaEscolhida, observacao })
-      setParams({ id: novo.id })
+      onAbrir(novo.id)
     } catch (ex) {
       setErro(ex instanceof ErroDeApi ? ex.message : 'Não foi possível abrir o inventário.')
     }
   }
 
+  const colunas: Coluna<Inventario>[] = [
+    {
+      titulo: 'Loja',
+      celula: (i) => (
+        <>
+          <span className="font-semibold">{i.loja}</span>
+          {i.observacao && <span className="block text-xs text-muted">{i.observacao}</span>}
+        </>
+      ),
+    },
+    { titulo: 'Situação', celula: (i) => <Selo status={i.status} /> },
+    { titulo: 'Aberto', celula: (i) => <span className="text-muted">{`${dataHora(i.abertoEm)}${i.abertoPor ? ` · ${i.abertoPor}` : ''}`}</span> },
+    { titulo: 'Contado', celula: (i) => `${i.skusContados} SKU(s) · ${pecas(i.pecasContadas)}`, alinhar: 'direita' },
+  ]
+
   return (
-    <div className="mx-auto max-w-5xl">
-      <p className="text-xs text-muted">Estoque</p>
-      <h1 className="text-2xl font-bold tracking-tight">Inventário</h1>
-      <p className="mt-1 text-sm text-muted">
-        Ao abrir, o sistema guarda a foto do saldo. A contagem é cega (quem conta não vê o saldo) e, ao concluir, o estoque é ajustado pela diferença.
-      </p>
+    <div className="mx-auto max-w-6xl">
+      <CabecalhoDaPagina
+        secao="Estoque"
+        titulo="Inventário"
+        descricao="Ao abrir, o sistema guarda a foto do saldo. A contagem é cega (quem conta não vê o saldo) e, ao concluir, o estoque é ajustado pela diferença."
+        acoes={<BotaoExportar relatorio="inventarios" parametros={grade.parametros} selecionados={[...grade.selecionados]} />}
+      />
 
       {consolidado ? (
         <p className={`mt-6 ${estilos.erro}`}>Escolha uma empresa no seletor do topo para abrir um inventário.</p>
@@ -138,41 +157,50 @@ export function InventarioPage() {
           <button type="submit" disabled={!lojaEscolhida} className={estilos.botaoPrimario}>Abrir inventário</button>
         </form>
       )}
-      {erro && <p role="alert" className={`mt-4 ${estilos.erro}`}>{erro}</p>}
+      {(erro ?? erroDaLista) && <p role="alert" className={`mt-4 ${estilos.erro}`}>{erro ?? erroDaLista}</p>}
 
-      {lista && (
-        <div className="mt-6 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-          {lista.length === 0 ? (
-            <p className="p-8 text-center text-sm text-muted">Nenhum inventário ainda.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-left text-xs text-muted uppercase">
-                <tr>
-                  <th className="px-4 py-2">Loja</th>
-                  <th className="px-4 py-2">Situação</th>
-                  <th className="px-4 py-2">Aberto</th>
-                  <th className="px-4 py-2 text-right">Contado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {lista.map((i) => (
-                  <tr key={i.id}>
-                    <td className="px-4 py-2.5">
-                      <button type="button" onClick={() => setParams({ id: i.id })} className="text-left font-semibold hover:text-primary hover:underline">
-                        {i.loja}
-                      </button>
-                      {i.observacao && <span className="block text-xs text-muted">{i.observacao}</span>}
-                    </td>
-                    <td className="px-4 py-2.5"><Selo status={i.status} /></td>
-                    <td className="px-4 py-2.5 text-muted">{`${dataHora(i.abertoEm)}${i.abertoPor ? ` · ${i.abertoPor}` : ''}`}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{`${i.skusContados} SKU(s) · ${pecas(i.pecasContadas)}`}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
+        <label className="w-44 text-sm">
+          <span className="mb-1 block font-semibold">Situação</span>
+          <select value={grade.filtros.situacao} onChange={(e) => grade.filtrar({ situacao: e.target.value })} className={estilos.campo}>
+            <option value="">Todas</option>
+            <option value="Aberto">Em contagem</option>
+            <option value="Concluido">Concluídos</option>
+            <option value="Cancelado">Cancelados</option>
+          </select>
+        </label>
+        <label className="w-52 text-sm">
+          <span className="mb-1 block font-semibold">Loja do inventário</span>
+          <select value={grade.filtros.lojaId} onChange={(e) => grade.filtrar({ lojaId: e.target.value })} className={estilos.campo}>
+            <option value="">Todas as lojas</option>
+            {lojas?.map((l) => (
+              <option key={l.id} value={l.id}>{l.nome}</option>
+            ))}
+          </select>
+        </label>
+        <label className="w-40 text-sm">
+          <span className="mb-1 block font-semibold">Aberto de</span>
+          <input type="date" value={grade.filtros.de} onChange={(e) => grade.filtrar({ de: e.target.value })} className={estilos.campo} />
+        </label>
+        <label className="w-40 text-sm">
+          <span className="mb-1 block font-semibold">Até</span>
+          <input type="date" value={grade.filtros.ate} onChange={(e) => grade.filtrar({ ate: e.target.value })} className={estilos.campo} />
+        </label>
+      </BarraDeFiltros>
+
+      <GradeDeRegistros
+        rotulo="Inventários"
+        colunas={colunas}
+        itens={dados?.itens ?? (erroDaLista ? [] : null)}
+        chave={(i) => i.id}
+        nome={(i) => `${i.loja} ${dataHora(i.abertoEm)}`}
+        total={dados?.total ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
+        apagada={(i) => i.status === 'Cancelado'}
+        vazio={grade.ativos ? 'Nenhum inventário com esses filtros.' : 'Nenhum inventário ainda.'}
+        acoes={(i) => <AcaoDaLinha rotulo={`Abrir inventário de ${i.loja}`} icone="eye" onClick={() => onAbrir(i.id)} />}
+      />
     </div>
   )
 }

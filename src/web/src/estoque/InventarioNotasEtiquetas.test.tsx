@@ -95,10 +95,36 @@ const divergencias = (zerar: boolean) => ({
 })
 
 describe('Estoque → Inventário', () => {
+  it('lista os inventários em grade com filtros e exporta os selecionados', async () => {
+    const pagina = (itens: unknown[]) => json({ itens, total: itens.length, pagina: 1, tamanho: 20 })
+    const cancelado = { ...inventario, id: 'i2', status: 'Cancelado', observacao: null }
+    const fetch = api({
+      'GET /api/estoque/inventarios?pagina=1&tamanho=20': () => pagina([inventario, cancelado]),
+      'GET /api/estoque/inventarios?situacao=Cancelado&pagina=1&tamanho=20': () => pagina([cancelado]),
+      'GET /api/relatorios/inventarios.xlsx?ids=i2': () => new Response('x', { headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename=inventarios.xlsx' } }),
+      'GET /api/estoque/inventarios/i2': () => json(cancelado),
+    })
+    renderApp('/estoque/inventario')
+
+    const tabela = await screen.findByRole('table', { name: 'Inventários' })
+    expect(await within(tabela).findByText('Em contagem')).toBeInTheDocument()
+    expect(screen.getByText('2 registros')).toBeInTheDocument()
+
+    await userEvent.selectOptions(screen.getByLabelText('Situação'), 'Cancelado')
+    expect(await screen.findByText('1 registro')).toBeInTheDocument()
+    await userEvent.click(screen.getAllByRole('checkbox', { name: /Selecionar Kamus Moda Centro/ })[0]!)
+    await userEvent.click(screen.getByRole('button', { name: /Exportar/ }))
+    await userEvent.click(within(screen.getByRole('menu', { name: 'Exportar' })).getByRole('menuitem', { name: /Excel/ }))
+    await vi.waitFor(() => expect(fetch.mock.calls.some(([url]) => url === '/api/relatorios/inventarios.xlsx?ids=i2')).toBe(true))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir inventário de Kamus Moda Centro' }))
+    expect(await screen.findByRole('heading', { name: /Inventário — Kamus Moda Centro/ })).toBeInTheDocument()
+  })
+
   it('abre o inventário da loja', async () => {
     let enviado: Record<string, unknown> | null = null
     api({
-      'GET /api/estoque/inventarios': () => json([]),
+      'GET /api/estoque/inventarios?pagina=1&tamanho=20': () => json({ itens: [], total: 0, pagina: 1, tamanho: 20 }),
       'POST /api/estoque/inventarios': (init) => {
         enviado = corpo(init)
         return json(inventario, 201)
@@ -199,11 +225,43 @@ const nota = (extra = {}) => ({
   ...extra,
 })
 
+const resumoDaNota = (id: string, numero: string, extra = {}) => ({
+  id, numero, serie: '1', emitidaEm: '2026-10-14T12:15:00Z', fornecedorNome: 'Aurora Moda', valorTotal: 600, status: 'Pendente', itens: 2, pendentes: 1,
+  importadaEm: '2026-10-15T12:00:00Z', ...extra,
+})
+
 describe('Estoque → Entrada por XML', () => {
+  it('lista as notas em grade com filtros, abre a conferência e exporta as selecionadas', async () => {
+    const pagina = (itens: unknown[], total = itens.length) => json({ itens, total, pagina: 1, tamanho: 20 })
+    const fetch = api({
+      'GET /api/estoque/notas?situacao=todas&pagina=1&tamanho=20': () => pagina([resumoDaNota('n1', '4567'), resumoDaNota('n2', '4568', { status: 'Lancada' })]),
+      'GET /api/estoque/notas?situacao=lancadas&pagina=1&tamanho=20': () => pagina([resumoDaNota('n2', '4568', { status: 'Lancada' })]),
+      'GET /api/estoque/notas?situacao=lancadas&de=2026-10-01&pagina=1&tamanho=20': () => pagina([resumoDaNota('n2', '4568', { status: 'Lancada' })]),
+      'GET /api/relatorios/notas-de-entrada.csv?ids=n2': () => new Response('csv', { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=notas.csv' } }),
+      'GET /api/estoque/notas/n2': () => json(nota({ id: 'n2', numero: '4568', status: 'Lancada', loja: 'Kamus Moda Centro', operacaoId: 'op5' })),
+    })
+    renderApp('/estoque/xml')
+
+    const tabela = await screen.findByRole('table', { name: 'Notas importadas' })
+    expect(await within(tabela).findByText('Conferência: 1 de 2 pendente(s)')).toBeInTheDocument()
+    expect(screen.getByText('2 registros')).toBeInTheDocument()
+
+    await userEvent.selectOptions(screen.getByLabelText('Situação'), 'lancadas')
+    expect(await screen.findByText('1 registro')).toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText('Emitida de'), '2026-10-01')
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Selecionar NF 4568/1' }))
+    await userEvent.click(screen.getByRole('button', { name: /Exportar/ }))
+    await userEvent.click(within(screen.getByRole('menu', { name: 'Exportar' })).getByRole('menuitem', { name: /CSV/ }))
+    await vi.waitFor(() => expect(fetch.mock.calls.some(([url]) => url === '/api/relatorios/notas-de-entrada.csv?ids=n2')).toBe(true))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir NF 4568/1' }))
+    expect(await screen.findByRole('heading', { name: 'NF 4568/1 — Aurora Moda' })).toBeInTheDocument()
+  })
+
   it('importa o XML e abre a conferência', async () => {
     let enviado: FormData | null = null
     api({
-      'GET /api/estoque/notas': () => json([]),
+      'GET /api/estoque/notas?situacao=todas&pagina=1&tamanho=20': () => json({ itens: [], total: 0, pagina: 1, tamanho: 20 }),
       'POST /api/estoque/notas': (init) => {
         enviado = init?.body as FormData
         return json(nota(), 201)
@@ -225,7 +283,7 @@ describe('Estoque → Entrada por XML', () => {
   })
 
   it('recusa com o motivo da API', async () => {
-    api({ 'GET /api/estoque/notas': () => json([]), 'POST /api/estoque/notas': () => problema(400, 'Esta nota foi emitida para o CNPJ 98.765.432/0001-98.') })
+    api({ 'GET /api/estoque/notas?situacao=todas&pagina=1&tamanho=20': () => json({ itens: [], total: 0, pagina: 1, tamanho: 20 }), 'POST /api/estoque/notas': () => problema(400, 'Esta nota foi emitida para o CNPJ 98.765.432/0001-98.') })
     renderApp('/estoque/xml')
     await userEvent.upload(await screen.findByLabelText('Arquivo XML da NF-e'), new File(['x'], 'nota.xml', { type: 'text/xml' }))
     await userEvent.click(screen.getByRole('button', { name: 'Importar XML' }))

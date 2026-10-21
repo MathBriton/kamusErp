@@ -5,6 +5,7 @@ import { ErroDeApi } from '../auth/api'
 import { lerNumero, moeda, type ProdutoResumo } from '../cadastros/catalogo'
 import { Campo } from '../components/Campo'
 import { estilos } from '../components/estilos'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
 import { Icone } from '../components/Icone'
 import { useEmpresa } from '../empresa/EmpresaContext'
 import { MatrizDeEstoque } from './MatrizDeEstoque'
@@ -194,9 +195,7 @@ export function MovimentacaoPage({ modo }: { modo: Modo }) {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <p className="text-xs text-muted">Estoque</p>
-      <h1 className="text-2xl font-bold tracking-tight">{textos.titulo}</h1>
-      <p className="mt-1 text-sm text-muted">{textos.subtitulo}</p>
+      <CabecalhoDaPagina secao="Estoque" titulo={textos.titulo} descricao={textos.subtitulo} />
 
       {sucesso && (
         <p role="status" className="mt-4 flex items-center gap-2 rounded-lg bg-success-soft px-3 py-2.5 text-sm text-success">

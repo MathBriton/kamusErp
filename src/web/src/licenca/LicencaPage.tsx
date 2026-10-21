@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useApi } from '../api/useApi'
 import { ErroDeApi } from '../auth/api'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
 import { Icone } from '../components/Icone'
 import { formatarDia, formatarMoeda, useLicenca, type EstadoLicenca } from './LicencaContext'
 
@@ -41,9 +42,7 @@ export function LicencaPage() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <p className="text-xs text-muted">Administrativo</p>
-      <h1 className="text-2xl font-bold tracking-tight">Licença e assinatura</h1>
-      <p className="mt-1 text-sm text-muted">Plano, vencimento e situação da mensalidade do Kamus.</p>
+      <CabecalhoDaPagina secao="Administrativo" titulo="Licença e assinatura" descricao="Plano, vencimento e situação da mensalidade do Kamus." />
 
       {!situacao ? (
         <p className="mt-6 text-sm text-muted">Carregando...</p>

@@ -6,8 +6,13 @@ import { moeda } from '../cadastros/catalogo'
 import { Campo } from '../components/Campo'
 import { Dialogo } from '../components/Dialogo'
 import { estilos } from '../components/estilos'
+import { BarraDeFiltros } from '../components/grade/BarraDeFiltros'
+import { CabecalhoDaPagina } from '../components/grade/CabecalhoDaPagina'
+import { AcaoDaLinha, GradeDeRegistros, type Coluna } from '../components/grade/GradeDeRegistros'
+import { useGrade, useListaPaginada } from '../components/grade/useGrade'
 import { Icone } from '../components/Icone'
 import { useEmpresa } from '../empresa/EmpresaContext'
+import { BotaoExportar } from '../relatorios/BotaoExportar'
 import { BotaoEtiquetas } from './BotaoEtiquetas'
 import { BuscaDeProduto } from './BuscaDeProduto'
 import { MatrizDeEstoque } from './MatrizDeEstoque'
@@ -74,30 +79,29 @@ const SITUACAO: Record<ItemDaNota['situacao'], string> = {
   Ignorado: 'bg-surface-2 text-muted',
 }
 
-/** Entrada por XML da NF-e: importar o arquivo, conferir cada item (SKU, grade e fator) e lançar no estoque. */
+const FILTROS = { situacao: 'todas', busca: '', de: '', ate: '' }
+
+function SituacaoDaNota({ nota }: { nota: ResumoDaNota }) {
+  if (nota.status === 'Lancada') return <span className="rounded-full bg-success-soft px-2 py-0.5 text-xs font-semibold text-success">Lançada</span>
+  if (nota.status === 'Descartada') return <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted">Descartada</span>
+  return (
+    <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning">
+      {nota.pendentes ? `Conferência: ${nota.pendentes} de ${nota.itens} pendente(s)` : 'Pronta para lançar'}
+    </span>
+  )
+}
+
+/** Entrada por XML da NF-e: importar o arquivo, conferir cada item (SKU, grade e fator) e lançar no estoque. As notas ficam numa grade com filtros. */
 export function NotasPage() {
-  const { getJson, enviarArquivo } = useApi()
   const { perfilAtual, consolidado } = useEmpresa()
   const [params, setParams] = useSearchParams()
   const id = params.get('id')
-  const [lista, setLista] = useState<ResumoDaNota[] | null>(null)
-  const [arquivo, setArquivo] = useState<File | null>(null)
-  const [erro, setErro] = useState<string | null>(null)
-  const [enviando, setEnviando] = useState(false)
+  const permitido = PERFIS_QUE_MOVIMENTAM.includes(perfilAtual) && !consolidado
 
-  useEffect(() => {
-    if (id || consolidado || !PERFIS_QUE_MOVIMENTAM.includes(perfilAtual)) return
-    const controle = new AbortController()
-    getJson<ResumoDaNota[]>('/api/estoque/notas', controle.signal)
-      .then(setLista)
-      .catch(() => {})
-    return () => controle.abort()
-  }, [getJson, id, consolidado, perfilAtual])
-
-  if (!PERFIS_QUE_MOVIMENTAM.includes(perfilAtual) || consolidado)
+  if (!permitido)
     return (
       <div className="mx-auto max-w-3xl">
-        <h1 className="text-2xl font-bold tracking-tight">Entrada por XML da NF-e</h1>
+        <CabecalhoDaPagina secao="Estoque" titulo="Entrada por XML da NF-e" />
         <p className={`mt-4 ${estilos.erro}`}>
           {consolidado ? 'Escolha uma empresa no seletor do topo: a nota precisa ser da empresa que a recebeu.' : 'Só Dono, Gerente e Estoquista lançam notas de entrada.'}
         </p>
@@ -105,6 +109,16 @@ export function NotasPage() {
     )
 
   if (id) return <DetalheDaNota id={id} onVoltar={() => setParams({})} />
+  return <ListaDeNotas onAbrir={(nota) => setParams({ id: nota })} />
+}
+
+function ListaDeNotas({ onAbrir }: { onAbrir: (id: string) => void }) {
+  const { enviarArquivo } = useApi()
+  const grade = useGrade(FILTROS)
+  const { dados, erro: erroDaLista } = useListaPaginada<{ itens: ResumoDaNota[]; total: number }>(`/api/estoque/notas?${grade.consulta}`, 0, grade.filtros.busca ? 250 : 0)
+  const [arquivo, setArquivo] = useState<File | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+  const [enviando, setEnviando] = useState(false)
 
   async function importar(e: FormEvent) {
     e.preventDefault()
@@ -115,7 +129,7 @@ export function NotasPage() {
       const formulario = new FormData()
       formulario.append('arquivo', arquivo)
       const r = await enviarArquivo<Nota>('/api/estoque/notas', formulario)
-      setParams({ id: r.corpo.id })
+      onAbrir(r.corpo.id)
     } catch (ex) {
       setErro(ex instanceof ErroDeApi ? ex.message : 'Não foi possível importar o XML.')
     } finally {
@@ -123,13 +137,23 @@ export function NotasPage() {
     }
   }
 
+  const colunas: Coluna<ResumoDaNota>[] = [
+    { titulo: 'Nota', celula: (n) => <span className="font-semibold">{`NF ${n.numero}/${n.serie}`}</span> },
+    { titulo: 'Fornecedor', celula: (n) => n.fornecedorNome },
+    { titulo: 'Emissão', celula: (n) => <span className="text-muted">{data(n.emitidaEm)}</span> },
+    { titulo: 'Itens', celula: (n) => n.itens, alinhar: 'direita' },
+    { titulo: 'Valor', celula: (n) => moeda(n.valorTotal), alinhar: 'direita' },
+    { titulo: 'Situação', celula: (n) => <SituacaoDaNota nota={n} /> },
+  ]
+
   return (
-    <div className="mx-auto max-w-5xl">
-      <p className="text-xs text-muted">Estoque</p>
-      <h1 className="text-2xl font-bold tracking-tight">Entrada por XML da NF-e</h1>
-      <p className="mt-1 text-sm text-muted">
-        Envie o XML que o fornecedor mandou. Itens já conhecidos (pelo código de barras ou por uma nota anterior) vêm vinculados; os outros você liga à grade uma vez e o sistema lembra.
-      </p>
+    <div className="mx-auto max-w-6xl">
+      <CabecalhoDaPagina
+        secao="Estoque"
+        titulo="Entrada por XML da NF-e"
+        descricao="Envie o XML que o fornecedor mandou. Itens já conhecidos (pelo código de barras ou por uma nota anterior) vêm vinculados; os outros você liga à grade uma vez e o sistema lembra."
+        acoes={<BotaoExportar relatorio="notas-de-entrada" parametros={grade.parametros} selecionados={[...grade.selecionados]} />}
+      />
 
       <form onSubmit={importar} className="mt-6 flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-surface p-5 shadow-sm">
         <Campo rotulo="Arquivo XML da NF-e" className="min-w-72 flex-1">
@@ -137,55 +161,50 @@ export function NotasPage() {
         </Campo>
         <button type="submit" disabled={!arquivo || enviando} className={estilos.botaoPrimario}>{enviando ? 'Importando...' : 'Importar XML'}</button>
       </form>
-      {erro && (
+      {(erro ?? erroDaLista) && (
         <p role="alert" className={`mt-4 flex items-center gap-2 ${estilos.erro}`}>
           <Icone nome="alert" />
-          {erro}
+          {erro ?? erroDaLista}
         </p>
       )}
 
-      {lista && (
-        <div className="mt-6 overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
-          {lista.length === 0 ? (
-            <p className="p-8 text-center text-sm text-muted">Nenhuma nota importada ainda.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-left text-xs text-muted uppercase">
-                <tr>
-                  <th className="px-4 py-2">Nota</th>
-                  <th className="px-4 py-2">Fornecedor</th>
-                  <th className="px-4 py-2">Emissão</th>
-                  <th className="px-4 py-2 text-right">Valor</th>
-                  <th className="px-4 py-2">Situação</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {lista.map((n) => (
-                  <tr key={n.id}>
-                    <td className="px-4 py-2.5">
-                      <button type="button" onClick={() => setParams({ id: n.id })} className="font-semibold hover:text-primary hover:underline">
-                        {`NF ${n.numero}/${n.serie}`}
-                      </button>
-                    </td>
-                    <td className="px-4 py-2.5">{n.fornecedorNome}</td>
-                    <td className="px-4 py-2.5 text-muted">{data(n.emitidaEm)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{moeda(n.valorTotal)}</td>
-                    <td className="px-4 py-2.5">
-                      {n.status === 'Lancada' ? (
-                        <span className="rounded-full bg-success-soft px-2 py-0.5 text-xs font-semibold text-success">Lançada</span>
-                      ) : (
-                        <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning">
-                          {n.pendentes ? `Conferência: ${n.pendentes} de ${n.itens} pendente(s)` : 'Pronta para lançar'}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+      <BarraDeFiltros ativos={grade.ativos} onLimpar={grade.limpar}>
+        <label className="min-w-60 flex-1 text-sm">
+          <span className="mb-1 block font-semibold">Buscar</span>
+          <input value={grade.filtros.busca} onChange={(e) => grade.filtrar({ busca: e.target.value })} placeholder="Número, fornecedor, CNPJ ou chave" className={estilos.campo} />
+        </label>
+        <label className="w-48 text-sm">
+          <span className="mb-1 block font-semibold">Situação</span>
+          <select value={grade.filtros.situacao} onChange={(e) => grade.filtrar({ situacao: e.target.value })} className={estilos.campo}>
+            <option value="todas">Todas</option>
+            <option value="pendentes">Em conferência</option>
+            <option value="lancadas">Lançadas</option>
+            <option value="descartadas">Descartadas</option>
+          </select>
+        </label>
+        <label className="w-40 text-sm">
+          <span className="mb-1 block font-semibold">Emitida de</span>
+          <input type="date" value={grade.filtros.de} onChange={(e) => grade.filtrar({ de: e.target.value })} className={estilos.campo} />
+        </label>
+        <label className="w-40 text-sm">
+          <span className="mb-1 block font-semibold">Até</span>
+          <input type="date" value={grade.filtros.ate} onChange={(e) => grade.filtrar({ ate: e.target.value })} className={estilos.campo} />
+        </label>
+      </BarraDeFiltros>
+
+      <GradeDeRegistros
+        rotulo="Notas importadas"
+        colunas={colunas}
+        itens={dados?.itens ?? (erroDaLista ? [] : null)}
+        chave={(n) => n.id}
+        nome={(n) => `NF ${n.numero}/${n.serie}`}
+        total={dados?.total ?? 0}
+        {...grade.paginacao}
+        selecao={grade.selecao}
+        apagada={(n) => n.status === 'Descartada'}
+        vazio={grade.ativos ? 'Nenhuma nota com esses filtros.' : 'Nenhuma nota importada ainda.'}
+        acoes={(n) => <AcaoDaLinha rotulo={`Abrir NF ${n.numero}/${n.serie}`} icone="eye" onClick={() => onAbrir(n.id)} />}
+      />
     </div>
   )
 }
