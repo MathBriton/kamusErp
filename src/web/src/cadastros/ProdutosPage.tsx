@@ -86,7 +86,7 @@ export function ProdutosPage() {
     { titulo: 'Cores', celula: (p) => p.cores.join(', ') },
     { titulo: 'SKUs', celula: (p) => p.skus, alinhar: 'direita' },
     { titulo: 'Preço', celula: (p) => moeda(p.precoVenda), alinhar: 'direita' },
-    { titulo: 'Markup', celula: (p) => (p.markup === null ? '—' : decimal(p.markup)), alinhar: 'direita' },
+    { titulo: 'Markup', celula: (p) => (p.markup === null ? '—' : `${decimal(p.markup)}×`), alinhar: 'direita' },
     {
       titulo: 'Situação',
       celula: (p) => (
@@ -102,7 +102,7 @@ export function ProdutosPage() {
       <CabecalhoDaPagina
         secao="Cadastros"
         titulo="Produtos"
-        descricao="Cada produto gera um SKU por cor × tamanho, com código de barras próprio."
+        descricao="SKU é cada combinação de cor e tamanho de um produto, com código de barras próprio. Markup = preço de venda ÷ custo."
         acoes={
           <>
             <BotaoExportar relatorio="produtos" parametros={grade.parametros} selecionados={[...grade.selecionados]} />
@@ -252,6 +252,9 @@ function FormularioDeProduto({ produto, onFechar, onSalvo }: { produto: Produto 
   const { getJson, enviar } = useApi()
   const [grades, setGrades] = useState<Grade[]>([])
   const [cores, setCores] = useState<Cor[]>([])
+  const [carregado, setCarregado] = useState(false)
+  const [versaoDasListas, setVersaoDasListas] = useState(0)
+  const [criandoPadroes, setCriandoPadroes] = useState(false)
   const [sugestoes, setSugestoes] = useState<{ marcas: string[]; categorias: string[]; colecoes: string[] }>({ marcas: [], categorias: [], colecoes: [] })
   const [form, setForm] = useState({
     referencia: produto?.referencia ?? '', descricao: produto?.descricao ?? '', marca: produto?.marca ?? '', categoria: produto?.categoria ?? '',
@@ -274,10 +277,26 @@ function FormularioDeProduto({ produto, onFechar, onSalvo }: { produto: Produto 
         setGrades(g)
         setCores(c)
         setSugestoes(s)
+        setCarregado(true)
       })
       .catch(() => {})
     return () => controle.abort()
-  }, [getJson])
+  }, [getJson, versaoDasListas])
+
+  // Loja nova ainda sem grades/cores: cria as padrão aqui mesmo, sem abandonar o cadastro.
+  async function criarPadroes() {
+    setCriandoPadroes(true)
+    setErro(null)
+    try {
+      await enviar('POST', '/api/grades/padrao')
+      await enviar('POST', '/api/cores/padrao')
+      setVersaoDasListas((v) => v + 1)
+    } catch (falha) {
+      setErro(falha instanceof ErroDeApi ? falha.message : 'Não foi possível criar as grades e cores padrão.')
+    } finally {
+      setCriandoPadroes(false)
+    }
+  }
 
   const muda = (campo: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [campo]: e.target.value })
   const preco = lerNumero(form.precoVenda)
@@ -310,6 +329,15 @@ function FormularioDeProduto({ produto, onFechar, onSalvo }: { produto: Produto 
   return (
     <Dialogo titulo={produto ? `Editar ${produto.descricao}` : 'Novo produto'} onFechar={onFechar} largo>
       <form onSubmit={(e) => void salvar(e)} className="space-y-4">
+        {!produto && carregado && (grades.length === 0 || cores.length === 0) && (
+          <section aria-label="Grades e cores" className="rounded-xl border border-warning bg-warning-soft p-3 text-sm text-warning">
+            <p className="font-semibold">Antes do primeiro produto, a loja precisa de grades de tamanho e cores.</p>
+            <p className="mt-0.5">Crie as mais usadas (PP ao GG, 34 ao 46, infantil; branco, preto, azul...) e ajuste depois em Cadastros → Grades e cores.</p>
+            <button type="button" disabled={criandoPadroes} onClick={() => void criarPadroes()} className={`${estilos.botao} mt-2`}>
+              {criandoPadroes ? 'Criando...' : 'Adicionar grades e cores padrão'}
+            </button>
+          </section>
+        )}
         <div className="grid gap-3 sm:grid-cols-3">
           <Campo rotulo="Referência">
             <input value={form.referencia} onChange={muda('referencia')} disabled={!!produto} placeholder="CAM-001" className={estilos.campo} />
@@ -339,7 +367,7 @@ function FormularioDeProduto({ produto, onFechar, onSalvo }: { produto: Produto 
         {listas('sugestoes-marcas', sugestoes.marcas)}
         {listas('sugestoes-categorias', sugestoes.categorias)}
         {listas('sugestoes-colecoes', sugestoes.colecoes)}
-        {markup !== null && <p className="text-sm text-muted">{`Markup ${decimal(markup)}`}</p>}
+        {markup !== null && <p className="text-sm text-muted">{`Markup ${decimal(markup)}× (preço ÷ custo)`}</p>}
 
         <Campo rotulo="Grade de tamanhos">
           <select value={form.gradeId} onChange={muda('gradeId')} disabled={!!produto} className={estilos.campo}>

@@ -44,7 +44,7 @@ describe('Cadastros → Produtos', () => {
     expect(within(linha).getByText('Azul, Preto')).toBeInTheDocument()
     expect(within(linha).getByText('5')).toBeInTheDocument()
     expect(within(linha).getByText('R$ 59,90')).toBeInTheDocument()
-    expect(within(linha).getByText('2,50')).toBeInTheDocument()
+    expect(within(linha).getByText('2,50×')).toBeInTheDocument()
     expect(within(linha).getByText('Ativo')).toBeInTheDocument()
     expect(screen.getByText('1 registro')).toBeInTheDocument()
     expect(screen.getByText('Página 1 de 1')).toBeInTheDocument()
@@ -150,7 +150,7 @@ describe('Cadastros → Produtos', () => {
     await userEvent.type(within(dialogo).getByLabelText('Descrição'), 'Camiseta Básica Gola V')
     await userEvent.type(within(dialogo).getByLabelText('Preço de venda (R$)'), '59,90')
     await userEvent.type(within(dialogo).getByLabelText('Custo (R$)'), '24')
-    expect(within(dialogo).getByText('Markup 2,50')).toBeInTheDocument()
+    expect(within(dialogo).getByText('Markup 2,50× (preço ÷ custo)')).toBeInTheDocument()
     await userEvent.selectOptions(within(dialogo).getByLabelText('Grade de tamanhos'), 'g1')
     await userEvent.click(within(dialogo).getByRole('checkbox', { name: 'Azul' }))
     await userEvent.click(within(dialogo).getByRole('checkbox', { name: 'Preto' }))
@@ -159,6 +159,31 @@ describe('Cadastros → Produtos', () => {
 
     expect(enviado).toMatchObject({ referencia: 'CAM-001', descricao: 'Camiseta Básica Gola V', precoVenda: 59.9, precoCusto: 24, gradeId: 'g1', corIds: ['c1', 'c2'] })
     expect(await screen.findByRole('table', { name: 'Grade de Camiseta Básica Gola V' })).toBeInTheDocument()
+  })
+
+  it('loja sem grades nem cores: o formulário oferece criar as padrão sem sair do cadastro', async () => {
+    let criadas = false
+    api({
+      'GET /api/grades': () => json(criadas ? grades : []),
+      'GET /api/cores': () => json(criadas ? cores : []),
+      'POST /api/grades/padrao': () => {
+        criadas = true
+        return new Response(null, { status: 204 })
+      },
+      'POST /api/cores/padrao': () => new Response(null, { status: 204 }),
+    })
+    renderApp('/cadastros/produtos')
+    await screen.findByText('CAM-001')
+    expect(screen.getByText(/SKU é cada combinação de cor e tamanho/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Novo produto' }))
+    const dialogo = screen.getByRole('dialog', { name: 'Novo produto' })
+    const aviso = await within(dialogo).findByRole('region', { name: 'Grades e cores' })
+    await userEvent.click(within(aviso).getByRole('button', { name: 'Adicionar grades e cores padrão' }))
+
+    expect(await within(dialogo).findByRole('checkbox', { name: 'Azul' })).toBeInTheDocument()
+    expect(within(dialogo).getByRole('option', { name: /PP ao GG/ })).toBeInTheDocument()
+    expect(within(dialogo).queryByRole('region', { name: 'Grades e cores' })).not.toBeInTheDocument()
   })
 
   it('novo produto sem grade envia gradeId nulo e mostra a mensagem da API', async () => {
