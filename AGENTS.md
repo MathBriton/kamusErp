@@ -212,7 +212,7 @@ Para agir num tenant fora de uma requisição (rotina, painel), crie um escopo e
 
 ## 10. Estado atual e próximo passo (ATUALIZE AO TERMINAR)
 
-**Última atualização:** 2026-10-21 (tarde)
+**Última atualização:** 2026-10-22
 
 **Releases:** v0.1.0 → **v0.20.0** lançadas (a v0.20.0 trouxe a central de relatórios). Próxima: **v0.21.0** (segurança para produção).
 Plano de releases em `LEVANTAMENTO.md` → Plano de releases (v0.21.0 segurança, v0.22.0 robustez, v0.23.0 app nas lojas, v1.0.0 produção).
@@ -283,7 +283,13 @@ Plano de releases em `LEVANTAMENTO.md` → Plano de releases (v0.21.0 segurança
   para exportar das grades: vendedores, grades, cores, trocas, formas-de-pagamento, fechamentos-de-comissao, categorias-financeiras, contas-financeiras,
   lojas, notas-de-entrada, inventarios, usuarios, empresas; os existentes aceitam `ids`. Telas que não são lista (registrar venda, entrada/ajuste/
   transferência/etiquetas, importar planilha, fluxo de caixa, licença) só usam o cabeçalho padrão.
-- Testes: 581 backend (296 unit, 281 integração, 4 arquitetura), 227 web, 10 admin, 7 mobile. E2E em localhost: as 23 telas em grade (total, paginação,
+- **Correções do teste de uso (em `main`):** `Dialogo` com foco no 1º campo, Tab preso, Esc devolvendo o foco (pilha: só o de cima responde);
+  registro de venda com aviso "Antes de vender" (formas sem conta — `prontaParaVender`/`precisaDeConta` em `vendas/tipos.ts`), formas pendentes
+  desabilitadas no `EditorDePagamentos` (linha quebra no celular, "Remover" 40px), rascunho em `localStorage` (`kamus.rascunho-venda.{usuario}.{empresa}`),
+  data por extenso; tabela de itens rola sozinha no celular; produto explica SKU/markup e oferece "Adicionar grades e cores padrão"; etapa
+  `formas_de_pagamento` nos primeiros passos (Vendas `ProgressoDaImplantacao`); WhatsApp/consultoria só com `VITE_SUPORTE_WHATSAPP`; login com
+  apresentação no celular e "Ainda não tem acesso?".
+- Testes: 582 backend (296 unit, 282 integração, 4 arquitetura), 237 web, 10 admin, 7 mobile. E2E em localhost: as 23 telas em grade (total, paginação,
   filtros, seleção, exportar), CSV só dos selecionados, formas desativadas em lote, pagar selecionadas, histórico paginado, tema escuro — 3 execuções.
 
 **Próximo passo — v0.21.0: segurança para produção** (ver `README.md` → débitos "antes de ir para produção"):

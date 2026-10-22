@@ -205,8 +205,10 @@ O detalhamento das regras de negócio está no [LEVANTAMENTO.md](LEVANTAMENTO.md
 | 72 | Curva ABC (80% / 95%) e "sem giro" a partir de 60 dias — bons cortes para moda? | Provisório (v0.20.0); os dias do sem giro são escolhidos na tela |
 | 69 | App mobile: o que mais o dono quer ver no celular (estoque por produto, crediário, condicionais em lista)? | Provisório (v0.19.0): Início (dashboard), vendas de hoje, contas a pagar/receber de 7 dias e avisos; o resto pelo web |
 | 70 | Publicação nas lojas (Google Play / App Store), nome e ícone do app | Em aberto: precisa de conta de desenvolvedor e projeto EAS; hoje roda pelo Expo Go / navegador |
-| 71 | Número de WhatsApp do atendimento/implantação Kamus (botão flutuante e card "Implantação assistida" do dashboard) — e se haverá "assistente virtual" (bot) | Em aberto: configurável em `VITE_SUPORTE_WHATSAPP` (só dígitos, com DDI); sem número, os botões avisam que o contato não foi configurado |
-| 72 | Design system "Sartorial Modernist" (verde, Plus Jakarta Sans) vale para o sistema todo? Painel Administrativo e app mobile ainda usam a paleta antiga (índigo) | Provisório: aplicado aos tokens de toda a web do cliente; Painel e app mobile pendentes de confirmação |
+| 73 | Número de WhatsApp do atendimento/implantação Kamus (botão flutuante e card "Implantação assistida" do dashboard) — e se haverá "assistente virtual" (bot) | Em aberto: configurável em `VITE_SUPORTE_WHATSAPP` (só dígitos, com DDI); **sem número, o botão e o card não aparecem** (teste de uso: prometer ajuda que não existe frustra) |
+| 74 | Design system "Sartorial Modernist" (verde, Plus Jakarta Sans) vale para o sistema todo? Painel Administrativo e app mobile ainda usam a paleta antiga (índigo) | Provisório: aplicado aos tokens de toda a web do cliente; Painel e app mobile pendentes de confirmação |
+| 75 | Rascunho da venda fica só no navegador (por usuário e empresa): trocar de computador perde o rascunho — basta para a loja? | Provisório: sim; rascunho no servidor se a loja pedir |
+| 76 | Login: texto de apresentação ("Sua loja de roupas, organizada", nota fiscal no emissor atual, "atualizados a cada minuto") | Provisório; revisar com o dono (copy de marketing) |
 | 68 | Resumo diário por e-mail e push no celular | Push implementado (v0.19.0): toda notificação do sininho, inclusive o resumo, vai para os aparelhos do usuário; e-mail quando houver servidor de envio |
 
 ### Débitos técnicos
