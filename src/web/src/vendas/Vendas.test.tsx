@@ -148,6 +148,59 @@ describe('Vendas → Registrar venda', () => {
     expect(screen.getByRole('table', { name: 'Itens da venda' })).toBeInTheDocument()
   })
 
+  it('forma que entra na hora sem conta aparece pendente e não pode ser escolhida; remover tem nome claro', async () => {
+    api({ 'GET /api/produtos/por-codigo/7891234567895': () => json(porCodigo) })
+    renderApp('/vendas/registro')
+    await userEvent.type(await campoLiberado('Código de barras'), '7891234567895{Enter}')
+    await screen.findByRole('table', { name: 'Itens da venda' })
+
+    const pix = within(screen.getByLabelText('Forma do pagamento 1')).getByRole('option', { name: 'PIX — falta configurar a conta' })
+    expect(pix).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Adicionar forma de pagamento' }))
+    expect(screen.getByLabelText('Forma do pagamento 2')).toHaveValue('f4')
+    expect(screen.getByRole('button', { name: 'Remover pagamento 2' })).toBeInTheDocument()
+  })
+
+  it('sem forma de pagamento pronta, avisa antes de montar a venda com o atalho para configurar', async () => {
+    api({ 'GET /api/vendas/formas': () => json([{ ...formas[0], contaId: null }]) })
+    renderApp('/vendas/registro')
+
+    const aviso = await screen.findByRole('region', { name: 'Antes de vender' })
+    expect(aviso).toHaveTextContent('Dinheiro precisa de uma conta financeira')
+    expect(within(aviso).getByRole('link', { name: /Configurar formas de pagamento/ })).toHaveAttribute('href', '/vendas/formas-de-pagamento')
+  })
+
+  it('sair no meio da venda e voltar recupera o rascunho; descartar limpa', async () => {
+    api({
+      'GET /api/produtos/por-codigo/7891234567895': () => json(porCodigo),
+      'GET /api/vendas/formas?situacao=todas&pagina=1&tamanho=20': () => json({ itens: formas, total: 3, pagina: 1, tamanho: 20 }),
+    })
+    renderApp('/vendas/registro')
+    await userEvent.type(await campoLiberado('Código de barras'), '7891234567895{Enter}')
+    await screen.findByRole('table', { name: 'Itens da venda' })
+    await userEvent.type(screen.getByLabelText('Nota externa (opcional)'), 'NFC-e 5')
+
+    const menu = screen.getByRole('navigation', { name: 'Menu principal' })
+    await userEvent.click(within(menu).getByRole('link', { name: 'Formas de pagamento' }))
+    await screen.findByRole('heading', { name: 'Formas de pagamento' })
+    await userEvent.click(within(menu).getByRole('link', { name: 'Registrar venda' }))
+
+    expect(await screen.findByRole('table', { name: 'Itens da venda' })).toHaveTextContent('Camiseta básica · Azul M')
+    expect(screen.getByLabelText('Nota externa (opcional)')).toHaveValue('NFC-e 5')
+    expect(screen.getByRole('status', { name: 'Rascunho' })).toHaveTextContent('Recuperamos a venda que estava em andamento')
+    await userEvent.click(screen.getByRole('button', { name: 'Descartar rascunho' }))
+    expect(screen.queryByRole('table', { name: 'Itens da venda' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Nota externa (opcional)')).toHaveValue('')
+  })
+
+  it('mostra a data da venda por extenso', async () => {
+    api()
+    renderApp('/vendas/registro')
+    await screen.findByLabelText('Data')
+    const extenso = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${hojeIso()}T12:00:00Z`))
+    expect(screen.getByText(extenso, { exact: false })).toBeInTheDocument()
+  })
+
   it('o vendedor já vem escolhido para quem está vinculado a ele', async () => {
     api({}, sessaoVendedor)
     renderApp('/vendas/registro')

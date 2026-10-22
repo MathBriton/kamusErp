@@ -324,3 +324,9 @@ export interface RegrasDeVenda {
 
 /** 1 → "1 peça", 3 → "3 peças". */
 export const pecas = (n: number) => `${n} ${n === 1 ? 'peça' : 'peças'}`
+
+/** Dinheiro e PIX entram no caixa na hora: sem conta financeira a API recusa a venda. */
+export const precisaDeConta = (f: FormaDePagamento) => f.tipo === 'Dinheiro' || f.tipo === 'Pix'
+
+/** Forma que pode ser usada numa venda agora (ativa e, se entra na hora, com conta configurada). */
+export const prontaParaVender = (f: FormaDePagamento) => f.ativa && (!precisaDeConta(f) || !!f.contaId)

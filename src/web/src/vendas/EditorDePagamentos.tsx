@@ -5,7 +5,7 @@ import { decimal, moeda } from '../cadastros/catalogo'
 import { estilos } from '../components/estilos'
 import { dataBr } from '../financeiro/tipos'
 import { calcularPagamentos, novaLinha, type PagamentoDigitado } from './itens'
-import type { FormaDePagamento, ValeTroca } from './tipos'
+import { prontaParaVender, type FormaDePagamento, type ValeTroca } from './tipos'
 
 interface Props {
   formas: FormaDePagamento[]
@@ -23,7 +23,8 @@ export function EditorDePagamentos({ formas, total, linhas, onLinhas, clienteId 
   const mudar = (indice: number, mudanca: Partial<PagamentoDigitado>) => onLinhas(linhas.map((p, i) => (i === indice ? { ...p, ...mudanca } : p)))
 
   const adicionar = () => {
-    const outra = formas.find((f) => !linhas.some((p) => p.formaId === f.id)) ?? formas[0]
+    const prontas = formas.filter(prontaParaVender)
+    const outra = prontas.find((f) => !linhas.some((p) => p.formaId === f.id)) ?? prontas[0]
     if (!outra) return
     // Congela os valores atuais e deixa a nova forma cobrir o que falta.
     onLinhas([...linhas.map((p, i) => ({ ...p, valor: decimal(valores[i] ?? 0) })), novaLinha(outra)])
@@ -35,7 +36,8 @@ export function EditorDePagamentos({ formas, total, linhas, onLinhas, clienteId 
         const f = forma(p.formaId)
         return (
           <div key={i} className="space-y-2">
-            <div className="grid grid-cols-[minmax(0,1fr)_7rem_4.5rem_4rem] items-center gap-2">
+            {/* No celular a forma ocupa a linha inteira e valor/parcelas/remover vêm embaixo: o nome da forma nunca some. */}
+            <div className="flex flex-wrap items-center gap-2">
               <select
                 aria-label={`Forma do pagamento ${i + 1}`}
                 value={p.formaId}
@@ -43,10 +45,12 @@ export function EditorDePagamentos({ formas, total, linhas, onLinhas, clienteId 
                   const nova = forma(e.target.value)
                   mudar(i, { formaId: e.target.value, parcelas: 1, valeCodigo: nova?.tipo === 'ValeTroca' ? '' : undefined })
                 }}
-                className={estilos.campo}
+                className={`${estilos.campo} min-w-0 basis-full sm:flex-1 sm:basis-48`}
               >
                 {formas.map((x) => (
-                  <option key={x.id} value={x.id}>{x.nome}</option>
+                  <option key={x.id} value={x.id} disabled={!prontaParaVender(x)}>
+                    {prontaParaVender(x) ? x.nome : `${x.nome} — falta configurar a conta`}
+                  </option>
                 ))}
               </select>
               <input
@@ -54,29 +58,32 @@ export function EditorDePagamentos({ formas, total, linhas, onLinhas, clienteId 
                 value={p.valor ?? decimal(valores[i] ?? 0)}
                 onChange={(e) => mudar(i, { valor: e.target.value })}
                 inputMode="decimal"
-                className={`${estilos.campo} text-right`}
+                className={`${estilos.campo} w-28 flex-1 text-right sm:flex-none`}
               />
               {f && f.maxParcelas > 1 ? (
                 <select
                   aria-label={`Parcelas do pagamento ${i + 1}`}
                   value={p.parcelas}
                   onChange={(e) => mudar(i, { parcelas: Number(e.target.value) })}
-                  className={estilos.campo}
+                  className={`${estilos.campo} w-20`}
                 >
                   {Array.from({ length: f.maxParcelas }, (_, n) => n + 1).map((n) => (
                     <option key={n} value={n}>{`${n}x`}</option>
                   ))}
                 </select>
               ) : (
-                <span className="text-center text-xs text-muted">1x</span>
+                <span className="w-10 text-center text-xs text-muted">1x</span>
               )}
               {linhas.length > 1 ? (
-                <button type="button" onClick={() => onLinhas(linhas.filter((_, x) => x !== i))} className="text-xs text-danger hover:underline">
+                <button
+                  type="button"
+                  aria-label={`Remover pagamento ${i + 1}`}
+                  onClick={() => onLinhas(linhas.filter((_, x) => x !== i))}
+                  className="h-10 rounded-lg px-3 text-sm font-medium text-danger hover:bg-danger-soft"
+                >
                   Remover
                 </button>
-              ) : (
-                <span />
-              )}
+              ) : null}
             </div>
             {f?.tipo === 'ValeTroca' && <CodigoDoVale indice={i + 1} codigo={p.valeCodigo ?? ''} onCodigo={(c) => mudar(i, { valeCodigo: c })} />}
             {f?.tipo === 'Crediario' && clienteId !== undefined && <SituacaoDoCrediario clienteId={clienteId} />}

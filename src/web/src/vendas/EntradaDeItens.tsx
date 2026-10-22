@@ -122,53 +122,61 @@ export function EntradaDeItens({ lojaId, itens, onItens, onErro, rotulo, botaoDa
       )}
 
       {itens.length > 0 && (
-        <table aria-label={rotulo} className="mt-4 w-full text-sm">
-          <thead className="text-left text-xs text-muted uppercase">
-            <tr>
-              <th className="py-2">Produto</th>
-              <th className="w-20 py-2 text-right">Qtd.</th>
-              <th className="py-2 text-right">Preço</th>
-              {!semDesconto && <th className="w-28 py-2 text-right">Desconto (R$)</th>}
-              <th className="py-2 text-right">Total</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {itens.map((i) => (
-              <tr key={i.skuId}>
-                <td className="py-2 font-semibold">{i.descricao}</td>
-                <td className="py-2">
-                  <input
-                    aria-label={`Quantidade de ${i.descricao}`}
-                    value={i.quantidade}
-                    onChange={(e) => mudar(i.skuId, 'quantidade', e.target.value)}
-                    inputMode="numeric"
-                    className="h-9 w-full rounded-lg border border-border bg-surface px-2 text-right tabular-nums"
-                  />
-                </td>
-                <td className="py-2 text-right tabular-nums">{moeda(i.preco)}</td>
-                {!semDesconto && (
-                  <td className="py-2 pl-2">
+        // No celular a tabela rola dentro do próprio quadro (nada escapa da borda nem fica espremido).
+        <div className="mt-4 -mx-1 overflow-x-auto px-1">
+          <table aria-label={rotulo} className="w-full min-w-[34rem] text-sm">
+            <thead className="text-left text-xs text-muted uppercase">
+              <tr>
+                <th className="py-2">Produto</th>
+                <th className="w-20 py-2 text-right">Qtd.</th>
+                <th className="py-2 text-right">Preço</th>
+                {!semDesconto && <th className="w-28 py-2 text-right">Desconto (R$)</th>}
+                <th className="py-2 text-right">Total</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {itens.map((i) => (
+                <tr key={i.skuId}>
+                  <td className="py-2 pr-2 font-semibold">{i.descricao}</td>
+                  <td className="py-2">
                     <input
-                      aria-label={`Desconto de ${i.descricao}`}
-                      value={i.desconto}
-                      onChange={(e) => mudar(i.skuId, 'desconto', e.target.value)}
-                      inputMode="decimal"
-                      placeholder="0,00"
+                      aria-label={`Quantidade de ${i.descricao}`}
+                      value={i.quantidade}
+                      onChange={(e) => mudar(i.skuId, 'quantidade', e.target.value)}
+                      inputMode="numeric"
                       className="h-9 w-full rounded-lg border border-border bg-surface px-2 text-right tabular-nums"
                     />
                   </td>
-                )}
-                <td className="py-2 text-right font-semibold tabular-nums">{moeda(totalDoItem(i))}</td>
-                <td className="py-2 text-right">
-                  <button type="button" onClick={() => onItens((atual) => atual.filter((x) => x.skuId !== i.skuId))} className="text-xs text-danger hover:underline">
-                    Remover
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  <td className="py-2 text-right tabular-nums">{moeda(i.preco)}</td>
+                  {!semDesconto && (
+                    <td className="py-2 pl-2">
+                      <input
+                        aria-label={`Desconto de ${i.descricao}`}
+                        value={i.desconto}
+                        onChange={(e) => mudar(i.skuId, 'desconto', e.target.value)}
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        className="h-9 w-full rounded-lg border border-border bg-surface px-2 text-right tabular-nums"
+                      />
+                    </td>
+                  )}
+                  <td className="py-2 text-right font-semibold tabular-nums">{moeda(totalDoItem(i))}</td>
+                  <td className="py-2 text-right">
+                    <button
+                      type="button"
+                      aria-label={`Remover ${i.descricao}`}
+                      onClick={() => onItens((atual) => atual.filter((x) => x.skuId !== i.skuId))}
+                      className="ml-1 h-10 rounded-lg px-3 text-sm font-medium text-danger hover:bg-danger-soft"
+                    >
+                      Remover
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </>
   )
