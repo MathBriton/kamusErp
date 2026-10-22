@@ -63,6 +63,10 @@ public sealed class IndicadoresTests : IAsyncDisposable
         var pix = (await client.GetFromJsonAsync<List<FormaDto>>(U("/api/vendas/formas"), Ct))!.Single(f => f.Tipo == "Pix");
         (await client.PutAsJsonAsync(U($"/api/vendas/formas/{pix.Id}"), new { pix.Nome, pix.Tipo, contaId = caixa.Id, pix.TaxaAVista, pix.TaxaParcelado, pix.MaxParcelas, pix.PrazoDias }, Ct))
             .EnsureSuccessStatusCode();
+        var dinheiro = (await client.GetFromJsonAsync<List<FormaDto>>(U("/api/vendas/formas"), Ct))!.Single(f => f.Tipo == "Dinheiro");
+        (await client.PutAsJsonAsync(U($"/api/vendas/formas/{dinheiro.Id}"),
+            new { dinheiro.Nome, dinheiro.Tipo, contaId = caixa.Id, dinheiro.TaxaAVista, dinheiro.TaxaParcelado, dinheiro.MaxParcelas, dinheiro.PrazoDias }, Ct))
+            .EnsureSuccessStatusCode();
         var maria = (await (await client.PostAsJsonAsync(U("/api/pessoas"), new { tipo = "Fisica", nome = "Maria Souza", ehCliente = true, ehFornecedor = false, aceitaMarketing = false }, Ct))
             .Content.ReadFromJsonAsync<PessoaDto>(Ct))!;
         var c = new Cenario(client, camiseta, loja.Id, pix, maria);
@@ -152,7 +156,18 @@ public sealed class IndicadoresTests : IAsyncDisposable
         var c = await Preparar();
 
         var depois = (await c.Client.GetFromJsonAsync<DashboardDto>(U("/api/indicadores?periodo=hoje"), Ct))!;
-        depois.PrimeirosPassos.ShouldBe(["produtos", "clientes", "entrada_de_estoque", "contas_a_pagar", "primeira_venda"], ignoreOrder: true);
+        depois.PrimeirosPassos.ShouldBe(["produtos", "clientes", "entrada_de_estoque", "contas_a_pagar", "formas_de_pagamento", "primeira_venda"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task Dashboard_PrimeirosPassos_FormasSoContamComDinheiroEPixLigadosAUmaConta()
+    {
+        var client = await Entrar(_api);
+        (await client.PostAsync(U("/api/vendas/formas/padrao"), null, Ct)).EnsureSuccessStatusCode();
+
+        var d = (await client.GetFromJsonAsync<DashboardDto>(U("/api/indicadores?periodo=hoje"), Ct))!;
+
+        d.PrimeirosPassos.ShouldNotContain("formas_de_pagamento");
     }
 
     [Fact]

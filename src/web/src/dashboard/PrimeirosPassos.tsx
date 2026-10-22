@@ -2,10 +2,11 @@ import { Link } from 'react-router'
 import { Icone } from '../components/Icone'
 
 const ETAPAS = [
-  { codigo: 'produtos', titulo: 'Cadastrar produtos', descricao: 'Grade de cor × tamanho ou importação por planilha (XLSX/CSV).', acao: 'Cadastrar →', rota: '/cadastros/produtos' },
+  { codigo: 'produtos', titulo: 'Cadastrar produtos', descricao: 'Cor × tamanho (grades e cores padrão com um clique no próprio cadastro) ou planilha XLSX/CSV.', acao: 'Cadastrar →', rota: '/cadastros/produtos' },
   { codigo: 'clientes', titulo: 'Cadastrar clientes', descricao: 'Ficha com tamanhos preferidos e WhatsApp em 1 clique.', acao: 'Adicionar →', rota: '/cadastros/clientes' },
   { codigo: 'entrada_de_estoque', titulo: 'Dar entrada no estoque', descricao: 'Matriz de grade ou importação do XML da NF-e.', acao: 'Importar XML', rota: '/estoque/xml' },
   { codigo: 'contas_a_pagar', titulo: 'Lançar contas a pagar', descricao: 'Fornecedores, aluguel e custos fixos.', acao: 'Lançar →', rota: '/financeiro/contas-a-pagar' },
+  { codigo: 'formas_de_pagamento', titulo: 'Configurar formas de pagamento', descricao: 'Dinheiro e PIX precisam da conta onde o dinheiro cai (ex.: Caixa da loja); desative o que a loja não usa.', acao: 'Configurar →', rota: '/vendas/formas-de-pagamento' },
   { codigo: 'primeira_venda', titulo: 'Registrar a primeira venda', descricao: 'Baixa o estoque e lança no financeiro automaticamente.', acao: 'Registrar venda', rota: '/vendas/registro', marco: true },
 ]
 

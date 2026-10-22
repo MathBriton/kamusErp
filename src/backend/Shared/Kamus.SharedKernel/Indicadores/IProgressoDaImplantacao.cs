@@ -7,6 +7,7 @@ public static class EtapasDaImplantacao
     public const string Clientes = "clientes";
     public const string EntradaDeEstoque = "entrada_de_estoque";
     public const string ContasAPagar = "contas_a_pagar";
+    public const string FormasDePagamento = "formas_de_pagamento";
     public const string PrimeiraVenda = "primeira_venda";
 }
 
