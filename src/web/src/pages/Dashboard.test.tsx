@@ -38,7 +38,7 @@ const dashboard = (extra = {}) => ({
     { tipo: 'contas_a_pagar_vencidas', gravidade: 'perigo', titulo: '1 conta a pagar vencida', detalhe: 'R$ 50,00 em atraso', link: '/financeiro/contas-a-pagar' },
     { tipo: 'condicionais_atrasadas', gravidade: 'perigo', titulo: '1 condicional atrasada', detalhe: 'Passaram do prazo de devolução', link: '/vendas/condicional' },
   ],
-  primeirosPassos: ['produtos', 'clientes', 'entrada_de_estoque', 'contas_a_pagar', 'primeira_venda'],
+  primeirosPassos: ['produtos', 'clientes', 'entrada_de_estoque', 'contas_a_pagar', 'formas_de_pagamento', 'primeira_venda'],
   ...extra,
 })
 const vazio = () =>
@@ -146,11 +146,15 @@ describe('Dashboard', () => {
     const { unmount } = renderApp()
 
     const passos = await screen.findByRole('region', { name: 'Primeiros passos' })
-    expect(within(passos).getByText('2 de 5 concluídos')).toBeInTheDocument()
+    expect(within(passos).getByText('2 de 6 concluídos')).toBeInTheDocument()
     expect(within(passos).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '2')
     expect(within(passos).getByRole('listitem', { name: /Cadastrar produtos/ })).toHaveTextContent('Concluído')
     expect(within(passos).getByRole('link', { name: /Importar XML/ })).toHaveAttribute('href', '/estoque/xml')
     expect(within(passos).getByRole('link', { name: /Lançar/ })).toHaveAttribute('href', '/financeiro/contas-a-pagar')
+    expect(within(passos).getByRole('link', { name: /Configurar/ })).toHaveAttribute('href', '/vendas/formas-de-pagamento')
+    expect(within(passos).getAllByRole('listitem').map((i) => i.getAttribute('aria-label'))).toEqual([
+      'Cadastrar produtos', 'Cadastrar clientes', 'Dar entrada no estoque', 'Lançar contas a pagar', 'Configurar formas de pagamento', 'Registrar a primeira venda',
+    ])
     expect(within(passos).getByRole('link', { name: /Registrar venda/ })).toHaveAttribute('href', '/vendas/registro')
     expect(within(passos).getByText('Marco')).toBeInTheDocument()
     unmount()
@@ -192,8 +196,22 @@ describe('Dashboard', () => {
     expect(within(estoque).getByRole('link', { name: /Etiquetas/ })).toHaveAttribute('href', '/estoque/etiquetas')
     expect(within(estoque).getByRole('link', { name: /Grades e cores/ })).toHaveAttribute('href', '/cadastros/grades')
     expect(within(estoque).getByRole('link', { name: /Ajustes/ })).toHaveAttribute('href', '/estoque/ajustes')
-    expect(screen.getByRole('region', { name: 'Consultoria e implantação' })).toBeInTheDocument()
-    expect(screen.getByRole('complementary', { name: 'Atendimento pelo WhatsApp' })).toHaveTextContent('Dúvidas? Fale com a assistente virtual')
+    // Sem número de atendimento configurado, nada de prometer ajuda que não existe.
+    expect(screen.queryByRole('region', { name: 'Consultoria e implantação' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('complementary', { name: 'Atendimento pelo WhatsApp' })).not.toBeInTheDocument()
+  })
+
+  it('com o número de atendimento configurado, mostra o WhatsApp e o card de implantação com link', async () => {
+    vi.stubEnv('VITE_SUPORTE_WHATSAPP', '+55 (11) 99999-0000')
+    try {
+      api()
+      renderApp()
+      const atendimento = await screen.findByRole('complementary', { name: 'Atendimento pelo WhatsApp' })
+      expect(within(atendimento).getByRole('link', { name: 'Abrir conversa no WhatsApp' })).toHaveAttribute('href', expect.stringContaining('https://wa.me/5511999990000'))
+      expect(within(screen.getByRole('region', { name: 'Consultoria e implantação' })).getByRole('link', { name: /Falar com um consultor/ })).toBeInTheDocument()
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 
   it('trocar o período busca de novo e muda o título do cartão', async () => {

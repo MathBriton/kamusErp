@@ -39,11 +39,12 @@ export function LoginPage() {
           <h2 className="text-4xl leading-tight font-bold tracking-tight">
             Sua loja de roupas,
             <br />
-            organizada de ponta a ponta.
+            organizada.
           </h2>
           <p className="mt-4 text-base leading-relaxed text-white/80">
-            Estoque em grade (cor × tamanho), financeiro e indicadores em tempo real — na web e no celular.
+            Estoque em grade (cor × tamanho), vendas, financeiro e indicadores atualizados a cada minuto — na web e no celular.
           </p>
+          <p className="mt-3 text-sm leading-relaxed text-white/70">A nota fiscal continua no emissor que a loja já usa.</p>
         </div>
         <p className="mt-10 text-xs text-white/60">© 2026 Kamus</p>
       </section>
@@ -61,6 +62,11 @@ export function LoginPage() {
         <form onSubmit={onSubmit} noValidate className="m-auto w-full max-w-sm py-10">
           <h1 className="text-3xl font-bold tracking-tight">Entrar</h1>
           <p className="mt-1.5 mb-7 text-muted">Acesse o painel da sua loja.</p>
+          {/* No celular o painel da marca some: o resumo do produto vem aqui. */}
+          <div className="-mt-4 mb-6 rounded-xl bg-surface-2 p-3 text-xs leading-relaxed text-muted lg:hidden">
+            <p>Estoque em grade (cor × tamanho), vendas e financeiro da sua loja de roupas, com indicadores atualizados a cada minuto.</p>
+            <p className="mt-1">A nota fiscal continua no emissor que a loja já usa.</p>
+          </div>
 
           <label htmlFor="email" className="mb-1.5 block text-sm font-semibold">
             E-mail
@@ -125,6 +131,10 @@ export function LoginPage() {
             {enviando ? 'Entrando...' : 'Entrar'}
             {!enviando && <Icone nome="arrowRight" />}
           </button>
+
+          <p className="mt-5 text-center text-sm text-muted">
+            Ainda não tem acesso? Peça ao responsável pela loja para criar seu usuário em Administrativo → Usuários e senhas.
+          </p>
 
           {import.meta.env.DEV && (
             <div className="mt-7 rounded-lg border border-dashed border-warning bg-warning-soft px-3.5 py-3 text-xs leading-relaxed text-warning">

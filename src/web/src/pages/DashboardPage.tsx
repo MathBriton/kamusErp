@@ -324,6 +324,8 @@ function AcoesRapidas({ acoes }: { acoes: typeof ACOES_RAPIDAS }) {
 
 function Consultoria() {
   const link = linkDoWhatsApp('Olá! Quero ajuda com a implantação do Kamus na minha loja.')
+  // Sem canal de atendimento configurado, o card não aparece (não prometemos ajuda que não existe).
+  if (!link) return null
   return (
     <section aria-label="Consultoria e implantação" className="overflow-hidden rounded-2xl border border-primary bg-primary-soft p-6">
       <span className="grid size-10 place-items-center rounded-xl bg-primary text-primary-foreground">
@@ -333,14 +335,10 @@ function Consultoria() {
       <p className="mt-1 text-sm text-muted">
         Ajuda para montar as grades, importar planilhas, cadastrar o estoque inicial e treinar a equipe da loja.
       </p>
-      {link ? (
-        <a href={link} target="_blank" rel="noreferrer" className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary-hover">
-          Falar com um consultor
-          <Icone nome="arrowRight" className="size-4" />
-        </a>
-      ) : (
-        <p className="mt-4 text-xs font-semibold text-primary">Fale com a equipe Kamus pelo canal de atendimento da sua assinatura.</p>
-      )}
+      <a href={link} target="_blank" rel="noreferrer" className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary-hover">
+        Falar com um consultor
+        <Icone nome="arrowRight" className="size-4" />
+      </a>
     </section>
   )
 }

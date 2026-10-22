@@ -20,6 +20,20 @@ describe('Login', () => {
     expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeInTheDocument()
   })
 
+  it('explica o produto sem exagero (fiscal continua no emissor atual) e como conseguir acesso, também no celular', async () => {
+    mockApi({ ...semSessao, ...health })
+    renderApp()
+    await screen.findByRole('heading', { name: 'Entrar' })
+
+    // Texto do celular (o painel da marca some em telas pequenas).
+    expect(screen.getByText(/Estoque em grade \(cor × tamanho\), vendas e financeiro da sua loja de roupas/)).toBeInTheDocument()
+    expect(screen.getAllByText(/A nota fiscal continua no emissor que a loja já usa/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/atualizados a cada minuto/).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/de ponta a ponta/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/tempo real/)).not.toBeInTheDocument()
+    expect(screen.getByText(/Ainda não tem acesso\?/)).toHaveTextContent('Peça ao responsável pela loja')
+  })
+
   it('com sessão ativa (cookie válido) entra direto', async () => {
     mockApi({ 'POST /api/auth/refresh': () => json(sessaoDemo), ...health })
     renderApp()
