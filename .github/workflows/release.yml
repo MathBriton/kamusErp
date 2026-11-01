@@ -33,7 +33,7 @@ jobs:
         with:
           fetch-depth: 0 # histórico e tags completos para calcular a versão
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
